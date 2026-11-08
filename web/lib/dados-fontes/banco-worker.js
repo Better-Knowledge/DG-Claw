@@ -1,11 +1,19 @@
 'use strict';
-// Worker do banco SQLite: roda UMA consulta (ou uma instrução de escrita já aprovada) fora do event loop do
-// Web, para uma consulta pesada não travar o chat, a caixa e as aprovações. O chamador (ferramenta.js) impõe
-// o prazo e encerra o worker se ele passar. Entrada em workerData: { arquivo, sql, bind, acao, max }.
-const { parentPort, workerData } = require('node:worker_threads');
+// Processo filho do banco SQLite: roda UMA consulta (ou uma instrução de escrita já aprovada) fora do Web, para
+// uma consulta pesada não travar o chat, a caixa e as aprovações, e para o prazo valer de verdade: o chamador
+// (ferramenta.js) mata o processo com SIGKILL quando estoura, o que interrompe o SQLite no meio e deixa o
+// journal desfazer a escrita não confirmada. Entrada: JSON em stdin { arquivo, sql, bind, acao, max };
+// saída: JSON em stdout { ok } ou { erro: { status, mensagem } }.
+let entrada = '';
+process.stdin.setEncoding('utf8');
+process.stdin.on('data', (c) => { entrada += c; });
+process.stdin.on('end', () => {
+  let d;
+  try { d = JSON.parse(entrada); } catch (e) { process.stdout.write(JSON.stringify({ erro: { status: 500, mensagem: 'entrada do processo do banco inválida' } })); return; }
+  process.stdout.write(JSON.stringify(roda(d)));
+});
 
-function roda() {
-  const { arquivo, sql, bind, acao, max } = workerData;
+function roda({ arquivo, sql, bind, acao, max }) {
   let sqlite;
   try { sqlite = require('node:sqlite'); } catch (e) { return { erro: { status: 503, mensagem: 'Este Node não tem o módulo node:sqlite; o banco não pode ser consultado.' } }; }
   let db;
@@ -21,5 +29,3 @@ function roda() {
     return { erro: { status: 502, mensagem: `A consulta falhou no banco (${String(e.message).slice(0, 200)}).` } };
   } finally { try { db.close(); } catch (_) { /* já fechado */ } }
 }
-
-parentPort.postMessage(roda());

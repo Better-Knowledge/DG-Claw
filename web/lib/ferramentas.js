@@ -77,6 +77,7 @@ function validaOperacao(tipo, nomeOp, op, onde, erros) {
   if (tipo === 'api') {
     if (!METODOS.includes(op.metodo)) erros.push(`${o}.metodo precisa ser um de: ${METODOS.join(', ')}.`);
     if (typeof op.rota !== 'string' || !op.rota.startsWith('/') || op.rota.length > 300 || /[\s\u0000-\u001f\u007f?#]/.test(op.rota)) erros.push(`${o}.rota precisa começar por "/", sem espaço, "?" ou "#", até 300 caracteres (use {nome} para encaixar um parâmetro).`);
+    else if (new URL('https://x' + op.rota.replace(/\{[^}]*\}/g, 'p')).pathname !== op.rota.replace(/\{[^}]*\}/g, 'p')) erros.push(`${o}.rota tem caractere que a URL codificaria (acento, espaço, aspas, "<", ">"); escreva a rota já codificada (ex.: %C3%A7) ou só com letras, números e "/ . _ - ~".`);
     else {
       for (const m of op.rota.matchAll(/\{([^}]*)\}/g)) {
         if (!op.params || !Object.prototype.hasOwnProperty.call(op.params, m[1])) { erros.push(`${o}.rota usa {${m[1].slice(0, 40)}}, que não está em "params".`); continue; }

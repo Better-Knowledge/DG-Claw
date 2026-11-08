@@ -1440,6 +1440,9 @@ agente_recriar() {
         falha "o agente $slug nao esta em $DG_REGISTRO, entao nao sei a faixa de uid dele e nao recrio o container." \
               "nao mexi em nada. Confira o arquivo e, se o agente e antigo, peca ajuda antes de continuar."
     fi
+    # Antes de decidir se o container muda: estes arquivos sao da casa e valem mesmo com o agente parado.
+    passo "Garantindo o servidor MCP de dados e as tools dele"
+    garantir_mcp_dados "$slug"
 
     estado="$(estado_container "$slug")"
     case "$estado" in
@@ -1475,8 +1478,6 @@ agente_recriar() {
         rm -f "$unidades"
     fi
 
-    passo "Garantindo o servidor MCP de dados e as tools dele"
-    garantir_mcp_dados "$slug"
     passo "Trocando o container do agente $slug pelo da imagem atual"
     C_RECRIANDO="$slug"; C_RECRIOU=0
     trap '_recriar_ao_sair' EXIT
@@ -2071,13 +2072,16 @@ base_main() {
 garantir_mcp_dados() {
     local slug="$1" casa="$DG_CASAS/$1" mcp rj novo ug
     mcp="$casa/home/.plataforma/dgchat.mcp.json"; rj="$casa/runner/runner.json"
-    if [ -f "$mcp" ]; then
+    # A pasta .plataforma e o mcp.json sao do agente: root nao segue atalho ali (como a caixa faz).
+    if [ -L "$casa/home" ] || [ -L "$casa/home/.plataforma" ] || [ -L "$mcp" ]; then
+        aviso "a casa, a pasta .plataforma ou o dgchat.mcp.json do agente $slug e um atalho; nao mexo neles por seguranca (confira: ls -la $casa/home/.plataforma)"
+    elif [ -f "$mcp" ]; then
         if ! jq -e '(.mcpServers | type) == "object"' "$mcp" >/dev/null 2>&1; then
             aviso "o $mcp nao e um JSON valido com mcpServers; nao pus o MCP de dados nele (confira com: jq . $mcp)"
         elif ! jq -e '.mcpServers.dgclaw.args[0] == "/opt/dgclaw/app/bin/dgclaw-dados-mcp"' "$mcp" >/dev/null 2>&1; then
             if [ "$ENSAIO" = 1 ]; then info "[ensaio] poria o servidor MCP dgclaw (dados) em ${mcp#"$R"}"
             else
-                ug="$(stat -c '%u:%g' "$mcp")"
+                ug="$(stat -c '%u:%g' "$casa/home")"
                 novo="$(jq '.mcpServers.dgclaw = {command: "node", args: ["/opt/dgclaw/app/bin/dgclaw-dados-mcp"]}' "$mcp")" \
                     || falha "o jq nao conseguiu acrescentar o MCP de dados em $mcp." "confira o arquivo (jq . $mcp) e rode de novo"
                 printf '%s\n' "$novo" | escrever_arquivo "$mcp" 644 "$ug"

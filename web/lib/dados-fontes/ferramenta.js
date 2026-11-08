@@ -13,7 +13,6 @@ const http = require('node:http');
 const https = require('node:https');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
-const { Worker } = require('node:worker_threads');
 const { ErroFonte } = require('./json');
 const { validaParams } = require('./esquema');
 
@@ -30,10 +29,20 @@ function credencialDe(cofre, f) {
   }
 }
 
-/** Troca toda ocorrência da credencial por *** num texto que vai para o log. */
+/** Troca toda ocorrência da credencial (crua, em base64 e codificada para URL) por *** num texto. */
 function mascara(texto, credencial) {
-  const t = String(texto || '');
-  return credencial ? t.split(credencial).join('***') : t;
+  let t = String(texto || '');
+  if (!credencial) return t;
+  const formas = new Set([credencial, Buffer.from(credencial, 'utf8').toString('base64'), encodeURIComponent(credencial)]);
+  for (const f of formas) if (f && f.length >= 4) t = t.split(f).join('***');
+  return t;
+}
+/** A mesma máscara aplicada a um objeto inteiro (o que sai do gateway rumo ao agente, como defesa em profundidade). */
+function mascaraObjeto(v, credencial) {
+  if (!credencial || v === undefined) return v;
+  const t = JSON.stringify(v);
+  const m = mascara(t, credencial);
+  return m === t ? v : JSON.parse(m);
 }
 
 /** Só os campos de `campos` (quando a operação os declara), em cada item. */
@@ -102,7 +111,11 @@ function chamaApi(f, op, params, credencial) {
           reject(new ErroFonte(502, `O sistema respondeu ${res.statusCode} a "${op.nomeOp}". O motivo ficou no log do Web; se repetir, avise o dono.`)); return;
         }
         if (!texto.trim()) { resolve(null); return; }
-        try { resolve(JSON.parse(texto)); } catch (e) { reject(new ErroFonte(502, `O sistema não respondeu em JSON (${e.message}); o gateway só repassa JSON.`)); }
+        try { resolve(JSON.parse(texto)); } catch (e) {
+          // A mensagem do JSON.parse pode trazer um trecho do corpo: fica no log, mascarada; ao agente só o fato.
+          if (f.log) f.log('aviso', `Ferramenta ${f.nomeF}/${op.nomeOp}: resposta que não é JSON (${mascara(e.message, credencial).slice(0, MAX_ECO_LOG)})`);
+          reject(new ErroFonte(502, 'O sistema não respondeu em JSON; o gateway só repassa JSON. O detalhe ficou no log do Web.'));
+        }
       });
     });
     req.on('timeout', () => req.destroy(new Error('tempo esgotado')));
@@ -113,27 +126,34 @@ function chamaApi(f, op, params, credencial) {
 }
 
 // ── banco SQLite ────────────────────────────────────────────────────────────
-// A consulta roda num worker (fora do event loop do Web) e tem o prazo da ferramenta: passou, o worker é
-// encerrado e o agente recebe 504. Só os nomes de parâmetro que o SQL usa entram no bind.
+// A consulta roda num PROCESSO filho (não num worker): só o SIGKILL interrompe o SQLite no meio de uma
+// instrução, e com ele o journal desfaz a escrita não confirmada. Grupo de processo próprio, prazo da
+// ferramenta, só os nomes de parâmetro que o SQL usa entram no bind.
 function chamaBanco(f, op, params) {
   const bind = {};
   const usados = new Set([...op.sql.matchAll(/:([a-z][a-z0-9_]*)/g)].map((m) => m[1]));
   for (const [k, v] of Object.entries(params)) if (usados.has(k)) bind[k] = typeof v === 'boolean' ? (v ? 1 : 0) : v;
   return new Promise((resolve, reject) => {
-    let w;
-    try { w = new Worker(path.join(__dirname, 'banco-worker.js'), { workerData: { arquivo: f.arquivo, sql: op.sql, bind, acao: !!op.acao, max: op.max_itens || MAX_ITENS_PADRAO } }); } catch (e) {
+    let filho;
+    try { filho = spawn(process.execPath, ['--no-warnings', path.join(__dirname, 'banco-worker.js')], { env: { PATH: process.env.PATH || '/usr/bin:/bin' }, stdio: ['pipe', 'pipe', 'pipe'], detached: true }); } catch (e) {
       reject(new ErroFonte(503, `Não consegui iniciar a consulta ao banco (${e.code || e.message}).`)); return;
     }
-    let terminou = false;
+    let terminou = false; let saida = ''; let erros = '';
+    const mata = (sinal) => { try { process.kill(-filho.pid, sinal); } catch (_) { try { filho.kill(sinal); } catch (__) { /* já morreu */ } } };
     const fim = (fn) => { if (terminou) return; terminou = true; clearTimeout(timer); fn(); };
-    const timer = setTimeout(() => { w.terminate().catch(() => {}); fim(() => reject(new ErroFonte(504, `A consulta ao banco não terminou em ${f.timeout_s} s e foi interrompida. Peça um recorte menor.`))); }, f.timeout_s * 1000);
-    w.on('message', (m) => fim(() => {
+    const timer = setTimeout(() => { mata('SIGKILL'); fim(() => reject(new ErroFonte(504, `A consulta ao banco não terminou em ${f.timeout_s} s e foi interrompida (uma escrita interrompida é desfeita pelo banco). Peça um recorte menor.`))); }, f.timeout_s * 1000);
+    filho.on('error', (e) => fim(() => reject(new ErroFonte(503, `A consulta ao banco falhou ao iniciar (${e.code || e.message}).`))));
+    filho.stdout.on('data', (c) => { saida += c.toString('utf8'); if (saida.length > MAX_RESPOSTA * 2) { mata('SIGKILL'); fim(() => reject(new ErroFonte(502, 'A resposta do banco passou do teto.'))); } });
+    filho.stderr.on('data', (c) => { if (erros.length < 4000) erros += c.toString('utf8'); });
+    filho.on('exit', (codigo) => fim(() => {
+      let m = null;
+      try { m = JSON.parse(saida); } catch (_) { m = null; }
       if (m && m.erro) reject(new ErroFonte(m.erro.status, m.erro.mensagem));
-      else if (m && m.ok) resolve(m.ok.campos === undefined && op.campos && m.ok.itens ? Object.assign(m.ok, { itens: filtraCampos(m.ok.itens, op.campos) }) : m.ok);
-      else reject(new ErroFonte(502, 'A consulta ao banco devolveu algo inesperado.'));
+      else if (m && m.ok) resolve(op.campos && m.ok.itens ? Object.assign(m.ok, { itens: filtraCampos(m.ok.itens, op.campos) }) : m.ok);
+      else { if (f.log) f.log('aviso', `Ferramenta ${f.nomeF}/${op.nomeOp}: o processo do banco saiu (${codigo}) sem resposta${erros.trim() ? ': ' + erros.trim().slice(0, MAX_ECO_LOG) : ''}`); reject(new ErroFonte(502, 'A consulta ao banco encerrou sem resposta. O detalhe ficou no log do Web.')); }
     }));
-    w.on('error', (e) => fim(() => reject(new ErroFonte(502, `A consulta ao banco falhou (${String(e.message).slice(0, 200)}).`))));
-    w.on('exit', (c) => fim(() => reject(new ErroFonte(502, `A consulta ao banco encerrou sem resposta (código ${c}).`))));
+    filho.stdin.on('error', () => {});
+    filho.stdin.end(JSON.stringify({ arquivo: f.arquivo, sql: op.sql, bind, acao: !!op.acao, max: op.max_itens || MAX_ITENS_PADRAO }));
   });
 }
 
@@ -186,14 +206,21 @@ function chamaMcp(f, op, params, credencial) {
       await manda('notifications/initialized', undefined, false);
       const r = await manda('tools/call', { name: op.tool, arguments: params }, true);
       fim(() => resolve(r));
-    })().catch((e) => fim(() => reject(new ErroFonte(502, `O servidor MCP recusou a chamada (${e && e.message ? String(e.message).slice(0, 200) : JSON.stringify(e).slice(0, 200)}).`))));
+    })().catch((e) => fim(() => {
+      const detalhe = e && e.message ? String(e.message) : JSON.stringify(e);
+      if (f.log) f.log('aviso', `Ferramenta ${f.nomeF}/${op.nomeOp}: o servidor MCP recusou a chamada: ${mascara(detalhe, credencial).slice(0, MAX_ECO_LOG).replace(/[\u0000-\u001f]/g, ' ')}`);
+      reject(new ErroFonte(502, `O servidor MCP recusou a chamada "${op.nomeOp}". O motivo ficou no log do Web; se repetir, avise o dono.`));
+    }));
   });
 }
 
 /** O resultado de tools/call: o texto dos blocos (JSON quando parsear) ou o objeto estruturado. */
-function desembrulhaMcp(r) {
+function desembrulhaMcp(r, f, op, credencial) {
   if (!ehObjeto(r)) return r;
-  if (r.isError) throw new ErroFonte(502, `A tool do servidor MCP devolveu erro: ${JSON.stringify(r.content || r).slice(0, 300)}`);
+  if (r.isError) {
+    if (f && f.log) f.log('aviso', `Ferramenta ${f.nomeF}/${op.nomeOp}: a tool devolveu erro: ${mascara(JSON.stringify(r.content || r), credencial).slice(0, MAX_ECO_LOG)}`);
+    throw new ErroFonte(502, `A tool "${op ? op.nomeOp : '?'}" do servidor MCP devolveu erro. O motivo ficou no log do Web; se repetir, avise o dono.`);
+  }
   if (r.structuredContent !== undefined) return r.structuredContent;
   if (Array.isArray(r.content)) {
     const textos = r.content.filter((c) => c && c.type === 'text').map((c) => c.text);
@@ -210,9 +237,10 @@ function fonteFerramenta({ nome, ferramenta: fDef, cofre, log }) {
     const op = Object.assign({}, opDef, { nomeOp });
     const executa = async (params) => {
       const cred = credencialDe(cofre, f);
-      if (f.tipo === 'api') return normalizaResultado(await chamaApi(f, op, params, cred), op);
+      // O que sai rumo ao agente passa pela máscara: um sistema que ecoa o próprio cabeçalho não entrega a credencial.
+      if (f.tipo === 'api') return mascaraObjeto(normalizaResultado(await chamaApi(f, op, params, cred), op), cred);
       if (f.tipo === 'banco') return chamaBanco(f, op, params);
-      return normalizaResultado(desembrulhaMcp(await chamaMcp(f, op, params, cred)), op);
+      return mascaraObjeto(normalizaResultado(desembrulhaMcp(await chamaMcp(f, op, params, cred), f, op, cred), op), cred);
     };
     if (op.acao) {
       acoes[nomeOp] = {
@@ -239,4 +267,4 @@ function fonteFerramenta({ nome, ferramenta: fDef, cofre, log }) {
   };
 }
 
-module.exports = { fonteFerramenta, montaUrl, segmentoDeRota, mascara, normalizaResultado, filtraCampos, desembrulhaMcp };
+module.exports = { fonteFerramenta, montaUrl, segmentoDeRota, mascara, mascaraObjeto, normalizaResultado, filtraCampos, desembrulhaMcp };

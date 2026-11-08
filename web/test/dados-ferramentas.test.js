@@ -11,7 +11,7 @@ const { validaPapeis, criarPapeis } = require('../lib/papeis');
 const { validaFerramentas, criarFerramentas } = require('../lib/ferramentas');
 const { criarCofreSistemas, ErroCredencial } = require('../lib/cofre-sistemas');
 const { criarFontes, ErroFonte } = require('../lib/dados-fontes');
-const { montaUrl, normalizaResultado, desembrulhaMcp } = require('../lib/dados-fontes/ferramenta');
+const { montaUrl, normalizaResultado, desembrulhaMcp, mascara } = require('../lib/dados-fontes/ferramenta');
 const { criarDados } = require('../lib/dados');
 const { pastaTemp, capturaLog } = require('./ajuda');
 
@@ -115,6 +115,7 @@ test('montaUrl, normalizaResultado e desembrulhaMcp', () => {
   assert.deepEqual(normalizaResultado([{ a: 1, b: 2 }, { a: 3 }], { campos: ['a'], max_itens: 1 }), { itens: [{ a: 1 }], total: 2, truncado: true });
   assert.deepEqual(normalizaResultado({ data: [{ x: 1 }] }, {}), { itens: [{ x: 1 }], total: 1, truncado: false });
   assert.deepEqual(normalizaResultado({ x: 1, y: 2 }, { campos: ['y'] }), { item: { y: 2 } });
+  assert.equal(mascara('Basic dXNlcjpwYXNz e user%3Apass e user:pass', 'user:pass'), 'Basic *** e *** e ***', 'máscara cobre base64 e a forma codificada');
   assert.deepEqual(desembrulhaMcp({ content: [{ type: 'text', text: '{"a":1}' }] }), { a: 1 });
   assert.deepEqual(desembrulhaMcp({ content: [{ type: 'text', text: 'oi' }] }), { texto: 'oi' });
   assert.deepEqual(desembrulhaMcp({ structuredContent: { z: 1 }, content: [] }), { z: 1 });
@@ -145,7 +146,7 @@ async function subir() {
         if (m.params.name === 'explode') process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: m.id, error: { code: -32000, message: 'tool explodiu' } }) + '\\n');
         else if (m.params.name === 'trava') { setInterval(() => {}, 1000); return; }
         else if (m.params.name === 'morre') { process.stderr.write('ENV-DEBUG NOTAS_TOKEN=' + process.env.NOTAS_TOKEN + '\\n'); process.exit(3); }
-        else process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: m.id, result: { content: [{ type: 'text', text: JSON.stringify({ tool: m.params.name, args: m.params.arguments, token: process.env.NOTAS_TOKEN || null, extra: process.env.EXTRA || null, home: process.env.HOME || null }) }] } }) + '\\n');
+        else process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: m.id, result: { content: [{ type: 'text', text: JSON.stringify({ tool: m.params.name, args: m.params.arguments, token: process.env.NOTAS_TOKEN || null, token_len: (process.env.NOTAS_TOKEN || '').length, extra: process.env.EXTRA || null, home: process.env.HOME || null }) }] } }) + '\\n');
       } });
   `);
   const ferramentas = { versao: 1, ferramentas: {
@@ -165,6 +166,8 @@ async function subir() {
       resumo_mes: { sql: 'SELECT produto, SUM(valor) AS total FROM vendas WHERE mes = :mes GROUP BY produto ORDER BY produto', escopo: 'vendas:ler', params: { mes: { tipo: 'periodo', obrigatorio: true } } },
       apagar_mes: { sql: 'DELETE FROM vendas WHERE mes = :mes', escopo: 'vendas:escrever', acao: true, params: { mes: { tipo: 'periodo', obrigatorio: true } } },
       lenta: { sql: 'WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM c WHERE x < 40000000) SELECT COUNT(*) AS n FROM c', escopo: 'vendas:ler' },
+      escreve_lenta: { sql: "INSERT INTO vendas SELECT 'marca', 'x', (WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM c WHERE x < 40000000) SELECT COUNT(*) FROM c)", escopo: 'vendas:escrever', acao: true },
+      conta_marcas: { sql: "SELECT COUNT(*) AS n FROM vendas WHERE mes = 'marca'", escopo: 'vendas:ler' },
     }, timeout_s: 1 },
     wrapper: { tipo: 'mcp', comando: '/bin/sh', args: ['-c', `echo $$ > ${JSON.stringify(path.join(base, 'mcp-pid'))}; exec ${JSON.stringify(process.execPath)} ${JSON.stringify(mcp)}`], credencial: 'notas', credencial_env: 'NOTAS_TOKEN', timeout_s: 1, operacoes: {
       trava: { tool: 'trava', escopo: 'notas:ler' },
@@ -292,6 +295,16 @@ test('banco SQLite: consulta parametrizada só leitura; escrita só por aprovaç
     // consulta pesada passa do prazo: o worker é encerrado e o Web continua de pé
     const lenta = await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-vendas/lenta', {}, CAIXA('ana'));
     assert.equal(lenta.status, 504, lenta.texto); assert.match(lenta.json.erro, /não terminou em 1 s/);
+    // escrita lenta aprovada pelo dono: o prazo estoura, o processo é morto e a linha NÃO fica gravada
+    const el = await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-vendas/escreve_lenta', {}, DONO);
+    assert.equal(el.status, 202, el.texto);
+    const hl = (await s.pedir('GET', '/api/v1/dados/aprovacoes?estado=pendente', undefined, DONO)).json.aprovacoes[0].hash;
+    const al = await s.pedir('POST', `/api/v1/dados/aprovacoes/${el.json.pedido.id}/aprovar`, { hash: hl }, DONO);
+    assert.equal(al.json.pedido.estado, 'falhou'); assert.match(al.json.pedido.motivo, /interrompida/);
+    await new Promise((r) => setTimeout(r, 500));
+    const conta = await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-vendas/conta_marcas', {}, DONO);
+    assert.deepEqual(conta.json.itens, [{ n: 0 }], 'a escrita interrompida foi desfeita');
+    assert.ok(!s.cap.texto().includes('ExperimentalWarning'), 'sem o aviso experimental do sqlite no log');
     assert.equal((await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-vendas/resumo_mes', { mes: '2026-10' }, CAIXA('ana'))).status, 200, 'o Web responde logo depois');
     // o dono pede a escrita, aprova e o banco muda
     const e = await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-vendas/apagar_mes', { mes: '2026-11' }, DONO);
@@ -308,10 +321,13 @@ test('MCP: o servidor nasce com ambiente limpo mais a credencial na variável co
   try {
     const r = await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-notas/buscar', { query: 'reunião' }, CAIXA('ana'));
     assert.equal(r.status, 200, r.texto);
-    assert.deepEqual(r.json.item, { tool: 'search', args: { query: 'reunião' }, token: 'token-notas-xyz', extra: 'sim', home: null });
+    assert.deepEqual(r.json.item, { tool: 'search', args: { query: 'reunião' }, token: '***', token_len: 15, extra: 'sim', home: null }, 'a credencial chegou ao servidor (15 caracteres) e o eco dela sai mascarado');
     assert.ok(!r.texto.includes('NOTAS_TOKEN=') );
     const x = await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-notas/explode', {}, CAIXA('ana'));
-    assert.equal(x.status, 502); assert.match(x.json.erro, /tool explodiu/);
+    assert.equal(x.status, 502); assert.ok(!x.json.erro.includes('tool explodiu'), 'o detalhe do erro do servidor não chega ao agente'); assert.match(s.cap.texto(), /tool explodiu/);
+    // um servidor que ecoa a credencial no resultado: a máscara segura
+    const eco = await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-notas/buscar', { query: 'ecoa' }, CAIXA('ana'));
+    assert.equal(eco.status, 200); assert.equal(eco.json.item.token, '***');
     assert.equal((await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-notas/buscar', { query: 'x' }, CAIXA('bia'))).status, 404, 'sem escopo nenhum, a ferramenta não existe para bia');
     // servidor atrás de um wrapper (sh -c) que não responde: 504, e o neto morre junto (a credencial não fica num processo órfão)
     const tr = await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-wrapper/trava', {}, CAIXA('ana'));

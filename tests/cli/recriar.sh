@@ -109,4 +109,16 @@ dgclaw agente reparar ana >"$TMP/rep.txt" 2>&1
 igual "mcp.json quebrado: reparar avisa e nao derruba" "0" "$?"
 afirma "o aviso cita o arquivo" grep -q 'nao e um JSON valido com mcpServers' "$TMP/rep.txt"
 igual "o arquivo quebrado nao foi sobrescrito" "{ quebrado" "$(cat "$MCP")"
+# agente parado e imagem ja atual: o recriar nao troca o container, mas os arquivos ganham o MCP mesmo assim
+jq 'del(.mcpServers.dgclaw)' "$TMP/mcp-antes" > "$MCP"
+dgclaw agente parar ana >/dev/null 2>&1
+recriar ana
+igual "recriar de agente parado sai com 0" "0" "$?"
+afirma "mesmo sem trocar o container, o mcp.json ganhou o servidor dgclaw" jq -e '.mcpServers.dgclaw' "$MCP"
+# atalho no lugar do mcp.json: root nao segue; avisa e nao mexe
+rm -f "$MCP"; printf '{"mcpServers":{"x":{}},"SEGREDO_DO_ALVO":1}\n' > "$TMP/alvo.json"; ln -s "$TMP/alvo.json" "$MCP"
+recriar ana --forcar
+afirma "atalho: o aviso aparece" grep -q 'e um atalho; nao mexo' "$TMP/rec.txt"
+afirma "atalho: continua atalho e o alvo nao mudou" bash -c "[ -L '$MCP' ] && ! grep -q dgclaw '$TMP/alvo.json'"
+rm -f "$MCP"; cp "$TMP/mcp-antes" "$MCP"
 fim
