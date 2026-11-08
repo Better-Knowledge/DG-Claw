@@ -90,6 +90,19 @@
     }).join('');
   }
 
+  function htmlFerramentas(r) {
+    if (!r.valido) return '<p class="dp-erro">' + esc(r.erro || 'inválido') + '</p>';
+    const nomes = Object.keys(r.ferramentas || {}).sort();
+    const cred = (r.credenciais || []).length ? '<p class="dp-papel">Credenciais no cofre de sistemas (só os nomes): ' + (r.credenciais || []).map(c => '<code>' + esc(c) + '</code>').join(' ') + '</p>' : '<p class="dp-papel">Nenhuma credencial no cofre de sistemas.</p>';
+    if (!nomes.length) return cred + '<p class="dp-papel">Nenhuma ferramenta no catálogo. No servidor, descreva o sistema em <code>/etc/dgclaw/ferramentas.json</code> (veja <code>web/docs/FERRAMENTAS-POR-ESCOPO.md</code>).</p>';
+    return cred + nomes.map(n => {
+      const f = r.ferramentas[n];
+      const ops = Object.entries(f.operacoes || {}).map(([o, d]) => esc(o) + (d.acao ? ' (ação)' : '') + ' <small>' + esc(d.escopo) + '</small>').join(', ');
+      const semCred = f.credencial && !(r.credenciais || []).includes(f.credencial) ? ' <span class="dp-erro">· credencial ' + esc(f.credencial) + ' não está no cofre</span>' : '';
+      return '<p class="dp-papel"><code>' + esc(n) + '</code> ' + esc(f.titulo && f.titulo !== n ? f.titulo : '') + ' · ' + esc(f.tipo) + (f.credencial ? ' · credencial ' + esc(f.credencial) : '') + semCred + '<br>' + (ops || 'sem operações') + '</p>';
+    }).join('');
+  }
+
   const PASSOS = {
     pendentes: {
       alvo: '#secPendentes', titulo: 'Ações aguardando sua aprovação',
@@ -109,6 +122,12 @@
       como: 'Você cadastra no servidor com "dgclaw base criar" e põe os arquivos em /var/lib/dgclaw/bases/<nome>. Cada papel diz quais bases lê; a pessoa só alcança o que o escopo dela permite. Escrever numa base passa pela sua aprovação, aqui em cima.',
       porque: 'Para você ver de relance o que existe e quem alcança, sem abrir arquivo nenhum.',
     },
+    ferramentas: {
+      alvo: '#secFerramentas', titulo: 'Ferramentas e sistemas',
+      oque: 'Os sistemas de fora (CRM, ERP, servidor MCP, banco) que os agentes usam pelo gateway, com as operações e o escopo de cada uma.',
+      como: 'A credencial de cada sistema fica só no servidor; o agente pede a operação e o DG Claw chama o sistema por ele. Cada operação tem um escopo (crm:ler, crm:escrever) que precisa estar na pessoa e no papel do agente. Operação que escreve passa pela sua aprovação, aqui em cima.',
+      porque: 'Para você ver de relance o que está cadastrado e se alguma credencial está faltando, sem abrir arquivo nenhum.',
+    },
     log: {
       alvo: '#secLog', titulo: 'Últimos acessos',
       oque: 'Quem leu o quê, quando e com qual decisão. Sem o conteúdo dos dados.',
@@ -117,7 +136,7 @@
     },
   };
 
-  if (!raiz.document) return { fmt, prazo, paresDe, htmlPedido, htmlHistorico, htmlLog, htmlPapeis, htmlBases, ROTULO_ESTADO, PASSOS };
+  if (!raiz.document) return { fmt, prazo, paresDe, htmlPedido, htmlHistorico, htmlLog, htmlPapeis, htmlBases, htmlFerramentas, ROTULO_ESTADO, PASSOS };
 
   /* ── Parte com DOM ─────────────────────────────────────────────────────── */
   const $ = id => document.getElementById(id);
@@ -175,6 +194,13 @@
     $('bases').innerHTML = htmlBases(r.json);
   }
 
+  async function carregaFerramentas() {
+    const r = await chamar('GET', '/api/v1/dados/ferramentas');
+    if (!r.ok) { $('ferramentasEstado').textContent = r.erro; return; }
+    $('ferramentasEstado').textContent = r.json.valido ? (Object.keys(r.json.ferramentas || {}).length + ' ferramenta(s) no catálogo.') : 'Catálogo inválido: nenhuma ferramenta funciona até corrigir.';
+    $('ferramentas').innerHTML = htmlFerramentas(r.json);
+  }
+
   async function carregaLog() {
     const r = await chamar('GET', '/api/v1/dados/log?limit=50');
     if (!r.ok) return;
@@ -206,11 +232,11 @@
       if (raiz.DGTour && p) raiz.DGTour.inicia({ passos: [p] });
     }));
     raiz.DGDadosTutorial = () => { if (raiz.DGTour) raiz.DGTour.inicia({ passos: Object.values(PASSOS) }); };
-    Promise.all([carregaPendentes(), carregaPapeis(), carregaBases(), carregaLog()]);
+    Promise.all([carregaPendentes(), carregaPapeis(), carregaBases(), carregaFerramentas(), carregaLog()]);
     setInterval(() => { if (!document.hidden) carregaPendentes(); }, POLL_MS);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', inicia);
   else inicia();
 
-  return { fmt, prazo, paresDe, htmlPedido, htmlHistorico, htmlLog, htmlPapeis, htmlBases, ROTULO_ESTADO, PASSOS };
+  return { fmt, prazo, paresDe, htmlPedido, htmlHistorico, htmlLog, htmlPapeis, htmlBases, htmlFerramentas, ROTULO_ESTADO, PASSOS };
 });
