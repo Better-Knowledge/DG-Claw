@@ -101,13 +101,14 @@ As regras, todas conferidas no servidor (na dúvida, ele recusa):
 Quem tem acesso ao servidor (o Admin, por exemplo) convida sem passar pela tela:
 
 ```
-sudo dgclaw colaborador criar <agente> <email> [--nome "Nome"] [--json]
+sudo dgclaw colaborador criar <agente>[,<agente2>...] <email> [--nome "Nome"] [--json]
+sudo dgclaw colaborador agentes <id-ou-email> <agente>[,<agente2>...] [--json]
 sudo dgclaw colaborador listar [agente] [--json]
 sudo dgclaw colaborador reenviar <id-ou-email> [--json]
 sudo dgclaw colaborador revogar <id-ou-email> [--json]
 ```
 
-`criar` e `reenviar` imprimem o texto do convite pronto para copiar (endereço, login e a senha temporária, que vale 7 dias). O Admin nunca é compartilhado. O link usa o domínio do DG Claw (`DGCLAW_DOMINIO` do `dgclaw.env`); sem domínio, o link é o endereço local, só abre no servidor, e o comando avisa.
+`criar` aceita vários agentes separados por vírgula, e `agentes` troca a lista de quem já foi convidado (a lista nova substitui a antiga; vale no clique seguinte da pessoa, sem derrubar a sessão). `criar` e `reenviar` imprimem o texto do convite pronto para copiar (endereço, login e a senha temporária, que vale 7 dias). O Admin nunca é compartilhado. O link usa o domínio do DG Claw (`DGCLAW_DOMINIO` do `dgclaw.env`); sem domínio, o link é o endereço local, só abre no servidor, e o comando avisa.
 
 O comando fala com o painel por um socket local, `admin.sock`, na pasta de dados do Web (veja "Socket do servidor" abaixo). Se ele disser que não consegue falar com o Web, confira `systemctl status dgclaw-web`; depois de atualizar o DG Claw, o Web precisa ser reiniciado (`sudo systemctl restart dgclaw-web`) para o socket existir.
 

@@ -23,7 +23,8 @@ afirma "criar: avisa que o e-mail nao saiu e por que" grep -q 'sem e-mail config
 afirma "criar: usa o socket do Web na pasta de dados" grep -q -- "--unix-socket $LIB/web/admin.sock" "$STUB_LOG"
 afirma "criar: POST em /api/v1/colaboradores" grep -q 'http://dgclaw/api/v1/colaboradores' "$STUB_LOG"
 nega "criar: nenhum valor do usuario vai na linha de comando" grep -q 'maria\|Maria\|rm -rf' "$STUB_LOG"
-igual "criar: corpo montado pelo jq (agente)" "ana" "$(jq -r .agente "$ENT")"
+igual "criar: corpo montado pelo jq (lista de agentes)" "ana" "$(jq -r '.agentes | join(",")' "$ENT")"
+nega "criar: nao manda o campo antigo 'agente'" jq -e 'has("agente")' "$ENT"
 igual "criar: corpo (email como veio, o Web normaliza)" "Maria@Empresa.com" "$(jq -r .email "$ENT")"
 igual "criar: corpo (nome com aspas e \$() chega como texto)" "$NOME_PERIGOSO" "$(jq -r .nome "$ENT")"
 igual "criar: corpo leva o endereco publico do dgclaw.env" "https://teste.exemplo.org" "$(jq -r .base "$ENT")"
@@ -38,6 +39,14 @@ printf 'DGCLAW_VERSAO=1.0.0\n' >"$ETC/dgclaw.env"
 dgclaw colaborador criar ana maria@empresa.com >"$TMP/o.txt" 2>&1
 nega "criar sem dominio: nao manda base (o Web usa o padrao local e avisa)" jq -e 'has("base")' "$ENT"
 printf 'DGCLAW_DOMINIO=teste.exemplo.org\n' >"$ETC/dgclaw.env"
+
+zera; resposta 201 "$CONVITE"
+dgclaw colaborador criar ana,bob maria@empresa.com >"$TMP/o.txt" 2>&1
+igual "criar com dois agentes: sai com 0" "0" "$?"
+igual "criar com dois agentes: a lista vai inteira" "ana bob" "$(jq -r '.agentes | join(" ")' "$ENT")"
+zera; resposta 201 "$CONVITE"
+dgclaw colaborador criar ana, maria@empresa.com >/dev/null 2>&1
+igual "virgula sobrando nao vira agente vazio" "1" "$(jq -r '.agentes | length' "$ENT")"
 
 echo "criar: erros"
 zera; resposta 400 '{"ok":false,"erro":"O Admin nunca pode ser compartilhado: ele mexe no servidor inteiro."}'
@@ -69,15 +78,40 @@ dgclaw --ensaio colaborador reenviar a@b.com >/dev/null 2>&1
 nega "ensaio revogar/reenviar: nao chamou o Web" grep -q unix-socket "$STUB_LOG"
 
 echo "listar"
-zera; resposta 200 '{"ok":true,"colaboradores":[{"id":"abcDEF123456","email":"maria@empresa.com","agente":"ana","estado":"ativo","nome":"Maria"}]}'
+zera; resposta 200 '{"ok":true,"colaboradores":[{"id":"abcDEF123456","email":"maria@empresa.com","agente":"ana","agentes":["ana","bob"],"estado":"ativo","nome":"Maria"},{"id":"antigoREG0001","email":"ze@empresa.com","agente":"ana","estado":"ativo"}]}'
 dgclaw colaborador listar >"$TMP/o.txt" 2>&1
 afirma "listar: mostra a pessoa" bash -c "grep -q 'maria@empresa.com' '$TMP/o.txt' && grep -q ativo '$TMP/o.txt'"
+afirma "listar: mostra os agentes da pessoa" grep -q 'ana,bob' "$TMP/o.txt"
+afirma "listar: registro antigo (so 'agente') aparece com o agente dele" grep -qE 'antigoREG0001 +ana ' "$TMP/o.txt"
 zera; resposta 200 '{"ok":true,"colaboradores":[]}'
 dgclaw colaborador listar ana >"$TMP/o.txt" 2>&1
 afirma "listar vazio: diz que nao ha ninguem" grep -q 'Nenhum colaborador no agente ana' "$TMP/o.txt"
 afirma "listar agente: filtra na rota" grep -q 'colaboradores?agente=ana' "$STUB_LOG"
 zera; resposta 200 '{"ok":true,"colaboradores":[]}'
 afirma "listar --json" bash -c "'$CLI' colaborador listar --json | jq -e .ok"
+
+echo "agentes"
+zera
+resposta 200 '{"ok":true,"colaboradores":[{"id":"abcDEF123456","email":"maria@empresa.com","agentes":["ana"],"estado":"ativo"}]}' 1
+resposta 200 '{"ok":true,"colaborador":{"id":"abcDEF123456","email":"maria@empresa.com","agentes":["ana","bob"]}}' 2
+dgclaw colaborador agentes maria@empresa.com ana,bob >"$TMP/o.txt" 2>&1
+igual "agentes por e-mail: sai com 0" "0" "$?"
+afirma "agentes: POST no colaborador certo" bash -c "grep -q -- '-X POST' '$STUB_LOG' && grep -q 'http://dgclaw/api/v1/colaboradores/abcDEF123456\$' '$STUB_LOG'"
+igual "agentes: corpo com a lista" "ana bob" "$(jq -r '.agentes | join(" ")' "$ENT")"
+afirma "agentes: mostra a lista nova" grep -q 'ana, bob' "$TMP/o.txt"
+zera
+dgclaw colaborador agentes abcDEF123456 "" >"$TMP/o.txt" 2>&1
+igual "agentes com lista vazia: sai com 1" "1" "$?"
+afirma "agentes com lista vazia: manda usar revogar" grep -q 'colaborador revogar' "$TMP/o.txt"
+nega "agentes com lista vazia: nao chamou o Web" grep -q unix-socket "$STUB_LOG"
+zera; resposta 404 '{"ok":false,"erro":"Não existe agente com o id \"zed\"."}'
+dgclaw colaborador agentes abcDEF123456 zed >"$TMP/o.txt" 2>&1
+igual "agentes com agente inexistente: sai com 1" "1" "$?"
+afirma "agentes com agente inexistente: repete o motivo" grep -q 'zed' "$TMP/o.txt"
+zera
+dgclaw --ensaio colaborador agentes abcDEF123456 ana >/dev/null 2>&1
+nega "ensaio agentes: nao chamou o Web" grep -q unix-socket "$STUB_LOG"
+afirma "ajuda cita o subcomando agentes" bash -c "'$CLI' colaborador ajuda | grep -q 'colaborador agentes'"
 
 echo "reenviar e revogar"
 zera
