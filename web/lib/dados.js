@@ -200,7 +200,9 @@ function criarDados({ dir, papeis, bases, basesDir, ferramentas, cofreSistemas, 
   function descreve(fonte, operacao, acao, params, agente) {
     if (acao === 'enviar_email') return `O agente ${agente} quer enviar um e-mail para ${params.para} com o assunto "${params.assunto}" (${params.texto.length} caracteres de texto).`;
     if (acao === 'escrever_base') return `O agente ${agente} quer ${params.substituir ? 'substituir' : 'criar'} o arquivo ${params.caminho} na base ${fonte.replace(/^base-/, '')} (${Buffer.byteLength(params.conteudo, 'utf8')} bytes).`;
-    if (acao === 'propor_skill') return `O agente ${agente} quer ${params.nome ? 'publicar' : 'propor'} a skill "${params.nome}" para o grupo ${params.grupo} (${Buffer.byteLength(params.conteudo, 'utf8')} bytes de SKILL.md).`;
+    if (acao === 'propor_skill') return params.substituir
+      ? `ATENÇÃO: o agente ${agente} quer SUBSTITUIR a skill "${params.nome}" do grupo ${params.grupo}, que já existe, por um texto novo (${Buffer.byteLength(params.conteudo, 'utf8')} bytes). Os outros agentes do grupo passam a seguir o texto novo.`
+      : `O agente ${agente} quer publicar a skill nova "${params.nome}" para o grupo ${params.grupo} (${Buffer.byteLength(params.conteudo, 'utf8')} bytes de SKILL.md).`;
     if (acao.startsWith('ferramenta:')) return `O agente ${agente} quer executar "${operacao}" no sistema ${fonte.replace(/^ferramenta-/, '')} com ${Object.keys(params).length} parâmetro(s): ${Object.entries(params).map(([k, v]) => `${k}=${JSON.stringify(v).slice(0, 80)}`).join(', ') || '(nenhum)'}.`;
     return `O agente ${agente} quer executar ${acao} em ${fonte} (${operacao}).`;
   }

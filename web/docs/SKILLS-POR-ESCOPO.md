@@ -10,9 +10,10 @@ as skills da imagem e as que ele mesmo aprendeu, na própria casa. Agora existe 
 | grupo | `grupos/<grupo>/<skill>/` | idem, e só se a pessoa do agente está no grupo |
 | agente | `agentes/<slug>/<skill>/` | só aquele agente, sempre |
 
-A pasta é montada **só leitura** em `/run/dgclaw/skills` dentro de cada container; o que o agente vê em
-`~/.claude/skills` são links para as skills liberadas. O agente não altera o catálogo: ele **propõe** uma skill
-para o grupo dele, e uma pessoa aprova no painel.
+Cada agente recebe uma **vista** própria do catálogo (`/var/lib/dgclaw/skills/.vistas/<slug>/`, cópias de root
+só das skills que a política libera para ele), montada **só leitura** em `/run/dgclaw/skills` dentro do
+container; o que o agente vê em `~/.claude/skills` são links para elas. O agente não enxerga as skills dos
+outros escopos nem altera o catálogo: ele **propõe** uma skill para o grupo dele, e uma pessoa aprova no painel.
 
 ## Para o dono
 
@@ -25,14 +26,16 @@ sudo dgclaw skill remover conciliacao --escopo grupo:financeiro     # vai para /
 sudo dgclaw skill aplicar [<slug>]                                   # refaz os links pela política atual
 ```
 
-`publicar` copia a pasta (a que tem o `SKILL.md`) com dono root, pastas 755 e arquivos 644, e recusa: atalho,
-arquivo que não é texto, pasta acima de 2 MB, `name` do frontmatter diferente do nome da pasta, e qualquer coisa
-que pareça segredo (chave, token, senha). **Skill é lida por todo agente que a recebe**: ela diz onde pegar a
-chave (o cofre), nunca o valor.
+`publicar` copia a pasta (a que tem o `SKILL.md`) para uma pasta temporária de root e **confere a cópia** (a
+origem pode ser a casa de um agente), com dono root, pastas 755 e arquivos 644; recusa: atalho ou fifo, arquivo
+que não é texto, pasta acima de 2 MB, `name` do frontmatter diferente do nome da pasta, **nome de uma skill da
+imagem do DG Claw** (`memory`, `aprender`, `agenda`...: uma compartilhada com esse nome tomaria o lugar da nativa)
+e qualquer coisa que pareça segredo (os padrões ficam em `lib/segredos.regex`, os mesmos que o Web usa). **Skill
+é lida por todo agente que a recebe**: ela diz onde pegar a chave (o cofre), nunca o valor.
 
 Depois de publicar, remover ou mudar o bloco `skills` de um papel, rode `sudo dgclaw skill aplicar`: ele refaz
-os links em cada agente ligado (vale na próxima sessão). `dgclaw agente criar` e `agente reparar` fazem isso
-sozinhos.
+a vista e os links em cada agente ligado (vale na próxima sessão). `dgclaw agente criar`, `agente iniciar` e
+`agente reparar` fazem isso sozinhos.
 
 ## Grupos e papéis
 
@@ -56,23 +59,29 @@ na própria casa:
 
 ```bash
 dgclaw-api POST /api/v1/dados/fontes/skills/propor '{"nome": "relatorio-semanal", "grupo": "financeiro", "conteudo": "---\nname: relatorio-semanal\ndescription: ...\n---\n..."}'
-dgclaw-api POST /api/v1/dados/fontes/skills/listar '{}'      # o catálogo compartilhado (global e grupos)
+dgclaw-api POST /api/v1/dados/fontes/skills/propor '{"nome": "relatorio-semanal", "grupo": "financeiro", "conteudo": "...", "substituir": true}'   # trocar o texto de uma que já existe
 ```
 
 Ou pelas tools `dados_chamar` com `fonte: "skills"`. Regras: a pessoa do agente precisa estar no `grupo`; a
 ação `propor_skill` precisa estar em `aprovacao_humana` na pessoa e no papel; `conteudo` é o `SKILL.md` inteiro
-(frontmatter com `name` igual ao nome e `description`), até 60 KB, sem caracteres invisíveis e sem segredo.
-A proposta vira um pedido na tela Dados; aprovada, o Web grava em `grupos/<grupo>/<nome>/SKILL.md` e os
-agentes do grupo a recebem no próximo `dgclaw skill aplicar`. Ninguém propõe para o escopo global: ali só o dono.
+(frontmatter com `name` igual ao nome e `description`), até 60 KB, sem caracteres invisíveis e sem segredo; o
+nome não pode ser o de uma skill da imagem. Skill que já existe no grupo só é trocada com `"substituir": true`,
+e a pessoa vê na tela, em destaque, que é uma substituição; skill publicada pelo dono com mais arquivos além
+do `SKILL.md` um agente não substitui. A proposta vira um pedido na tela Dados; aprovada (e com a pessoa ainda
+no grupo), o Web grava em `grupos/<grupo>/<nome>/SKILL.md` e os agentes do grupo a recebem no próximo
+`dgclaw skill aplicar`. Ninguém propõe para o escopo global: ali só o dono. O agente não lista o catálogo dos
+outros escopos: o que ele tem está em `~/.claude/skills`.
 
 ## Segurança e limites
 
-- O catálogo é de root e só leitura no container; o agente não consegue mudar uma skill compartilhada nem
-  a sua cópia (é link). O que ele pode mudar é o que está na casa dele (as skills que ele mesmo aprendeu).
+- Só a vista do agente é montada, de root e só leitura: ele não lê as skills dos outros escopos nem muda uma
+  compartilhada (é link para a cópia de root). O que ele pode mudar é o que está na casa dele (as skills que ele
+  mesmo aprendeu). Ele pode criar links à mão, mas só para o que já está na vista dele.
 - Skill é instrução que o modelo segue: só o dono publica em escopo compartilhado, e a proposta de um agente só
   entra com aprovação humana do texto inteiro. O conteúdo passa pelo mesmo filtro de caracteres invisíveis e
   de segredo da escrita em base.
 - Os links são refeitos por `skill aplicar`, `agente reparar` e na criação; uma skill removida do catálogo
   some do agente nessa hora, não antes. O que o agente já leu continua na memória dele.
-- Esta versão exige recriar o container dos agentes existentes para a pasta ser montada
-  (`sudo dgclaw agente recriar <slug> --forcar`); o CHANGELOG explica.
+- Os agentes existentes ganham a montagem quando o container é recriado: o `dgclaw atualizar` já recria os
+  que estavam ligados; agente que estava desligado na hora precisa de `sudo dgclaw agente recriar <slug>` depois
+  de ligado. O CHANGELOG explica.
