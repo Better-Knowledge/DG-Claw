@@ -37,7 +37,7 @@ function nomesReservados(raiz = RAIZ_APP) {
 }
 
 function fonteSkills({ dir, papeis, log, catalogo }) {
-  const reservados = nomesReservados();
+  function existeGlobal(nome) { try { return fs.statSync(path.join(dir, 'globais', nome, 'SKILL.md')).isFile(); } catch (_) { return false; } }
   /** null se não existe; { outros: true } se a pasta tem mais que o SKILL.md (publicada pela CLI com arquivos). */
   function existeSkill(grupo, nome) {
     const pasta = path.join(dir, 'grupos', grupo, nome);
@@ -59,6 +59,8 @@ function fonteSkills({ dir, papeis, log, catalogo }) {
         validar(p, contexto) {
           soChaves(p || {}, ['nome', 'grupo', 'conteudo', 'substituir'], 'propor em skills');
           if (typeof p.nome !== 'string' || !RX_NOME.test(p.nome)) throw new ErroFonte(400, '"nome" é obrigatório: minúsculas, números e hífen, começando por letra, até 40 (ex.: fechamento-mensal).');
+          // Lida a cada pedido: se a pasta skills/ faltava na subida do Web e o atualizar a trouxe, o 503 some sem reiniciar.
+          const reservados = nomesReservados();
           if (!reservados.ok) throw new ErroFonte(503, 'A cópia do DG Claw no servidor está sem a pasta skills/; não dá para conferir se o nome é de uma skill da imagem. O dono precisa rodar "dgclaw atualizar".');
           if (reservados.nomes.has(p.nome)) throw new ErroFonte(400, `"${p.nome}" é o nome de uma skill da imagem do DG Claw; uma skill compartilhada com esse nome tomaria o lugar dela. Escolha outro nome (ex.: ${p.nome}-da-empresa).`);
           if (p.substituir !== undefined && typeof p.substituir !== 'boolean') throw new ErroFonte(400, '"substituir" precisa ser true ou false.');
@@ -77,8 +79,8 @@ function fonteSkills({ dir, papeis, log, catalogo }) {
             if (!pessoa || !pessoa.grupos.includes(p.grupo)) throw new ErroFonte(403, `A pessoa ${contexto.pessoa} não faz parte do grupo "${p.grupo}"; só dá para propor skill para um grupo seu.`);
           }
           // Uma skill de grupo com o nome de uma global tomaria o lugar dela para o grupo inteiro (a mais específica vence).
-          let global = null; try { global = fs.statSync(path.join(dir, 'globais', p.nome, 'SKILL.md')); } catch (_) { global = null; }
-          if (global) throw new ErroFonte(409, `Já existe a skill global "${p.nome}" (publicada pelo dono); uma skill de grupo com o mesmo nome tomaria o lugar dela para o grupo. Escolha outro nome.`);
+          // A mensagem não diz que é global: o catálogo dos outros escopos não é do agente (sem oráculo de nomes).
+          if (existeGlobal(p.nome)) throw new ErroFonte(409, `O nome "${p.nome}" não está disponível para skill de grupo. Escolha outro nome (ex.: ${p.nome}-${p.grupo}).`);
           const existe = existeSkill(p.grupo, p.nome);
           if (existe && !p.substituir) throw new ErroFonte(409, `Já existe a skill "${p.nome}" no grupo ${p.grupo}. Para trocar o texto, proponha de novo com "substituir": true; a pessoa vai ver que é uma substituição.`);
           if (existe && existe.outros) throw new ErroFonte(409, `A skill "${p.nome}" do grupo ${p.grupo} foi publicada pelo dono com mais arquivos além do SKILL.md; um agente não a substitui. Peça ao dono.`);
@@ -93,6 +95,8 @@ function fonteSkills({ dir, papeis, log, catalogo }) {
             const pessoa = ag ? e.politica.pessoas[ag.pessoa] : null;
             if (!pessoa || pessoa.estado === 'desligada' || !pessoa.grupos.includes(p.grupo)) throw new ErroFonte(403, `A pessoa do agente ${contexto.agente} já não faz parte do grupo "${p.grupo}"; a skill não foi gravada.`);
           }
+          // O dono pode ter publicado uma global com esse nome entre o pedido e o clique: a de grupo a esconderia do grupo.
+          if (existeGlobal(p.nome)) throw new ErroFonte(409, `Agora existe uma skill global "${p.nome}"; a skill de grupo não foi gravada para não tomar o lugar dela.`);
           const pasta = path.join(dir, 'grupos', p.grupo, p.nome);
           const destino = path.join(pasta, 'SKILL.md');
           const existe = existeSkill(p.grupo, p.nome);

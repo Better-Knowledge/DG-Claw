@@ -150,7 +150,7 @@ test('rota: propor skill vira aprovação; o dono aprova e o arquivo nasce no gr
     fs.mkdirSync(path.join(c.skillsDir, 'globais', 'fechamento'), { recursive: true });
     fs.writeFileSync(path.join(c.skillsDir, 'globais', 'fechamento', 'SKILL.md'), SKILL('fechamento'));
     const g = await pedir('POST', '/api/v1/dados/fontes/skills/propor', { nome: 'fechamento', grupo: 'financeiro', conteudo: SKILL('fechamento') }, CAIXA('ana'));
-    assert.equal(g.status, 409, g.texto); assert.match(g.json.erro || g.texto, /global/);
+    assert.equal(g.status, 409, g.texto); assert.doesNotMatch(g.json.erro || g.texto, /global/, 'a mensagem não revela que existe uma global');
   } finally { srv.close(); c.fim(); }
 });
 
@@ -169,9 +169,30 @@ test('os padrões de segredo são os mesmos para a CLI (grep -Eif) e para o Web 
   try {
     fs.writeFileSync(path.join(base, 'r'), 'x[[:alnum:]]{3}\n');
     assert.throws(() => carregaSegredos(path.join(base, 'r')), /classe POSIX/);
+    // comentário e linha vazia no arquivo: os dois lados os ignoram (uma linha vazia no grep casaria tudo)
+    const comComentario = path.join(base, 'c');
+    fs.writeFileSync(comComentario, '# comentário\n\nsk-[a-z]{16,}\n   \n');
+    const rxC = carregaSegredos(comComentario);
+    const grepC = (t) => spawnSync('bash', ['-c', 'grep -Eiq -f <(grep -Ev \'^[[:space:]]*(#|$)\' "$1")', '_', comComentario], { input: t + '\n' }).status === 0;
+    for (const t of ['sk-abcdefghijklmnopqrst']) { assert.ok(rxC.test(t)); assert.ok(grepC(t)); }
+    for (const t of ['nada aqui', '# comentário']) { assert.ok(!rxC.test(t), 'web: ' + t); assert.ok(!grepC(t), 'cli: ' + t); }
     // nomes reservados: lista fixa mesmo sem a pasta skills/, e ok:false para o propor fechar
     const r = nomesReservados(base);
     assert.equal(r.ok, false); assert.ok(r.nomes.has('memory') && r.nomes.has('dgclaw'));
     assert.equal(nomesReservados().ok, true); assert.ok(nomesReservados().nomes.has('aprender'));
   } finally { fs.rmSync(base, { recursive: true, force: true }); }
+});
+
+test('a lista fixa de skills nativas é a mesma no vida_script do dgclaw, em lib/skills.sh e no Web', () => {
+  const raiz = path.join(__dirname, '..', '..');
+  const dgclaw = fs.readFileSync(path.join(raiz, 'bin', 'dgclaw'), 'utf8');
+  const m = /^for s in ([a-z0-9 -]+); do\n\s+origem="\/opt\/dgclaw\/app\/skills\/\$s"/m.exec(dgclaw);
+  assert.ok(m, 'o laço do vida_script que liga as skills da imagem');
+  const doVida = m[1].trim().split(/\s+/).sort();
+  const sh = /^SKILLS_RESERVADAS_FIXAS=" (.*) "$/m.exec(fs.readFileSync(path.join(raiz, 'lib', 'skills.sh'), 'utf8'));
+  assert.ok(sh, 'SKILLS_RESERVADAS_FIXAS em lib/skills.sh');
+  const daCli = sh[1].split(/\s+/).filter((x) => x !== 'dgclaw').sort();
+  const { nomesReservados } = require('../lib/dados-fontes/skills');
+  const doWeb = [...nomesReservados(pastaTemp('vazia')).nomes].filter((x) => x !== 'dgclaw').sort();
+  assert.deepEqual(daCli, doVida); assert.deepEqual(doWeb, doVida);
 });
