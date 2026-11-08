@@ -63,7 +63,8 @@ function fonteBase({ dir, nome, base, log, catalogo }) {
         const achados = [];
         let lidos = 0; let bytes = 0; let truncado = todos.length > MAX_ARQUIVOS_BUSCA;
         for (const it of todos.slice(0, MAX_ARQUIVOS_BUSCA)) {
-          if (bytes + it.tamanho > MAX_BYTES_BUSCA) { truncado = true; break; }
+          if (it.tamanho > MAX_ARQUIVO) continue;                                   // `ler` recusaria: nem entra na conta
+          if (bytes + it.tamanho > MAX_BYTES_BUSCA) { truncado = true; continue; }   // não coube: segue para os próximos, menores
           lidos++; bytes += it.tamanho;
           let texto = '';
           try { texto = pasta.operacoes.ler({ caminho: it.caminho }).item.conteudo; } catch (_) { continue; }   // arquivo que não dá para ler não entra
