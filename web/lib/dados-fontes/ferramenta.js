@@ -21,10 +21,17 @@ const MAX_ITENS_PADRAO = 200;
 const MAX_ECO_LOG = 300;      // o que do erro do sistema vai para o LOG do Web (nunca para o agente)
 const ehObjeto = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 
-/** Credencial que o adaptador precisa, lida na hora. Erro vira 503 sem o valor. */
-function credencialDe(cofre, f) {
-  if (!f.credencial) return null;
-  try { return cofre.ler(f.credencial); } catch (e) {
+/** O NOME da credencial que a operação usa: a do escopo dela em "credenciais", senão a padrão ("credencial"). */
+function nomeDaCredencial(f, op) {
+  if (f.credenciais && op && Object.prototype.hasOwnProperty.call(f.credenciais, op.escopo)) return f.credenciais[op.escopo];
+  return f.credencial || null;
+}
+
+/** Credencial que o adaptador precisa, lida na hora, pelo nome que a operação usa. Erro vira 503 sem o valor. */
+function credencialDe(cofre, f, op) {
+  const nome = nomeDaCredencial(f, op);
+  if (!nome) return null;
+  try { return cofre.ler(nome); } catch (e) {
     throw new ErroFonte(503, `A ferramenta não pode ser usada agora: ${e.message}`);
   }
 }
@@ -89,9 +96,11 @@ function montaUrl(f, op, params) {
   return { url: u, corpo };
 }
 
-function chamaApi(f, op, params, credencial) {
+function chamaApi(f, op, params, credencial, agente) {
   const { url, corpo } = montaUrl(f, op, params);
   const cab = { Accept: 'application/json', 'User-Agent': 'DG-Claw-gateway' };
+  // O sistema de destino sabe qual agente chamou (só o slug, nunca a pessoa nem a credencial), se o catálogo pedir.
+  if (f.cabecalho_agente && agente) cab[f.cabecalho_agente] = String(agente);
   if (f.auth.tipo === 'bearer') cab.Authorization = `Bearer ${credencial}`;
   else if (f.auth.tipo === 'cabecalho') cab[f.auth.nome] = credencial;
   else if (f.auth.tipo === 'basico') cab.Authorization = `Basic ${Buffer.from(credencial, 'utf8').toString('base64')}`;
@@ -166,9 +175,10 @@ function chamaBanco(f, op, params) {
 }
 
 // ── servidor MCP (stdio, JSON-RPC) ─────────────────────────────────────────
-function chamaMcp(f, op, params, credencial) {
+function chamaMcp(f, op, params, credencial, agente) {
   const env = Object.assign({ PATH: process.env.PATH || '/usr/local/bin:/usr/bin:/bin' }, f.env);
   if (f.credencial_env && credencial) env[f.credencial_env] = credencial;
+  if (f.env_agente && agente) env[f.env_agente] = String(agente);
   return new Promise((resolve, reject) => {
     let filho;
     // Grupo de processo próprio: no fim, o grupo inteiro recebe o sinal; um wrapper (npx, sh -c) não deixa neto vivo com a credencial no ambiente.
@@ -243,22 +253,24 @@ function fonteFerramenta({ nome, ferramenta: fDef, cofre, log }) {
   const ops = {}; const acoes = {};
   for (const [nomeOp, opDef] of Object.entries(f.operacoes)) {
     const op = Object.assign({}, opDef, { nomeOp });
-    const executa = async (params) => {
-      const cred = credencialDe(cofre, f);
+    const executa = async (params, agente) => {
+      const cred = credencialDe(cofre, f, op);
       // O que sai rumo ao agente passa pela máscara: um sistema que ecoa o próprio cabeçalho não entrega a credencial.
-      if (f.tipo === 'api') return mascaraObjeto(normalizaResultado(await chamaApi(f, op, params, cred), op), cred);
+      if (f.tipo === 'api') return mascaraObjeto(normalizaResultado(await chamaApi(f, op, params, cred, agente), op), cred);
       if (f.tipo === 'banco') return chamaBanco(f, op, params);
-      return mascaraObjeto(normalizaResultado(desembrulhaMcp(await chamaMcp(f, op, params, cred), f, op, cred), op), cred);
+      return mascaraObjeto(normalizaResultado(desembrulhaMcp(await chamaMcp(f, op, params, cred, agente), f, op, cred), op), cred);
     };
+    const credencialDaOp = nomeDaCredencial(f, op);
     if (op.acao) {
       acoes[nomeOp] = {
         acao: `ferramenta:${nomeOp}`,
         escopo: op.escopo,
+        credencial: credencialDaOp,
         validar: (p) => validaParams(op.params, p || {}, `${nomeOp} em ferramenta-${nome}`),
-        executar: (p, contexto) => executa(p).then((r) => { if (log) log('info', `Ferramenta ${nome}: ${nomeOp} executada a pedido de ${contexto.agente} (aprovação ${contexto.aprovacao}).`); return r; }),
+        executar: (p, contexto) => executa(p, contexto && contexto.agente).then((r) => { if (log) log('info', `Ferramenta ${nome}: ${nomeOp} executada a pedido de ${contexto.agente} (aprovação ${contexto.aprovacao}).`); return r; }),
       };
     } else {
-      ops[nomeOp] = Object.assign((p) => executa(validaParams(op.params, p || {}, `${nomeOp} em ferramenta-${nome}`)), { escopo: op.escopo });
+      ops[nomeOp] = Object.assign((p, contexto) => executa(validaParams(op.params, p || {}, `${nomeOp} em ferramenta-${nome}`), contexto && contexto.agente), { escopo: op.escopo, credencial: credencialDaOp });
     }
   }
   return {

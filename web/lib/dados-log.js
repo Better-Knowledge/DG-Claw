@@ -9,7 +9,7 @@ const path = require('node:path');
 
 const RX_ARQ = /^acessos-(\d{4}-\d{2}-\d{2})\.jsonl$/;
 const MAX_MOTIVO = 300;
-const CAMPOS = ['agente', 'pessoa', 'papel', 'fonte', 'escopo', 'operacao', 'acao', 'decisao', 'motivo', 'status', 'itens', 'bytes', 'aprovacao', 'por'];
+const CAMPOS = ['agente', 'pessoa', 'papel', 'fonte', 'escopo', 'operacao', 'acao', 'decisao', 'motivo', 'status', 'itens', 'bytes', 'aprovacao', 'por', 'credencial'];
 
 function diaDe(ms) { return new Date(ms).toISOString().slice(0, 10); }
 
@@ -106,7 +106,7 @@ function criarDadosLog({ dir, log, agora, retencaoDias }) {
 
   /** Contagens por agente, por fonte e por decisão desde `desde` (padrão: 30 dias), até 100 mil linhas. */
   function resumo(desde) {
-    const r = { desde: desde || diaDe(relogio() - 30 * 86400000), linhas: 0, por_decisao: {}, por_agente: {}, por_fonte: {}, por_pessoa: {} };
+    const r = { desde: desde || diaDe(relogio() - 30 * 86400000), linhas: 0, por_decisao: {}, por_agente: {}, por_fonte: {}, por_pessoa: {}, por_agente_sistema: {} };
     const soma = (o, k) => { o[k] = (o[k] || 0) + 1; };
     percorre(r.desde, (o) => {
       r.linhas++;
@@ -114,6 +114,8 @@ function criarDadosLog({ dir, log, agora, retencaoDias }) {
       soma(r.por_agente, o.agente || '?');
       soma(r.por_fonte, o.fonte || '?');
       if (o.pessoa) soma(r.por_pessoa, o.pessoa);
+      // Observabilidade por AGENTE nos sistemas de fora: quem usou qual sistema com qual escopo (a credencial é só o nome).
+      if (typeof o.fonte === 'string' && o.fonte.startsWith('ferramenta-') && o.escopo) soma(r.por_agente_sistema, `${o.agente || '?'} › ${o.fonte.slice(11)} (${o.escopo})`);
       return r.linhas < 100000;
     });
     return r;
