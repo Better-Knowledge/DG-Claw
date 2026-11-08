@@ -41,6 +41,23 @@ da atualização lista os agentes que ainda precisam disso. Servidor arm64 preci
 
 **Anexos na casa do agente.** Os arquivos enviados pela conversa agora são gravados pelo dono do agente, e não mais pelo root do servidor, para que uma pasta trocada por um atalho dentro da casa do agente não leve o arquivo para fora dela. Em instalações antigas, a pasta `uploads/` que o root tinha criado passa sozinha para o dono do agente no primeiro anexo; as pastas de dias antigos ficam como estão. Nada precisa ser feito para atualizar.
 
+**Skills compartilhadas por escopo.** Além das skills da imagem e das que cada agente aprende na própria casa,
+existe agora um catálogo compartilhado (`/var/lib/dgclaw/skills`) com três escopos: global, de um grupo
+(departamento, projeto, equipe) ou de um agente só. Você publica com `sudo dgclaw skill publicar <pasta>
+--escopo global|grupo:<g>|agente:<slug>`, cada papel diz quais recebe (bloco `skills` no arquivo de papéis), e
+o catálogo é montado só leitura dentro de cada agente: ele não altera uma skill compartilhada. O agente pode
+propor uma skill para o grupo da pessoa dele; você lê o roteiro inteiro e aprova na tela Dados. `sudo dgclaw
+skill aplicar` refaz os links depois de publicar, remover ou mudar um papel. Detalhes e limites em
+`web/docs/SKILLS-POR-ESCOPO.md`.
+
+### Como atualizar (skills compartilhadas)
+
+Peça ao Admin, no chat: "atualiza o DG Claw". A atualização cria a pasta do catálogo vazia e não muda nada nos
+agentes até você publicar uma skill. Para a pasta ficar visível dentro dos agentes que já existem, o container
+de cada um precisa ser recriado uma vez: peça ao Admin para rodar `sudo dgclaw agente recriar <slug> --forcar`
+(a casa, o cofre, as portas e as conversas ficam como estão). Agente criado depois da atualização já nasce com
+a pasta montada.
+
 **Ferramentas por escopo: o gateway para os sistemas da empresa.** Os agentes passam a usar o CRM, o ERP, um
 servidor MCP ou um banco de dados pelo DG Claw, sem receber credencial nenhuma: você guarda uma credencial
 por sistema (`printf %s "$CHAVE" | sudo dgclaw sistema credencial crm`), descreve as operações do sistema em

@@ -144,6 +144,12 @@ pelo STDIN, nunca na linha de comando nem no chat), o catálogo de operações f
 pessoas e dos papéis. Nunca cole uma credencial no `ferramentas.json` nem no `papeis.json`.
 `/opt/dgclaw/app/web/docs/FERRAMENTAS-POR-ESCOPO.md`.
 
+As skills compartilhadas ficam em `/var/lib/dgclaw/skills` (globais, por grupo, por agente) e entram com
+`sudo dgclaw skill publicar <pasta> --escopo global|grupo:<g>|agente:<slug>`; cada papel diz quais recebe no
+bloco `"skills"` do `papeis.json`. Depois de publicar, remover ou mudar um papel, rode `sudo dgclaw skill aplicar`.
+Quando o dono aprova uma skill proposta por um agente, ela já está no catálogo: só falta o `skill aplicar`.
+`/opt/dgclaw/app/web/docs/SKILLS-POR-ESCOPO.md`.
+
 ### Aviso de versão nova
 
 De tempos em tempos a plataforma confere se saiu versão nova do DG Claw e, quando saiu, manda a você um
