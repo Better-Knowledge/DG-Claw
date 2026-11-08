@@ -640,5 +640,5 @@ body:not(.ler-on) .fone{display:none}
 .row.fila-tocando .selo-fila{opacity:1;font-weight:600}
 .row.fila-pausada .selo-fila{opacity:.9}
 
-/* texto de erro curto (estado da barra, 'recusado' nos metadados) */
-.erro-txt{color:var(--t-erro);font-weight:600}
+/* texto de erro curto (estado da barra, 'recusado' nos metadados); no cabeçalho vence o .who span (acento) */
+.erro-txt,.who span.erro-txt{color:var(--t-erro);font-weight:600}

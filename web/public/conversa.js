@@ -1805,7 +1805,7 @@ const VIS_ALT_MIN = 40;
 const visuais = new Map();          // contentWindow -> estado (balão e tela cheia)
 const visEstados = new Set();       // estados dos balões na conversa
 // trocou o tema (seletor, aparelho ou outra aba): os visuais abertos acompanham
-document.addEventListener('dgclaw:tema', () => { for (const est of visEstados) enviaAoVisual(est, { tipo: 'tema', valor: temaApp() }); });
+document.addEventListener('dgclaw:tema', () => { for (const est of visEstados) enviaAoVisual(est, { tipo: 'tema', valor: temaApp() }); if (visTelaEst) enviaAoVisual(visTelaEst, { tipo: 'tema', valor: temaApp() }); });
 const visPorCaixa = new WeakMap();  // .visq -> estado
 const visAlturas = new Map();       // id da mídia -> última altura (sobrevive ao nó refeito)
 
