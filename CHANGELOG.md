@@ -12,6 +12,8 @@ pode ter várias pessoas: no convite você marca os agentes que ela vai usar, e 
 Colaboradores) muda a lista depois, sem derrubar a sessão dela. Com mais de um agente, ela troca de agente pelo menu,
 como você. O que ela não alcança continua igual: o Admin, os agentes que não foram marcados e as telas da caixa
 inteira. Quem já tinha convidado alguém não precisa fazer nada: o convite antigo continua valendo para o agente dele.
+Pelo chat, o Admin também convida, troca os agentes, reenvia e revoga (`sudo dgclaw colaborador ...`), com o mesmo
+arquivo e as mesmas regras da tela.
 
 **Acessos dos agentes.** A tela nova (menu ☰, `/acessos`) mostra, agente por agente, o que ele alcança de fato nos
 dados (fontes e campos, bases, ferramentas, skills e ações com aprovação) e quem conversa com ele no painel (você e

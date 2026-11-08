@@ -57,6 +57,14 @@ function scrypt(senha, h) {
 }
 
 /** Hash fictício, gerado uma vez: login de e-mail que não existe gasta o mesmo scrypt de um que existe. */
+/** Gera "scrypt$N$r$p$sal$hash" sem o módulo inteiro (a CLI usa; o criarAuth também, com o limite de scrypt simultâneo). */
+async function gerarHashSenha(senha) {
+  const h = Object.assign({}, SCRYPT_NOVO, { sal: crypto.randomBytes(16) });
+  h.hash = { length: 32 };
+  const k = await scrypt(senha, h);
+  return `scrypt$${h.N}$${h.r}$${h.p}$${h.sal.toString('base64url')}$${k.toString('base64url')}`;
+}
+
 let hashFicticioCache = null;
 function hashFicticio() {
   if (hashFicticioCache) return hashFicticioCache;
@@ -224,13 +232,8 @@ function criarAuth({ config, log, agora, colaboradores: colabsInicial }) {
     /** Gera "scrypt$N$r$p$sal$hash" (mesmo formato e parâmetros do panel/lib/auth.js). Respeita o limite de scrypt simultâneo. */
     async gerarHash(senha) {
       if (scryptEmCurso >= SCRYPT_SIMULTANEOS) { const e = new Error('Muitas senhas sendo processadas ao mesmo tempo. Tente de novo em alguns segundos.'); e.ocupado = true; throw e; }
-      const h = Object.assign({}, SCRYPT_NOVO, { sal: crypto.randomBytes(16) });
-      h.hash = { length: 32 };
       scryptEmCurso++;
-      try {
-        const k = await scrypt(senha, h);
-        return `scrypt$${h.N}$${h.r}$${h.p}$${h.sal.toString('base64url')}$${k.toString('base64url')}`;
-      } finally { scryptEmCurso--; }
+      try { return await gerarHashSenha(senha); } finally { scryptEmCurso--; }
     },
 
     /** Confere usuário e senha. Sempre gasta o scrypt (mesmo com usuário errado). { ok, trancado?, erro? } */
@@ -433,4 +436,4 @@ function criarAuth({ config, log, agora, colaboradores: colabsInicial }) {
   }
 }
 
-module.exports = { criarAuth, parseHash, NOME_COOKIE, TENTATIVAS_MAX };
+module.exports = { criarAuth, parseHash, gerarHashSenha, NOME_COOKIE, TENTATIVAS_MAX };

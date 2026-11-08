@@ -105,6 +105,7 @@ function criarColaboradores({ config, log, agora, gerarHash }) {
   const relogio = agora || (() => Date.now());
   const arquivo = path.join(config.dataDir, 'colaboradores.json');
   let lista = [];
+  let raizAlheia = {};     // chaves do arquivo que não são nossas (comentario...): sobrevivem à gravação
   let mtimeVisto = -1;     // -1: ainda não li; 0: arquivo ausente
   let ilegivel = null;     // motivo, quando o arquivo existe e não deu para ler
   let fila = Promise.resolve();
@@ -123,6 +124,7 @@ function criarColaboradores({ config, log, agora, gerarHash }) {
     try {
       const j = JSON.parse(fs.readFileSync(arquivo, 'utf8'));
       if (!j || typeof j !== 'object' || !Array.isArray(j.colaboradores)) throw new Error('o conteúdo não tem a lista "colaboradores"');
+      raizAlheia = Object.fromEntries(Object.entries(j).filter(([k]) => k !== 'colaboradores' && k !== 'versao'));
       lista = j.colaboradores.filter((c) => c && typeof c === 'object' && typeof c.id === 'string' && typeof c.email === 'string' && (typeof c.agente === 'string' || Array.isArray(c.agentes))).map(normalizaRegistro);
       if (lista.length !== j.colaboradores.length) log('aviso', `Em ${arquivo}, ${j.colaboradores.length - lista.length} registro(s) sem id, e-mail ou agente foram ignorados (o arquivo não foi alterado).`);
       ilegivel = null;
@@ -140,7 +142,7 @@ function criarColaboradores({ config, log, agora, gerarHash }) {
       fs.mkdirSync(path.dirname(arquivo), { recursive: true, mode: 0o700 });
       for (const c of lista) espelhaSingular(c);
       comTrava(arquivo, () => {
-        fs.writeFileSync(tmp, JSON.stringify({ versao: 1, colaboradores: lista }, null, 2) + '\n', { mode: 0o600 });
+        fs.writeFileSync(tmp, JSON.stringify(Object.assign({}, raizAlheia, { versao: 1, colaboradores: lista }), null, 2) + '\n', { mode: 0o600 });
         fs.chmodSync(tmp, 0o600);
         fs.renameSync(tmp, arquivo);
       });

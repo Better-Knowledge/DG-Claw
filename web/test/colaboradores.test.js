@@ -462,3 +462,21 @@ test('vários agentes: um agente recriado sai só ele da lista; registro antigo 
     assert.deepEqual((await c.get('/api/v1/eu')).json.agentes, ['ana']);
   } finally { await s.fechar(); }
 });
+
+test('colaboradores.json: uma chave alheia na raiz (comentário do dono) sobrevive a convidar, alterar e revogar', async () => {
+  const s = await cenario();
+  try {
+    const arq = path.join(s.t.dados, 'colaboradores.json');
+    fs.mkdirSync(path.dirname(arq), { recursive: true });
+    fs.writeFileSync(arq, JSON.stringify({ versao: 1, comentario: 'anotação do dono', colaboradores: [] }), { mode: 0o600 });
+    const r = await s.convida({ agentes: ['ana'], email: 'maria@x.com' });
+    assert.equal(r.status, 201, r.texto);
+    assert.equal(JSON.parse(fs.readFileSync(arq, 'utf8')).comentario, 'anotação do dono', 'convidar mantém a chave');
+    assert.equal((await s.dono.post('/api/v1/colaboradores/' + r.json.colaborador.id, { json: { agentes: ['bob'] } })).status, 200);
+    assert.equal(JSON.parse(fs.readFileSync(arq, 'utf8')).comentario, 'anotação do dono', 'alterar mantém a chave');
+    assert.equal((await s.dono.pedir('DELETE', '/api/v1/colaboradores/' + r.json.colaborador.id)).status, 200);
+    const j = JSON.parse(fs.readFileSync(arq, 'utf8'));
+    assert.equal(j.comentario, 'anotação do dono', 'revogar mantém a chave');
+    assert.equal(j.versao, 1); assert.equal(j.colaboradores.length, 1);
+  } finally { await s.fechar(); }
+});

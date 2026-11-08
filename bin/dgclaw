@@ -29,6 +29,8 @@ APP_DIR="$(cd "$(dirname "$DGCLAW_BIN_REAL")/.." && pwd)"
 . "$APP_DIR/lib/skills.sh"
 # shellcheck source=lib/pessoas.sh
 . "$APP_DIR/lib/pessoas.sh"
+# shellcheck source=lib/colaboradores.sh
+. "$APP_DIR/lib/colaboradores.sh"
 # shellcheck source=lib/backup.sh
 . "$APP_DIR/lib/backup.sh"
 # shellcheck source=lib/atualizar.sh
@@ -140,6 +142,16 @@ Pessoas (quem trabalha com os agentes, pelo arquivo de papeis)
       longo). Base que ja esta no catalogo fica com o escopo que o dono deixou.
       Exemplo:  sudo dgclaw pessoa desligar marta --sim
   dgclaw pessoa religar <pessoa>        volta a pessoa para ativa (os agentes dela voltam com: dgclaw agente iniciar <slug>)
+
+Colaboradores (pessoas convidadas para conversar com um ou mais agentes pelo painel; web/docs/COLABORADORES.md)
+  dgclaw colaborador listar             e-mail, nome, estado, agentes e ultimo acesso de cada pessoa convidada
+  dgclaw colaborador convidar <email> --agentes <a,b> [--nome <nome>]
+      Cria o convite e imprime o texto com o link, o login e a senha temporaria (7 dias, aparece so nessa hora)
+      para o dono repassar a pessoa. Nunca invente nem peca a senha de ninguem. Exemplo:
+      sudo dgclaw colaborador convidar maria@x.com --agentes ana,bob --nome "Maria"
+  dgclaw colaborador agentes <email> <a,b>   troca a lista de agentes da pessoa (vale no proximo clique dela)
+  dgclaw colaborador reenviar <email>   senha temporaria nova; as sessoes dela caem e ela cria a senha de novo
+  dgclaw colaborador revogar <email>    encerra o acesso na hora; o registro fica na lista, com a data
 
 Skills compartilhadas (por escopo: global, grupo ou agente)
   dgclaw skill publicar <pasta> --escopo global|grupo:<grupo>|agente:<slug> [--nome <nome>]
@@ -2303,6 +2315,19 @@ pessoa_religar() {
     [ "$ENSAIO" = 1 ] || ok "pessoa $1 ativa de novo; os agentes dela voltam com: dgclaw agente iniciar <slug>"
 }
 
+colaborador_main() {
+    local sub="${1:-}"; shift || true
+    case "$sub" in
+        listar) colaborador_listar "$@" ;;
+        convidar) colaborador_convidar "$@" ;;
+        agentes) colaborador_agentes "$@" ;;
+        reenviar) colaborador_reenviar "$@" ;;
+        revogar) colaborador_revogar "$@" ;;
+        "") falha "faltou dizer o que fazer com os colaboradores." "use: listar, convidar, agentes, reenviar ou revogar (veja dgclaw --ajuda)." ;;
+        *) falha "'colaborador $sub' nao existe." "use: listar, convidar, agentes, reenviar ou revogar (veja dgclaw --ajuda)." ;;
+    esac
+}
+
 pessoa_main() {
     local sub="${1:-}"; shift || true
     case "$sub" in
@@ -2857,6 +2882,7 @@ main() {
         sistema) sistema_main "$@" ;;
         skill) skill_main "$@" ;;
         pessoa) pessoa_main "$@" ;;
+        colaborador) colaborador_main "$@" ;;
         imagem) imagem_main "$@" ;;
         senha) senha_main "$@" ;;
         seguranca) seguranca_main "$@" ;;

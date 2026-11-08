@@ -51,6 +51,15 @@ A senha temporária vale por 7 dias. Passado o prazo, o login dela avisa que a s
 - **Revogar acesso** encerra tudo na hora: no próximo toque dela, a sessão cai. O registro continua na lista, com a data da revogação.
 - A lista de baixo mostra todos os colaboradores de todos os agentes, inclusive os revogados.
 
+### Pela linha de comando (o Admin faz por você)
+
+Tudo isso também sai pelo terminal, com o mesmo arquivo e as mesmas regras do painel, para o Admin fazer quando você
+pedir pelo chat: `sudo dgclaw colaborador listar`, `convidar <email> --agentes <a,b> [--nome <nome>]` (imprime o texto
+do convite com a senha temporária, que aparece só nessa hora), `agentes <email> <a,b>`, `reenviar <email>` e
+`revogar <email>`. O Web percebe a mudança sozinho: revogar ou reenviar pela CLI derruba a sessão da pessoa no clique
+seguinte, como pela tela. Se o painel e a CLI tentarem gravar ao mesmo tempo, um deles espera alguns segundos e, se
+não der, recusa em vez de gravar por cima.
+
 ### E-mail (opcional)
 
 Sem configurar nada, o convite sai pelo texto da tela e você manda por WhatsApp. Para o DG Claw mandar o e-mail sozinho, coloque estas linhas no `/etc/dgclaw/web.env` (uma linha por vez, sem apagar as outras) e reinicie o painel:
