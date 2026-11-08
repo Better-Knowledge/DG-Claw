@@ -40,6 +40,11 @@ mk_skill "$TMP/com-segredo" com-segredo; printf 'use api_key = "abcdefghijklmnop
 mk_skill "$TMP/com-nul" com-nul; printf 'texto\0\napi_key = "abcdefghijklmnopqrstuvwxyz123"\n' >>"$TMP/com-nul/notas.md"
 nega "segredo no texto" dgclaw skill publicar "$TMP/com-segredo" --escopo global
 nega "byte nulo no texto nao esconde o segredo do grep" dgclaw skill publicar "$TMP/com-nul" --escopo global
+mk_skill "$TMP/so-nul" so-nul; printf 'texto\0\nsem segredo aqui\n' >>"$TMP/so-nul/notas.md"
+nega "byte nulo sem segredo tambem e recusado (nao e texto)" dgclaw skill publicar "$TMP/so-nul" --escopo global
+mk_skill "$TMP/com-acentos" com-acentos; printf 'ação, coração, 😀\n' >>"$TMP/com-acentos/notas.md"
+afirma "UTF-8 legitimo com acentos e emoji passa" dgclaw skill publicar "$TMP/com-acentos" --escopo global
+afirma "(limpeza) tira a de acentos do catalogo" dgclaw skill remover com-acentos --escopo global
 mk_skill "$TMP/Maiuscula" Maiuscula
 nega "nome com maiuscula" dgclaw skill publicar "$TMP/Maiuscula" --escopo global
 nega "nada disso entrou" bash -c "ls '$SK/globais' | grep -qE 'nome-errado|com-|Maiuscula'"

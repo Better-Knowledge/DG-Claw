@@ -178,9 +178,11 @@ test('os padrões de segredo são os mesmos para a CLI (grep -Eif) e para o Web 
     assert.throws(() => carregaSegredos(path.join(base, 'r')), /classe POSIX/);
     // comentário e linha vazia no arquivo: os dois lados os ignoram (uma linha vazia no grep casaria tudo)
     const comComentario = path.join(base, 'c');
-    fs.writeFileSync(comComentario, '# comentário\n\nsk-[a-z]{16,}\n   \n');
+    const raizRepo = path.join(__dirname, '..', '..');
+    fs.writeFileSync(comComentario, '# comentário\n\n  sk-[a-z]{16,}   \n   \n');
     const rxC = carregaSegredos(comComentario);
-    const grepC = (t) => spawnSync('bash', ['-c', 'grep -Eiq -f <(grep -Ev \'^[[:space:]]*(#|$)\' "$1")', '_', comComentario], { input: t + '\n' }).status === 0;
+    // o lado da CLI usa a normalização REAL (skills_padroes_segredo de lib/skills.sh), não uma cópia dela
+    const grepC = (t) => spawnSync('bash', ['-c', '. "$2/lib/comum.sh"; . "$2/lib/skills.sh"; grep -Eiq -f <(skills_padroes_segredo)', '_', comComentario, raizRepo], { input: t + '\n', env: Object.assign({}, process.env, { DGCLAW_SEGREDOS_REGEX: comComentario, APP_DIR: raizRepo, DGCLAW_RAIZ: base }) }).status === 0;
     for (const t of ['sk-abcdefghijklmnopqrst']) { assert.ok(rxC.test(t)); assert.ok(grepC(t)); }
     for (const t of ['nada aqui', '# comentário']) { assert.ok(!rxC.test(t), 'web: ' + t); assert.ok(!grepC(t), 'cli: ' + t); }
     // arquivo só de comentários: os dois lados fecham (erro), em vez de "sem segredo"
