@@ -70,9 +70,17 @@ skills_conferir_pasta() {
     [ "$achado" = "$nome" ] || falha "o SKILL.md diz 'name: ${achado:-(nada)}', mas a skill se chama '$nome'." "corrija o name no frontmatter do SKILL.md para $nome"
     # Segredo nunca entra em skill: o arquivo fica legivel por todo agente que a recebe. Padroes em lib/segredos.regex.
     [ -s "$SKILLS_SEGREDOS_REGEX" ] || falha "nao achei a lista de padroes de segredo em $SKILLS_SEGREDOS_REGEX." "a copia do DG Claw esta incompleta; reinstale"
-    # Linha vazia ou comentario no arquivo de padroes nao vira padrao (vazio casaria qualquer linha); o Web
-    # (carregaSegredos) descarta as mesmas linhas, para os dois lados lerem a lista igual.
-    if grep -Ev '^[[:space:]]*(#|$)' "$SKILLS_SEGREDOS_REGEX" | grep -rEIin -f - "$origem" >/dev/null; then
+    # A lista e normalizada como o Web faz (carregaSegredos): espaco nas pontas fora, linha vazia e comentario
+    # fora (vazio casaria qualquer linha). Lista que fica vazia e erro, nao "sem segredo" (fechado).
+    local padroes
+    padroes="$(sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' "$SKILLS_SEGREDOS_REGEX" | grep -Ev '^(#|$)')" || padroes=""
+    [ -n "$padroes" ] || falha "a lista de padroes de segredo em $SKILLS_SEGREDOS_REGEX esta vazia." "a copia do DG Claw esta incompleta; reinstale"
+    # Byte NUL no meio de um "texto" faria o grep tratar o arquivo como binario e pular a busca; texto de skill
+    # nao tem NUL, entao e recusado. E a busca usa -a, para nunca pular arquivo.
+    if LC_ALL=C grep -rlP '\x00' "$origem" >/dev/null 2>&1; then
+        falha "a pasta '$origem' tem um arquivo com byte nulo (nao e texto)." "tire ou reescreva o arquivo; skill compartilhada so tem texto"
+    fi
+    if grep -rEain -f <(printf '%s\n' "$padroes") "$origem" >/dev/null; then
         falha "a pasta '$origem' parece ter um segredo (chave, token ou senha)." "tire o valor; a skill diz ONDE pegar a chave (no cofre), nunca o valor"
     fi
 }
@@ -102,7 +110,8 @@ skills_publicar() {
     # (a skill aprendida na casa dele), e entre conferir e copiar ele poderia trocar um arquivo por atalho ou fifo.
     tmp="$(mktemp -d "$pasta/.$nome.XXXXXX")"
     # ulimit -f (em blocos de 1024): nenhum arquivo copiado passa do teto, mesmo que a origem cresca durante a copia.
-    if ! ( ulimit -f $((SKILL_MAX_BYTES / 1024 + 1)); cp -R --no-dereference --preserve=mode "$origem/." "$tmp/" ) 2>/dev/null; then rm -rf "$tmp"; falha "nao consegui copiar a pasta '$origem' (ou um arquivo dela passa de $SKILL_MAX_BYTES bytes)." "confira o tamanho, a permissao e o espaco em disco"; fi
+    # Com o sinal ignorado, o cp recebe EFBIG e sai com erro comum (sem "File size limit exceeded" na tela nem core).
+    if ! ( trap '' XFSZ; ulimit -f $((SKILL_MAX_BYTES / 1024 + 1)); cp -R --no-dereference --preserve=mode "$origem/." "$tmp/" ) 2>/dev/null; then rm -rf "$tmp"; falha "nao consegui copiar a pasta '$origem' (ou um arquivo dela passa de $SKILL_MAX_BYTES bytes)." "confira o tamanho, a permissao e o espaco em disco"; fi
     if find "$tmp" ! -type f ! -type d | grep -q .; then rm -rf "$tmp"; falha "a pasta '$origem' tem atalho, fifo ou outro arquivo que nao e comum; skill compartilhada so tem arquivos e pastas." "troque o atalho pelo arquivo"; fi
     SKILLS_TMP_LIMPAR="$tmp"; trap '[ -n "${SKILLS_TMP_LIMPAR:-}" ] && rm -rf "$SKILLS_TMP_LIMPAR"' EXIT
     skills_conferir_pasta "$tmp" "$nome"

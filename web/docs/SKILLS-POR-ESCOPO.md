@@ -16,8 +16,9 @@ container; o que o agente vê em `~/.claude/skills` são links para elas. O agen
 outros escopos nem altera o catálogo: ele **propõe** uma skill para o grupo dele, e uma pessoa aprova no painel.
 Quando o mesmo nome existe em mais de um escopo que o agente recebe, a **mais específica vence** (agente > grupo >
 global; entre dois grupos da mesma pessoa, vence o grupo de nome alfabeticamente maior): a skill privada de um
-agente nunca é trocada por uma de grupo de mesmo nome. Por isso a proposta de um agente recusa o nome de uma
-skill global (sem dizer que ela existe), e o `publicar` avisa quando o nome já existe em outro escopo.
+agente nunca é trocada por uma de grupo de mesmo nome. Por isso uma proposta de agente com o nome de uma skill
+global não é gravada na aprovação (o agente recebe "nome não disponível", sem saber que a global existe; o
+motivo de verdade fica no log do Web), e o `publicar` avisa quando o nome já existe em outro escopo.
 A pasta da vista é sempre a mesma (só o conteúdo dela é trocado): o container montado nela enxerga a mudança
 na hora, mesmo ligado.
 

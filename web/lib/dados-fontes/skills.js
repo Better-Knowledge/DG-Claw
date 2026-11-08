@@ -17,6 +17,7 @@ const RAIZ_APP = path.join(__dirname, '..', '..', '..');
 /** Os mesmos padrões de segredo que o dgclaw skill publicar usa (lib/segredos.regex): uma lista só. */
 function carregaSegredos(arquivo) {
   const linhas = fs.readFileSync(arquivo, 'utf8').split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
+  if (!linhas.length) throw new Error('lib/segredos.regex: a lista de padrões de segredo está vazia.');
   // [[:space:]] é POSIX; em JS vira \s. O resto dos padrões é ERE que o JS entende. Outra classe POSIX ([[:alnum:]]
   // etc.) viraria em silêncio uma classe errada em JS: é recusada para a lista continuar igual nos dois lados.
   for (const l of linhas) {
@@ -79,8 +80,8 @@ function fonteSkills({ dir, papeis, log, catalogo }) {
             if (!pessoa || !pessoa.grupos.includes(p.grupo)) throw new ErroFonte(403, `A pessoa ${contexto.pessoa} não faz parte do grupo "${p.grupo}"; só dá para propor skill para um grupo seu.`);
           }
           // Uma skill de grupo com o nome de uma global tomaria o lugar dela para o grupo inteiro (a mais específica vence).
-          // A mensagem não diz que é global: o catálogo dos outros escopos não é do agente (sem oráculo de nomes).
-          if (existeGlobal(p.nome)) throw new ErroFonte(409, `O nome "${p.nome}" não está disponível para skill de grupo. Escolha outro nome (ex.: ${p.nome}-${p.grupo}).`);
+          // Nome igual ao de uma skill global: conferido só na hora de gravar (executar), para a resposta ao pedido
+          // não servir de oráculo dos nomes das globais (o catálogo dos outros escopos não é do agente).
           const existe = existeSkill(p.grupo, p.nome);
           if (existe && !p.substituir) throw new ErroFonte(409, `Já existe a skill "${p.nome}" no grupo ${p.grupo}. Para trocar o texto, proponha de novo com "substituir": true; a pessoa vai ver que é uma substituição.`);
           if (existe && existe.outros) throw new ErroFonte(409, `A skill "${p.nome}" do grupo ${p.grupo} foi publicada pelo dono com mais arquivos além do SKILL.md; um agente não a substitui. Peça ao dono.`);
@@ -95,8 +96,12 @@ function fonteSkills({ dir, papeis, log, catalogo }) {
             const pessoa = ag ? e.politica.pessoas[ag.pessoa] : null;
             if (!pessoa || pessoa.estado === 'desligada' || !pessoa.grupos.includes(p.grupo)) throw new ErroFonte(403, `A pessoa do agente ${contexto.agente} já não faz parte do grupo "${p.grupo}"; a skill não foi gravada.`);
           }
-          // O dono pode ter publicado uma global com esse nome entre o pedido e o clique: a de grupo a esconderia do grupo.
-          if (existeGlobal(p.nome)) throw new ErroFonte(409, `Agora existe uma skill global "${p.nome}"; a skill de grupo não foi gravada para não tomar o lugar dela.`);
+          // Uma global com esse nome seria escondida do grupo pela de grupo (a mais específica vence). O motivo de
+          // verdade vai só para o log do Web (do dono); ao agente, a frase genérica.
+          if (existeGlobal(p.nome)) {
+            if (log) log('aviso', `Skills: a proposta "${p.nome}" para o grupo ${p.grupo} (aprovação ${contexto && contexto.aprovacao}) não foi gravada: já existe uma skill global com esse nome, e a de grupo tomaria o lugar dela para o grupo. Peça outro nome ao agente.`);
+            throw new ErroFonte(409, `O nome "${p.nome}" não está disponível para skill de grupo; a skill não foi gravada. Escolha outro nome (ex.: ${p.nome}-${p.grupo}).`);
+          }
           const pasta = path.join(dir, 'grupos', p.grupo, p.nome);
           const destino = path.join(pasta, 'SKILL.md');
           const existe = existeSkill(p.grupo, p.nome);
