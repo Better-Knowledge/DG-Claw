@@ -16,7 +16,9 @@
 //   GET  /api/v1/dados/papeis                         só dono: estado do arquivo de papéis (válido, hash, resumo)
 //   GET  /api/v1/dados/bases                          só dono: o catálogo de bases de conhecimento (web/lib/bases.js)
 //   GET  /api/v1/dados/ferramentas                    só dono: o catálogo de ferramentas e os NOMES das credenciais (web/lib/ferramentas.js)
-//   GET  /api/v1/dados/log?limit=                     só dono: últimas linhas do log de acesso
+//   GET  /api/v1/dados/log?limit=&agente=&pessoa=&fonte=&decisao=&operacao=&desde=&ate=   só dono: linhas do log de acesso filtradas
+//   GET  /api/v1/dados/log.csv (mesmos filtros)         só dono: as linhas em CSV, para planilha
+//   GET  /api/v1/dados/log/resumo?desde=              só dono: contagens por decisão, agente, fonte e pessoa
 // A caixa libera só /api/v1/dados/fontes, /api/v1/dados/pedidos e /api/v1/dados/docs.md (server.js). As rotas
 // do dono recusam sessão vinda da caixa também aqui (guarda dupla).
 //
@@ -387,11 +389,34 @@ function criarDados({ dir, papeis, bases, basesDir, ferramentas, cofreSistemas, 
         const n = (o) => Object.keys(o).length;
         return H.enviaJson(res, 200, { ok: true, valido: e.ok, erro: e.erro, origem: e.origem, hash: e.hash, pessoas: n(e.politica.pessoas), papeis: n(e.politica.papeis), grupos: n(e.politica.grupos || {}), agentes: Object.keys(e.politica.agentes), politica: e.ok ? e.politica : null }), true;
       }
-      if (sub === '/log') {
+      if (sub === '/log' || sub === '/log.csv' || sub === '/log/resumo') {
         metodo(['GET']); soDono(quem, sessao);
-        const bruto = url.searchParams.get('limit');
+        const q = url.searchParams;
+        const filtro = {};
+        const bruto = q.get('limit');
         if (bruto !== null && !/^\d{1,4}$/.test(bruto)) throw new ErroDados(400, '"limit" precisa ser um inteiro de 1 a 1000.');
-        return H.enviaJson(res, 200, { ok: true, linhas: acessos.ultimas(bruto === null ? 100 : Number(bruto)) }), true;
+        filtro.limit = bruto === null ? (sub === '/log.csv' ? 1000 : 100) : Number(bruto);
+        for (const k of ['agente', 'pessoa', 'fonte', 'decisao', 'operacao']) {
+          const v = q.get(k);
+          if (v === null || v === '') continue;
+          if (!/^[a-z0-9][a-z0-9_:-]{0,50}$/.test(v)) throw new ErroDados(400, `"${k}" precisa ser um nome simples.`);
+          filtro[k] = v;
+        }
+        for (const k of ['desde', 'ate']) {
+          const v = q.get(k);
+          if (v === null || v === '') continue;
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) throw new ErroDados(400, `"${k}" precisa ser uma data AAAA-MM-DD.`);
+          filtro[k] = v;
+        }
+        if (sub === '/log/resumo') return H.enviaJson(res, 200, Object.assign({ ok: true }, acessos.resumo(filtro.desde))), true;
+        const linhas = acessos.filtrar(filtro);
+        if (sub === '/log.csv') {
+          const texto = acessos.csv(linhas);
+          res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="acessos-dados.csv"', 'Cache-Control': 'no-store' });
+          res.end('\ufeff' + texto);
+          return true;
+        }
+        return H.enviaJson(res, 200, { ok: true, linhas, filtro }), true;
       }
       throw new ErroDados(404, `Não existe ${m} ${p}. As rotas estão em GET ${BASE}/docs.md.`);
     } catch (e) {
