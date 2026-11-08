@@ -24,6 +24,12 @@ test('dados.html liga os scripts e estilos certos, e o sw.js guarda os estático
   for (const u of ['/dados.js', '/dados.css']) assert.ok(s.includes(`'${u}'`), u);
 });
 
+test('a tela pede os pendentes numa chamada só deles, para um histórico cheio nunca esconder um cartão', () => {
+  const js = pub('dados.js');
+  assert.ok(js.includes("'/api/v1/dados/aprovacoes?estado=pendente&limit=500'"));
+  assert.ok(js.includes("'/api/v1/dados/aprovacoes?limit=40'"));
+});
+
 test('o cartão do pedido mostra a ação exata, escapa HTML e carrega o hash para aprovar', () => {
   const p = { id: 'a'.repeat(24), hash: 'f'.repeat(64), descricao: 'A ana quer enviar um e-mail para <b>x</b>', pedido_por: 'agente:ana', pedido_em: '2026-11-08T12:00:00.000Z', expira_em: '2026-11-08T12:15:00.000Z', pessoa: 'marta', papel: 'recepcao', params: { para: 'x@exemplo.test', assunto: 'Oi "chefe"', texto: 'linha 1\n<script>alert(1)</script>', extra: { a: 1 } } };
   const h = T.htmlPedido(p, Date.parse('2026-11-08T12:03:00.000Z'));

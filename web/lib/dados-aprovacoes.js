@@ -87,11 +87,15 @@ function criarAprovacoes({ dir, log, agora, prazoMs }) {
   /** Vence o que passou do prazo. Chamado em toda leitura. */
   function expira() {
     const t = relogio();
-    let mudou = false;
-    for (const p of itens.values()) {
-      if (p.estado === 'pendente' && Date.parse(p.expira_em) <= t) { p.estado = 'expirada'; p.decidido_em = new Date(t).toISOString(); mudou = true; }
+    const alvos = [...itens.values()].filter((p) => p.estado === 'pendente' && Date.parse(p.expira_em) <= t);
+    if (!alvos.length) return;
+    const antes = alvos.map((p) => ({ p, decidido_em: p.decidido_em }));
+    for (const p of alvos) { p.estado = 'expirada'; p.decidido_em = new Date(t).toISOString(); }
+    try { salva(); } catch (e) {
+      // Memória e disco não podem divergir: desfaz. Os pedidos continuam vencidos pelo prazo, então aprovar já falha.
+      for (const a of antes) { a.p.estado = 'pendente'; a.p.decidido_em = a.decidido_em; }
+      log('aviso', `Aprovações de dados: ${alvos.length} pedido(s) venceram mas não consegui gravar (${e.message}); tento de novo na próxima leitura.`);
     }
-    if (mudou) salva();
   }
 
   function garante() { carrega(); expira(); }

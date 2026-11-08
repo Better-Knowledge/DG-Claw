@@ -130,14 +130,16 @@
   }
 
   async function carregaPendentes() {
-    const r = await chamar('GET', '/api/v1/dados/aprovacoes');
+    /* Pendentes vêm todos (até o teto do servidor), numa chamada só deles: um histórico cheio nunca esconde um cartão. */
+    const r = await chamar('GET', '/api/v1/dados/aprovacoes?estado=pendente&limit=500');
     if (!r.ok) { msg(r.erro, 'erro'); return; }
-    const lista = r.json.aprovacoes || [];
-    const pend = lista.filter(p => p.estado === 'pendente');
+    const pend = r.json.aprovacoes || [];
     $('pendentes').innerHTML = pend.length ? pend.map(p => htmlPedido(p)).join('') : '<p class="lp-vazio">Nenhuma ação esperando você.</p>';
-    const hist = lista.filter(p => p.estado !== 'pendente').slice(0, 30);
-    $('historico').innerHTML = hist.length ? hist.map(htmlHistorico).join('') : '<p class="lp-vazio">Nenhum ainda.</p>';
     document.title = (pend.length ? '(' + pend.length + ') ' : '') + 'Dados - DG Claw';
+    const h = await chamar('GET', '/api/v1/dados/aprovacoes?limit=40');
+    if (!h.ok) return;
+    const hist = (h.json.aprovacoes || []).filter(p => p.estado !== 'pendente').slice(0, 30);
+    $('historico').innerHTML = hist.length ? hist.map(htmlHistorico).join('') : '<p class="lp-vazio">Nenhum ainda.</p>';
   }
 
   async function carregaPapeis() {
