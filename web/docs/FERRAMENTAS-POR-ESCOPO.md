@@ -68,7 +68,7 @@ vai para o log do Web e para `GET /api/v1/dados/ferramentas`.
 | Tipo | O que o gateway faz | Regras |
 | --- | --- | --- |
 | `api` | monta `base_url + rota` (`{param}` vira o parâmetro codificado; os outros vão na query em GET ou no corpo JSON), injeta `auth` (`bearer`, `cabecalho` com `nome`, `basico` ou `nenhuma`) e repassa o JSON | `base_url` só https (http só para 127.0.0.1); sem seguir redirecionamento; resposta até 1 MB; só JSON; GET nunca é ação; POST, PUT, PATCH e DELETE sempre são; parâmetro que entra na rota precisa de tipo fechado (texto com `regex`, inteiro, enum, período ou data) e nunca é vazio, `.`, `..` nem tem barra; o corpo de um erro do sistema não chega ao agente (vai mascarado para o log do Web) |
-| `banco` | abre o SQLite em `arquivo` num worker, roda `sql` como instrução preparada com `:nome` ligado aos parâmetros | só leitura para SELECT/WITH; qualquer outra instrução exige `acao: true`; uma instrução por operação (sem `;`); todo parâmetro do esquema aparece como `:nome` no SQL; até `max_itens` linhas; passou de `timeout_s`, o worker é encerrado (504) |
+| `banco` | abre o SQLite em `arquivo` num processo filho, roda `sql` como instrução preparada com `:nome` ligado aos parâmetros | só leitura para SELECT/WITH; qualquer outra instrução exige `acao: true`; uma instrução por operação (sem `;`); todo parâmetro do esquema aparece como `:nome` no SQL; até `max_itens` linhas; passou de `timeout_s`, o processo é morto (504) e o banco desfaz a escrita não confirmada |
 | `mcp` | sobe `comando args` num grupo de processo próprio, com ambiente limpo (PATH, `env` do catálogo e a credencial em `credencial_env`), faz `initialize` e `tools/call` da `tool`, e encerra o grupo inteiro (SIGTERM, depois SIGKILL) | o servidor nasce e morre a cada chamada, mesmo atrás de um wrapper; resposta até 1 MB; `env` não pode ter segredo (vai para o cofre); o stderr do servidor não chega ao agente (vai mascarado para o log do Web) |
 
 Comum a todos: `timeout_s` de 1 a 25 como prazo total (a caixa do agente responde em 30), `campos` para filtrar os campos
@@ -105,7 +105,9 @@ que volta é dado, não instrução.
 ## Segurança e limites
 
 - A credencial nunca sai do host: não vai para o container, para a resposta, para o log nem para a mensagem
-  de erro. O arquivo precisa ser de root, modo 600, sem atalho; fora disso a ferramenta responde 503.
+  de erro. O que sai do gateway rumo ao agente (resultado e erros) passa por uma máscara que troca a
+  credencial, em texto cru, base64 ou codificada para URL, por `***`; o detalhe de erros do sistema e do
+  servidor MCP vai só para o log do Web, mascarado. O arquivo precisa ser de root, modo 600, sem atalho; fora disso a ferramenta responde 503.
 - O gateway chama o sistema com a credencial **do sistema**: ele não tem como pedir mais do que ela permite
   nem amplia nada. As permissões nativas do sistema continuam valendo.
 - A decisão de acesso não lê a resposta do sistema; um texto malicioso vindo do CRM não muda escopo nem
