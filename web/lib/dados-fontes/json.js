@@ -38,6 +38,14 @@ function normalizaId(v) {
   return v;
 }
 
+// Caracteres de formatação e controle (Cf/Cc: zero-width, marcas bidi, BOM...) que fazem a pessoa ler na tela algo
+// diferente do que está nos bytes. Recusados em tudo que uma pessoa aprova.
+const RX_INVISIVEL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff\ufff9-\ufffb]/;
+function semInvisivel(v, onde) {
+  if (typeof v === 'string' && RX_INVISIVEL.test(v)) throw new ErroFonte(400, `${onde} tem caracteres invisíveis ou de formatação (zero-width, marca de direção, controle), que a tela não mostra. Tire-os e mande de novo.`);
+  return v;
+}
+
 function soChaves(q, permitidas, onde) {
   if (!ehObjeto(q)) throw new ErroFonte(400, `${onde} precisa ser um objeto JSON.`);
   for (const k of Object.keys(q)) if (!permitidas.includes(k)) throw new ErroFonte(400, `${onde}: o campo "${String(k).slice(0, 40)}" não existe. Campos aceitos: ${permitidas.join(', ') || '(nenhum)'}.`);
@@ -87,4 +95,4 @@ function fonteJson({ dir, nome, campos, busca, catalogo }) {
   };
 }
 
-module.exports = { fonteJson, ErroFonte, soChaves, limiteDe, LIMIT_MAX };
+module.exports = { fonteJson, ErroFonte, soChaves, limiteDe, semInvisivel, RX_INVISIVEL, LIMIT_MAX };

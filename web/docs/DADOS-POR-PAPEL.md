@@ -42,8 +42,9 @@ O Web relê o arquivo sozinho quando ele muda.
 - Níveis de fonte: `negado` ou `leitura`. Níveis de ação: `negado` ou `aprovacao_humana`. Não existe
   ação livre: toda ação é executada pelo Web depois que uma pessoa aprova no painel.
 - Um papel serve a vários agentes; mudar o papel muda todos eles na hora.
-- **Revogar** é tirar a pessoa (ou o agente) do arquivo: o próximo pedido é negado e os pedidos de
-  aprovação pendentes dele viram `revogada`.
+- **Revogar** é tirar a pessoa (ou o agente) do arquivo: o próximo pedido é negado e, assim que o Web
+  percebe a mudança (no primeiro pedido que chegar à rota), os pedidos de aprovação pendentes de quem
+  perdeu o acesso viram `revogada`.
 - Arquivo inválido (JSON quebrado, nome errado, referência a pessoa que não existe) **fecha a rota**:
   todo acesso fica negado e o motivo vai para o log do Web e para `GET /api/v1/dados/papeis`. O painel
   continua funcionando, porque é por ele que você conserta.
@@ -74,7 +75,7 @@ Cada fonte declara um **catálogo** (dono, classificação, finalidade, retenç�
 | `GET /api/v1/dados/fontes` | agente e dono | agente: só o que ele alcança (fontes, campos efetivos, ações); dono: o catálogo inteiro |
 | `POST /api/v1/dados/fontes/<fonte>/<operacao>` | agente e dono | leitura filtrada (200) ou pedido de aprovação (202); negado (403) |
 | `GET /api/v1/dados/pedidos/<id>` | agente (só os seus) e dono | estado e resultado de um pedido de ação |
-| `GET /api/v1/dados/aprovacoes[?estado=]` | só dono | a fila, com a ação exata de cada pedido |
+| `GET /api/v1/dados/aprovacoes[?estado=&limit=]` | só dono | a fila (até `limit`, padrão 100): pendentes com a ação exata; decididos sem os parâmetros |
 | `POST /api/v1/dados/aprovacoes/<id>/aprovar` | só dono, pelo navegador | corpo `{"hash": "..."}`: o hash que a tela mostrou |
 | `POST /api/v1/dados/aprovacoes/<id>/recusar` | só dono | corpo `{"motivo": "..."}` opcional |
 | `GET /api/v1/dados/papeis` | só dono | se o arquivo está válido, o hash curto e o resumo |
@@ -90,7 +91,10 @@ qualquer sessão vinda da caixa. Nenhum campo do corpo identifica quem pede: `ag
 - `buscar`: `{ "termo": "...", "limit": ... }` (termo até 200 caracteres, sem distinguir maiúsculas).
 - `ler`: `{ "id": "..." }` nas fontes JSON; `{ "caminho": "sub/arquivo.md" }` na pasta (relativo, sem `..`,
   sem atalho, até 256 KB, só texto).
-- `email/enviar`: `{ "para": "x@exemplo.test", "assunto": "...", "texto": "..." }`.
+- `email/enviar`: `{ "para": "x@exemplo.test", "assunto": "...", "texto": "..." }`. Um único endereço
+  simples (letras, números e `. _ % + -` antes do `@`); assunto e texto sem caracteres invisíveis ou de
+  formatação (zero-width, marcas de direção), para a pessoa ler na tela exatamente o que está nos bytes.
+  Cada agente tem no máximo 10 pedidos pendentes, e o painel 200; acima disso volta 429.
 
 Campo que a operação não aceita volta 400 dizendo quais existem. Resposta acima de 512 KB volta 413:
 peça menos. Teto de 60 pedidos por minuto por agente nesta rota (além dos 120 da caixa).
@@ -137,7 +141,10 @@ dgclaw-api GET  /api/v1/dados/pedidos/<id>
 
 Uma linha JSON por pedido em `/var/lib/dgclaw/web/dados/log/acessos-AAAA-MM-DD.jsonl` (root, 600):
 `quando, agente, pessoa, papel, fonte, operacao, acao, decisao, motivo, status, itens, bytes, aprovacao, por`.
-**Sem parâmetros, sem conteúdo, sem segredo.** Retenção de `DGCLAW_DADOS_LOG_DIAS` dias (padrão 90) no
+**Sem parâmetros, sem conteúdo, sem segredo.** Quando a recusa veio de um parâmetro inválido, o `motivo`
+no log é um código fixo ("a fonte recusou os parâmetros (400)"), nunca o valor que o agente mandou; a frase
+completa vai só na resposta ao agente. O que o agente vê de um pedido de aprovação nunca traz o login do
+painel: quem decidiu aparece como `dono`. Retenção de `DGCLAW_DADOS_LOG_DIAS` dias (padrão 90) no
 `web.env`; os arquivos mais velhos são apagados na primeira escrita de cada dia.
 
 ## O que esta camada NÃO cobre (leia antes de confiar nela)

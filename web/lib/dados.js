@@ -80,11 +80,13 @@ function criarDados({ dir, papeis, push, log, agora, retencaoDias, prazoAprovaca
     const slug = quem.tipo === 'agente' ? quem.slug : null;
     const chave = slug || `dono:${quem.usuario || '?'}`;
     const base = { agente: slug || 'dono', por: quem.tipo === 'agente' ? `agente:${slug}` : `dono:${quem.usuario || '?'}`, fonte: nomeFonte, operacao };
-    const nega = (status, motivo, extra) => { registra(Object.assign({}, base, { decisao: 'negado', motivo, status }, extra || {})); throw new ErroDados(status, motivo, { decisao: 'negado' }); };
+    // `motivoLog` é o que vai para o log quando a frase de erro ecoa algo que o agente mandou (valor de parâmetro):
+    // o log guarda um código estável, nunca texto livre do agente.
+    const nega = (status, motivo, motivoLog) => { registra(Object.assign({}, base, { decisao: 'negado', motivo: motivoLog || motivo, status })); throw new ErroDados(status, motivo, { decisao: 'negado' }); };
 
-    if (!RX_NOME.test(nomeFonte) || !RX_NOME.test(operacao)) nega(400, 'Fonte e operação precisam ser nomes simples (a-z, 0-9, _ e -).');
+    if (!RX_NOME.test(nomeFonte) || !RX_NOME.test(operacao)) { base.fonte = '?'; base.operacao = '?'; nega(400, 'Fonte e operação precisam ser nomes simples (a-z, 0-9, _ e -).', 'nome de fonte ou operação inválido'); }
     const espera = esperaDoTeto(chave);
-    if (espera) nega(429, `Pedidos demais: o teto da rota de dados é ${TETO_POR_MINUTO} por minuto por agente. Espere ${espera} s.`, { });
+    if (espera) nega(429, `Pedidos demais: o teto da rota de dados é ${TETO_POR_MINUTO} por minuto por agente. Espere ${espera} s.`, 'teto de pedidos por minuto');
     const fonte = fontes.obter(nomeFonte);
     if (!fonte) nega(404, `Não existe a fonte "${nomeFonte}". As fontes estão em GET ${BASE}/fontes.`);
     const ehLeitura = OPERACOES_LEITURA.has(operacao) && !!fonte.operacoes[operacao];
@@ -92,10 +94,10 @@ function criarDados({ dir, papeis, push, log, agora, retencaoDias, prazoAprovaca
     if (!ehLeitura && !acaoDef) nega(404, `A fonte "${nomeFonte}" não tem a operação "${operacao}". Operações: ${[...Object.keys(fonte.operacoes), ...Object.keys(fonte.acoes || {})].join(', ') || 'nenhuma'}.`);
 
     let corpo;
-    try { corpo = await H.lerJson(req, MAX_CORPO); } catch (e) { nega(e.status || 400, e.message); }
+    try { corpo = await H.lerJson(req, MAX_CORPO); } catch (e) { nega(e.status || 400, e.message, 'corpo inválido ou grande demais'); }
     // Identidade no corpo é recusada de forma explícita: nada aqui vem do pedido.
     for (const k of ['agente', 'dono', 'pessoa', 'papel', 'slug', 'usuario']) {
-      if (Object.prototype.hasOwnProperty.call(corpo, k)) nega(400, `O campo "${k}" não existe nos parâmetros: a identidade vem da caixa do agente, não do corpo do pedido.`);
+      if (Object.prototype.hasOwnProperty.call(corpo, k)) nega(400, `O campo "${k}" não existe nos parâmetros: a identidade vem da caixa do agente, não do corpo do pedido.`, `campo de identidade "${k}" no corpo`);
     }
 
     // Decisão. O dono do painel lê tudo e pede ação como qualquer pessoa; o agente passa pelos papéis.
@@ -111,7 +113,7 @@ function criarDados({ dir, papeis, push, log, agora, retencaoDias, prazoAprovaca
     if (ehLeitura) {
       let r;
       try { r = fonte.operacoes[operacao](corpo); } catch (e) {
-        if (e instanceof ErroFonte) nega(e.status, e.message);
+        if (e instanceof ErroFonte) nega(e.status, e.message, `a fonte recusou os parâmetros (${e.status})`);
         log('erro', `Dados ${nomeFonte}/${operacao} (${base.por}): falha inesperada no adaptador (${e.stack || e.message}).`);
         nega(500, `Falha inesperada ao ler "${nomeFonte}"; por segurança nada foi devolvido. Tente de novo; se repetir, avise o dono.`);
       }
@@ -119,7 +121,7 @@ function criarDados({ dir, papeis, push, log, agora, retencaoDias, prazoAprovaca
       if (r.item) saida.item = filtra(r.item, d.campos, fonte);
       else { saida.itens = (r.itens || []).map((it) => filtra(it, d.campos, fonte)); saida.total = r.total; }
       const texto = JSON.stringify(saida);
-      if (Buffer.byteLength(texto) > MAX_RESPOSTA) nega(413, `A resposta de ${nomeFonte}/${operacao} passou de ${MAX_RESPOSTA} bytes. Use "limit" menor ou um termo mais específico.`);
+      if (Buffer.byteLength(texto) > MAX_RESPOSTA) nega(413, `A resposta de ${nomeFonte}/${operacao} passou de ${MAX_RESPOSTA} bytes. Use "limit" menor ou um termo mais específico.`, 'resposta acima do teto');
       registra(Object.assign({}, base, { decisao: 'permitido', motivo: d.motivo, status: 200, itens: saida.item ? 1 : saida.itens.length, bytes: Buffer.byteLength(texto) }));
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': Buffer.byteLength(texto), 'Cache-Control': 'no-store' });
       res.end(texto);
@@ -129,7 +131,7 @@ function criarDados({ dir, papeis, push, log, agora, retencaoDias, prazoAprovaca
     // Ação: valida, congela, pede aprovação. Nada executa aqui.
     let params;
     try { params = acaoDef.validar(corpo); } catch (e) {
-      if (e instanceof ErroFonte) nega(e.status, e.message);
+      if (e instanceof ErroFonte) nega(e.status, e.message, `a ação recusou os parâmetros (${e.status})`);
       log('erro', `Dados ${nomeFonte}/${operacao}: falha ao validar (${e.stack || e.message}).`);
       nega(500, 'Falha inesperada ao validar a ação; nada foi pedido.');
     }
@@ -138,11 +140,11 @@ function criarDados({ dir, papeis, push, log, agora, retencaoDias, prazoAprovaca
     try {
       pedido = aprovacoes.pedir({ agente: base.agente, pessoa: d.pessoa, papel: d.papel, fonte: nomeFonte, operacao, acao: acaoDef.acao, params, descricao, pedido_por: base.por });
     } catch (e) {
-      if (e instanceof ErroAprovacao) nega(e.status, e.message);
+      if (e instanceof ErroAprovacao) nega(e.status, e.message, e.status === 429 ? 'teto de pedidos pendentes' : `a fila recusou o pedido (${e.status})`);
       throw e;
     }
-    registra(Object.assign({}, base, { decisao: 'aprovacao', motivo: d.motivo, status: 202, aprovacao: pedido.id }));
-    avisaPessoa(pedido);
+    registra(Object.assign({}, base, { decisao: 'aprovacao', motivo: pedido.novo ? d.motivo : 'pedido repetido; devolvido o pendente', status: 202, aprovacao: pedido.id }));
+    if (pedido.novo) avisaPessoa(pedido);
     H.enviaJson(res, 202, { ok: true, decisao: 'aprovacao', pedido: { id: pedido.id, estado: pedido.estado, expira_em: pedido.expira_em, descricao: pedido.descricao }, mensagem: `A ação "${acaoDef.acao}" foi registrada e espera a aprovação de uma pessoa no painel (${pedido.expira_em} é o prazo). Nada foi executado. Acompanhe em GET ${BASE}/pedidos/${pedido.id}.` });
   }
 
@@ -212,11 +214,31 @@ function criarDados({ dir, papeis, push, log, agora, retencaoDias, prazoAprovaca
     return saida;
   }
 
+  // Cada vez que o arquivo de papéis muda (ou fecha), os pendentes de quem perdeu o acesso são revogados na hora,
+  // não só quando o dono abre a fila.
+  let assinaturaPapeis = null;
+  function sincronizaPendentes() {
+    const e = papeis.estado();
+    const sig = `${e.ok}:${e.origem}:${e.hash}`;
+    if (sig === assinaturaPapeis) return;
+    assinaturaPapeis = sig;
+    try {
+      const n = varrePendentes(e);
+      if (n) log('info', `Dados: os papéis mudaram e ${n} pedido(s) de aprovação pendente(s) foram revogados.`);
+    } catch (err) { log('erro', `Dados: não consegui varrer os pedidos pendentes depois da mudança dos papéis (${err.message}).`); }
+  }
+
+  /** O que o agente vê de um pedido: sem o login do dono (quem decidiu aparece só como "dono"). */
+  function pedidoParaAgente(a) {
+    return Object.assign({}, a, { decidido_por: a.decidido_por ? 'dono' : null, pedido_por: a.pedido_por && a.pedido_por.startsWith('dono:') ? 'dono' : a.pedido_por });
+  }
+
   async function rotas(req, res, url, sessao) {
     const p = url.pathname;
     if (p !== BASE && !p.startsWith(BASE + '/')) return false;
     const m = req.method;
     const quem = quemChamou(sessao);
+    sincronizaPendentes();
     const sub = p.slice(BASE.length).replace(/\/+$/, '');
     const metodo = (aceitos) => { if (!aceitos.includes(m)) { res.setHeader('Allow', aceitos.join(', ')); throw new ErroDados(405, `${p} não aceita ${m}. Use ${aceitos.join(' ou ')}.`); } };
     try {
@@ -227,7 +249,13 @@ function criarDados({ dir, papeis, push, log, agora, retencaoDias, prazoAprovaca
         return H.enviaJson(res, 200, { ok: true, fontes: fontes.catalogo() }), true;
       }
       const op = /^\/fontes\/([^/]{1,40})\/([^/]{1,40})$/.exec(sub);
-      if (op) { metodo(['POST']); await operar(req, res, quem, decodeURIComponent(op[1]), decodeURIComponent(op[2])); return true; }
+      if (op) {
+        metodo(['POST']);
+        let nomeFonte; let operacao;
+        try { nomeFonte = decodeURIComponent(op[1]); operacao = decodeURIComponent(op[2]); } catch (_) { throw new ErroDados(400, 'Fonte e operação precisam ser nomes simples (a-z, 0-9, _ e -).'); }
+        await operar(req, res, quem, nomeFonte, operacao);
+        return true;
+      }
 
       const ped = /^\/pedidos\/([^/]{1,40})$/.exec(sub);
       if (ped) {
@@ -235,15 +263,17 @@ function criarDados({ dir, papeis, push, log, agora, retencaoDias, prazoAprovaca
         if (!RX_ID.test(ped[1])) throw new ErroDados(400, 'O id do pedido precisa ter 24 caracteres hexadecimais.');
         const a = aprovacoes.obter(ped[1], true);
         if (quem.tipo === 'agente' && a.agente !== quem.slug) throw new ErroDados(404, `Não existe o pedido ${ped[1]} para o agente ${quem.slug}.`);
-        return H.enviaJson(res, 200, { ok: true, pedido: a }), true;
+        return H.enviaJson(res, 200, { ok: true, pedido: quem.tipo === 'agente' ? pedidoParaAgente(a) : a }), true;
       }
 
       if (sub === '/aprovacoes') {
         metodo(['GET']); soDono(quem, sessao);
-        varrePendentes(papeis.estado());
         const estado = url.searchParams.get('estado');
         if (estado !== null && !/^[a-z]{1,12}$/.test(estado)) throw new ErroDados(400, 'O parâmetro "estado" precisa ser um nome simples (pendente, aprovada, recusada, expirada, revogada, executada, falhou).');
-        return H.enviaJson(res, 200, { ok: true, aprovacoes: aprovacoes.listar({ estado }), pendentes: aprovacoes.pendentes().length }), true;
+        const bruto = url.searchParams.get('limit');
+        if (bruto !== null && !/^\d{1,3}$/.test(bruto)) throw new ErroDados(400, '"limit" precisa ser um inteiro de 1 a 500.');
+        const limit = bruto === null ? 100 : Math.min(500, Math.max(1, Number(bruto)));
+        return H.enviaJson(res, 200, { ok: true, aprovacoes: aprovacoes.listar({ estado, limit }), pendentes: aprovacoes.pendentes().length }), true;
       }
       const ap = /^\/aprovacoes\/([^/]{1,40})\/(aprovar|recusar)$/.exec(sub);
       if (ap) {
@@ -282,7 +312,7 @@ function criarDados({ dir, papeis, push, log, agora, retencaoDias, prazoAprovaca
     } catch (e) {
       if (e instanceof ErroDados) { H.erroJson(res, e.status, e.message, e.extra); return true; }
       if (e instanceof ErroAprovacao) { H.erroJson(res, e.status, e.message); return true; }
-      if (e && e.status === 400) { H.erroJson(res, 400, e.message); return true; }
+      if (e && Number.isInteger(e.status) && e.status >= 400 && e.status < 500) { H.erroJson(res, e.status, e.message); return true; }
       log('erro', `Dados ${m} ${p}: falha inesperada (${e && (e.stack || e.message)})`);
       H.erroJson(res, 500, 'Falha inesperada na rota de dados; por segurança nada foi devolvido. Tente de novo; se repetir, veja o log do Web.');
       return true;
