@@ -50,6 +50,8 @@ test('credenciais por escopo: a do escopo vence a padrão; cabecalho_agente e en
   assert.deepEqual(r.ferramentas.crm.credenciais, { 'crm:escrever': 'crm-escrita' }); assert.equal(r.ferramentas.crm.credencial, 'crm-leitura'); assert.equal(r.ferramentas.crm.cabecalho_agente, 'X-DGClaw-Agente');
   assert.equal(r.ferramentas.so.credencial, null); assert.deepEqual(r.ferramentas.so.credenciais, { 'so:ler': 'so-leitura' });
   assert.equal(r.ferramentas.m.env_agente, 'DGCLAW_AGENTE'); assert.equal(r.ferramentas.m.cabecalho_agente, undefined);
+  const ok2 = validaFerramentas({ versao: 1, ferramentas: { k: { tipo: 'api', base_url: 'https://a.test', auth: { tipo: 'bearer' }, credencial: 'c', cabecalho_agente: 'X-Keycloak-Agente', operacoes: {} }, m2: { tipo: 'mcp', comando: '/usr/bin/node', env_agente: 'DGCLAW_AGENTE_SLUG', operacoes: {} } } });
+  assert.equal(ok2.ok, true, JSON.stringify(ok2.erros));
 });
 
 test('validaFerramentas recusa o que abriria uma brecha ou quebraria a chamada', () => {
@@ -113,6 +115,13 @@ test('validaFerramentas recusa o que abriria uma brecha ou quebraria a chamada',
     [api({ auth: { tipo: 'bearer' }, credencial: 'c', cabecalho_agente: 'X-Rewrite-URL' }), /cabecalho_agente precisa ser/],
     [api({ auth: { tipo: 'bearer' }, credencial: 'c', cabecalho_agente: 'X-Vault-Token' }), /cabecalho_agente precisa ser/],
     [api({ auth: { tipo: 'bearer' }, credencial: 'c', cabecalho_agente: 'X-Goog-Api-Key' }), /cabecalho_agente precisa ser/],
+    [api({ auth: { tipo: 'bearer' }, credencial: 'c', cabecalho_agente: 'X-Remote-User' }), /cabecalho_agente precisa ser/],
+    [api({ auth: { tipo: 'bearer' }, credencial: 'c', cabecalho_agente: 'X-WEBAUTH-USER' }), /cabecalho_agente precisa ser/],
+    [api({ auth: { tipo: 'bearer' }, credencial: 'c', cabecalho_agente: 'X-Hub-Signature-256' }), /cabecalho_agente precisa ser/],
+    [api({ auth: { tipo: 'bearer' }, credencial: 'c', cabecalho_agente: 'X-Session-Id' }), /cabecalho_agente precisa ser/],
+    [api({ auth: { tipo: 'bearer' }, credencial: 'c', cabecalho_agente: 'X-Email' }), /cabecalho_agente precisa ser/],
+    [{ versao: 1, ferramentas: { m: { tipo: 'mcp', comando: '/usr/bin/node', env_agente: 'DGCLAW_RAIZ', operacoes: {} } } }, /env_agente precisa ser/],
+    [{ versao: 1, ferramentas: { m: { tipo: 'mcp', comando: '/usr/bin/node', env_agente: 'DGCLAW_WEB_DATA', operacoes: {} } } }, /env_agente precisa ser/],
     [{ versao: 1, ferramentas: { m: { tipo: 'mcp', comando: '/usr/bin/node', env_agente: 'LD_PRELOAD', operacoes: {} } } }, /env_agente precisa ser/],
     [{ versao: 1, ferramentas: { m: { tipo: 'mcp', comando: '/usr/bin/node', env_agente: 'NODE_OPTIONS', operacoes: {} } } }, /env_agente precisa ser/],
     [{ versao: 1, ferramentas: { m: { tipo: 'mcp', comando: '/usr/bin/node', env: { EXTRA: 'sim' }, env_agente: 'EXTRA', operacoes: {} } } }, /env_agente precisa ser/],
