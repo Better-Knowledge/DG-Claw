@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Dados - DG Claw</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#2f9e5e">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="stylesheet" href="/lembretes.css">
+<link rel="stylesheet" href="/dados.css">
+<link rel="stylesheet" href="/casca.css">
+<link rel="stylesheet" href="/menu-lado.css">
+<link rel="stylesheet" href="/sem-zoom.css">
+<script src="/sem-zoom.js"></script>
+</head>
+<body class="lp dp">
+<main class="lp-main">
+  <p class="lp-msg erro" id="msgGeral" role="alert" hidden></p>
+
+  <section class="lp-sec" id="secPendentes" aria-label="Ações aguardando sua aprovação">
+    <h2><span>Ações aguardando sua aprovação</span><button type="button" class="lp-ajuda" data-ajuda="pendentes" aria-label="Tutorial das aprovações">?</button></h2>
+    <p class="lp-fraco">Um agente pediu para fazer algo fora da conversa (enviar um e-mail, por exemplo). Leia a ação exata. Aprovar executa só o que está escrito aqui; o agente não consegue mudar nada depois de pedir.</p>
+    <div id="pendentes"><p class="lp-vazio">Carregando…</p></div>
+  </section>
+
+  <section class="lp-sec" id="secPapeis" aria-label="Papéis de acesso a dados">
+    <h2><span>Papéis de acesso a dados</span><button type="button" class="lp-ajuda" data-ajuda="papeis" aria-label="Tutorial dos papéis">?</button></h2>
+    <p class="lp-fraco" id="papeisEstado">Conferindo…</p>
+    <div id="papeis"></div>
+  </section>
+
+  <section class="lp-sec" id="secHistorico" aria-label="Pedidos já decididos">
+    <h2><span>Pedidos já decididos</span></h2>
+    <div id="historico"><p class="lp-vazio">Nenhum ainda.</p></div>
+  </section>
+
+  <section class="lp-sec" id="secLog" aria-label="Últimos acessos a dados">
+    <h2><span>Últimos acessos</span><button type="button" class="lp-ajuda" data-ajuda="log" aria-label="Tutorial do log de acesso">?</button></h2>
+    <div id="log"><p class="lp-vazio">Nenhum acesso registrado.</p></div>
+  </section>
+</main>
+
+<script src="/tour.js"></script>
+<script src="/menu-lado.js"></script>
+<script src="/casca.js"></script>
+<script src="/dados.js"></script>
+<script>
+DGCasca.monta({ pagina: 'dados', titulo: 'Dados', aoTutorial: function () { if (window.DGDadosTutorial) window.DGDadosTutorial(); } });
+</script>
+</body>
+</html>

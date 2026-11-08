@@ -1,0 +1,24 @@
+/* dados.css: a tela /dados (aprovações de ações, papéis e log de acesso). Reaproveita a base lp- de lembretes.css. */
+.dp-pedido{border:1px solid var(--lp-linha);border-radius:12px;padding:12px;margin-bottom:10px;background:#fffdf5}
+.dp-pedido h3{font-size:15.5px;margin:0 0 6px;overflow-wrap:anywhere}
+.dp-pedido .dp-meta{color:var(--lp-fraco);font-size:13px;margin:0 0 8px;overflow-wrap:anywhere}
+.dp-pedido dl{margin:0 0 10px;display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:14px}
+.dp-pedido dt{color:var(--lp-fraco)}
+.dp-pedido dd{margin:0;overflow-wrap:anywhere;white-space:pre-wrap;max-height:260px;overflow:auto}
+.dp-pedido .dp-hash{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--lp-fraco);overflow-wrap:anywhere}
+.dp-acoes{display:flex;gap:8px;flex-wrap:wrap}
+.dp-aprovar{background:var(--lp-acento)!important;border-color:var(--lp-acento)!important;color:#fff!important}
+.dp-recusar{background:#fff0f0!important;border-color:#e3b4b4!important;color:#8a1c1c!important}
+.dp-hist{border-top:1px solid var(--lp-linha);padding:8px 0;font-size:14px;overflow-wrap:anywhere}
+.dp-hist:first-child{border-top:0}
+.dp-estado{display:inline-block;border-radius:10px;padding:1px 8px;font-size:12.5px;font-weight:600;margin-right:6px;background:#eef2ee;color:#38523f}
+.dp-estado.executada{background:#e3f5ea;color:#1d6b3c}
+.dp-estado.recusada,.dp-estado.revogada,.dp-estado.falhou{background:#fde8e8;color:#8a1c1c}
+.dp-estado.expirada{background:#f4f0e3;color:#7a5a00}
+.dp-log{font-size:13px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;overflow-wrap:anywhere;padding:4px 0;border-top:1px solid var(--lp-linha)}
+.dp-log:first-child{border-top:0}
+.dp-log .negado{color:#8a1c1c}
+.dp-log .permitido,.dp-log .executada{color:#1d6b3c}
+.dp-papel{margin:0 0 6px;font-size:14px;overflow-wrap:anywhere}
+.dp-papel code{background:#f2f6f2;padding:1px 5px;border-radius:5px}
+.dp-erro{color:#8a1c1c;white-space:pre-wrap;overflow-wrap:anywhere}

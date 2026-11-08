@@ -31,6 +31,7 @@
   const LINK_CONECTAR = { nome: 'Conectar conta', ico: '🔑', href: '/conectar' };
   const LINK_COLABORADOR = { nome: 'Convidar colaborador', ico: '👥', href: '/colaboradores' };
   const ehColaborador = () => !!(raiz.DGPapel && raiz.DGPapel.colaborador);
+  const LINK_DADOS = { nome: 'Dados', ico: '🗂', href: '/dados' };
 
   /* Sessões é item fixo para todo agente com painel (a tela fica no painel dele). Devolve o link do menu e os
      endereços que o menu consulta (config: a aba está ligada? pedidos: quantas sessões esperam o dono), ou null. */
@@ -277,7 +278,7 @@
     return { tipo: 'sem', texto: 'Este navegador não oferece a instalação por aqui. No Chrome ou no Edge, abra o menu do navegador e procure Instalar app. No Firefox para computador, o recurso não existe.' };
   }
 
-  if (!raiz.document) return { corUso, quandoZeraUso, miniBarraUso, itemUso, ABAS_PAINEL, LINK_LEMBRETES, LINK_AVISOS, LINK_SEGURANCA, LINK_CONECTAR, LINK_COLABORADOR, linkSessoes, linkTela, itemAgente, bolinhaMenu, seloDe, totalNaoLidas, totalPrecisam, horaCurta, linksPainel, linksExtras, comAgente, chaveDoHref, passosMenu, instrucaoInstalar };
+  if (!raiz.document) return { corUso, quandoZeraUso, miniBarraUso, itemUso, ABAS_PAINEL, LINK_LEMBRETES, LINK_AVISOS, LINK_SEGURANCA, LINK_CONECTAR, LINK_COLABORADOR, LINK_DADOS, linkSessoes, linkTela, itemAgente, bolinhaMenu, seloDe, totalNaoLidas, totalPrecisam, horaCurta, linksPainel, linksExtras, comAgente, chaveDoHref, passosMenu, instrucaoInstalar };
 
   /* ── Parte com DOM ─────────────────────────────────────────────────────── */
   const $ = id => document.getElementById(id);
@@ -600,6 +601,11 @@
     }
     $('mlTabs').insertAdjacentHTML('beforeend', `<div data-tour="gm-conectar"><a class="ml-tab" href="${comAgente(LINK_CONECTAR.href, ag.id)}">` +
       `<span class="ml-ico" aria-hidden="true">${LINK_CONECTAR.ico}</span>${LINK_CONECTAR.nome}</a></div>`);
+    // Dados (aprovações por papel): só o dono; o colaborador não vê a entrada.
+    if (!colab) {
+      $('mlTabs').insertAdjacentHTML('beforeend', `<div data-tour="gm-dados"><a class="ml-tab" href="${comAgente(LINK_DADOS.href, ag.id)}">` +
+        `<span class="ml-ico" aria-hidden="true">${LINK_DADOS.ico}</span>${LINK_DADOS.nome}</a></div>`);
+    }
     // Convidar colaborador: só o dono, e nunca para o Admin (o Admin mexe no servidor inteiro)
     if (!colab && ag.tipo !== 'admin' && ag.id) {
       $('mlTabs').insertAdjacentHTML('beforeend', `<div data-tour="gm-colaborador"><a class="ml-tab" href="${LINK_COLABORADOR.href}?agente=${encodeURIComponent(ag.id)}">` +
