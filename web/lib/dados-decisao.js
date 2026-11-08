@@ -12,6 +12,10 @@
 //   - política inválida, agente fora do arquivo, pessoa ou papel que sumiram, qualquer exceção: negado.
 
 const OPERACOES_LEITURA = new Set(['listar', 'buscar', 'ler']);
+// Consulta por chave sem cair no protótipo: "constructor" ou "__proto__" como nome de agente, fonte ou base
+// nunca devolvem algo que não está escrito na política.
+const tem = (o, k) => o != null && typeof o === 'object' && Object.prototype.hasOwnProperty.call(o, k);
+const de = (o, k) => (tem(o, k) ? o[k] : undefined);
 
 function intersecao(a, b) {
   if (!a && !b) return null;
@@ -38,17 +42,18 @@ function decidir(entrada) {
     if (typeof slug !== 'string' || !slug) return negado('Pedido sem identidade de agente: a rota de dados só atende pela caixa do agente ou pela sessão do dono.');
     if (typeof fonte !== 'string' || !fonte) return negado('Pedido sem fonte.');
     const pol = estado.politica;
-    const ag = pol.agentes[slug];
+    const ag = de(pol.agentes, slug);
     if (!ag) return negado(`O agente ${slug} não está no arquivo de papéis (/etc/dgclaw/papeis.json); sem pessoa e papel, nenhuma fonte é liberada. Peça ao dono para acrescentá-lo.`);
-    const pessoa = pol.pessoas[ag.pessoa];
-    const papel = pol.papeis[ag.papel];
+    const pessoa = de(pol.pessoas, ag.pessoa);
+    const papel = de(pol.papeis, ag.papel);
     if (!pessoa) return negado(`A pessoa "${ag.pessoa}" do agente ${slug} não existe mais nos papéis; acesso retirado.`, { pessoa: ag.pessoa, papel: ag.papel });
     if (!papel) return negado(`O papel "${ag.papel}" do agente ${slug} não existe mais nos papéis; acesso retirado.`, { pessoa: ag.pessoa, papel: ag.papel });
     const ids = { pessoa: ag.pessoa, papel: ag.papel };
+    if (pessoa.estado === 'desligada') return negado(`A pessoa ${ag.pessoa} está desligada; o agente ${slug} não alcança fonte nem ação alguma.`, ids);
 
     if (OPERACOES_LEITURA.has(operacao)) {
-      const fp = pessoa.fontes[fonte];
-      const fr = papel.fontes[fonte];
+      const fp = de(pessoa.fontes, fonte);
+      const fr = de(papel.fontes, fonte);
       if (!fp || fp.nivel !== 'leitura') return negado(`A pessoa ${ag.pessoa} não tem leitura na fonte "${fonte}"${fp ? ' (está como negado)' : ' (não está escrita)'}; o agente ${slug} não a alcança, qualquer que seja o papel.`, ids);
       if (!fr || fr.nivel !== 'leitura') return negado(`O papel ${ag.papel} não tem leitura na fonte "${fonte}"${fr ? ' (está como negado)' : ' (não está escrita)'}; o agente ${slug} não a alcança.`, ids);
       const campos = intersecao(fp.campos, fr.campos);
@@ -57,8 +62,8 @@ function decidir(entrada) {
     }
 
     if (typeof acao !== 'string' || !acao) return negado(`A operação "${String(operacao).slice(0, 40)}" em "${fonte}" não é leitura nem uma ação conhecida.`, ids);
-    const ap = pessoa.acoes[acao];
-    const ar = papel.acoes[acao];
+    const ap = de(pessoa.acoes, acao);
+    const ar = de(papel.acoes, acao);
     if (ap !== 'aprovacao_humana') return negado(`A pessoa ${ag.pessoa} não tem a ação "${acao}"${ap ? ' (está como negado)' : ' (não está escrita)'}; o agente ${slug} não pode pedi-la.`, ids);
     if (ar !== 'aprovacao_humana') return negado(`O papel ${ag.papel} não tem a ação "${acao}"${ar ? ' (está como negado)' : ' (não está escrita)'}; o agente ${slug} não pode pedi-la.`, ids);
     return Object.assign({ decisao: 'aprovacao', campos: null, motivo: `a ação ${acao} precisa da aprovação de uma pessoa no painel` }, ids);
@@ -78,8 +83,8 @@ function foraDoEscopo(nomePessoa, pessoa, base) {
 /** Nível de uma base num bloco "bases": o nome exato vence o "*"; sem nada = null. */
 function nivelDaBase(bloco, nome) {
   if (!bloco) return null;
-  if (bloco[nome] !== undefined) return bloco[nome];
-  if (bloco['*'] !== undefined) return bloco['*'];
+  if (tem(bloco, nome)) return bloco[nome];
+  if (tem(bloco, '*')) return bloco['*'];
   return null;
 }
 
@@ -98,25 +103,27 @@ function decidirBase(entrada) {
     if (typeof slug !== 'string' || !slug) return negado('Pedido sem identidade de agente.');
     if (!base || typeof nomeBase !== 'string') return negado(`A base "${String(nomeBase).slice(0, 40)}" não está no catálogo.`);
     const pol = estado.politica;
-    const ag = pol.agentes[slug];
+    const ag = de(pol.agentes, slug);
     if (!ag) return negado(`O agente ${slug} não está no arquivo de papéis; nenhuma base é liberada.`);
-    const pessoa = pol.pessoas[ag.pessoa];
-    const papel = pol.papeis[ag.papel];
+    const pessoa = de(pol.pessoas, ag.pessoa);
+    const papel = de(pol.papeis, ag.papel);
     const ids = { pessoa: ag.pessoa, papel: ag.papel };
     if (!pessoa) return negado(`A pessoa "${ag.pessoa}" do agente ${slug} não existe mais nos papéis; acesso retirado.`, ids);
     if (!papel) return negado(`O papel "${ag.papel}" do agente ${slug} não existe mais nos papéis; acesso retirado.`, ids);
     if (pessoa.estado === 'desligada') return negado(`A pessoa ${ag.pessoa} está desligada; o agente ${slug} não alcança base nenhuma.`, ids);
     const fora = foraDoEscopo(ag.pessoa, pessoa, base);
-    if (fora) return negado(`A base "${nomeBase}" está fora do alcance da pessoa ${ag.pessoa}: ${fora}.`, ids);
-    if (nivelDaBase(pessoa.bases, nomeBase) === 'negado') return negado(`A pessoa ${ag.pessoa} tem a base "${nomeBase}" como negada.`, ids);
+    // `invisivel: true` = para o agente a base deve parecer inexistente (404), para não revelar donos de bases privadas
+    // nem nomes de grupos; o motivo completo vai só para o log.
+    if (fora) return negado(`A base "${nomeBase}" está fora do alcance da pessoa ${ag.pessoa}: ${fora}.`, Object.assign({ invisivel: true }, ids));
+    if (nivelDaBase(pessoa.bases, nomeBase) === 'negado') return negado(`A pessoa ${ag.pessoa} tem a base "${nomeBase}" como negada.`, Object.assign({ invisivel: true }, ids));
     const np = nivelDaBase(papel.bases, nomeBase);
-    if (np !== 'leitura') return negado(`O papel ${ag.papel} não tem leitura na base "${nomeBase}"${np ? ' (está como negado)' : ' (não está escrita; use o nome ou "*" no bloco "bases" do papel)'}.`, ids);
+    if (np !== 'leitura') return negado(`O papel ${ag.papel} não tem leitura na base "${nomeBase}"${np ? ' (está como negado)' : ' (não está escrita; use o nome ou "*" no bloco "bases" do papel)'}.`, Object.assign({ invisivel: true }, ids));
     if (OPERACOES_LEITURA.has(operacao)) {
       return Object.assign({ decisao: 'permitido', campos: null, motivo: `leitura da base ${nomeBase} (escopo ${base.escopo}) liberada para a pessoa ${ag.pessoa} e para o papel ${ag.papel}`, escopo: base.escopo }, ids);
     }
     if (typeof acao !== 'string' || !acao) return negado(`A operação "${String(operacao).slice(0, 40)}" na base "${nomeBase}" não é leitura nem uma ação conhecida.`, ids);
-    if (pessoa.acoes[acao] !== 'aprovacao_humana') return negado(`A pessoa ${ag.pessoa} não tem a ação "${acao}"; o agente ${slug} não pode propor escrita na base.`, ids);
-    if (papel.acoes[acao] !== 'aprovacao_humana') return negado(`O papel ${ag.papel} não tem a ação "${acao}"; o agente ${slug} não pode propor escrita na base.`, ids);
+    if (de(pessoa.acoes, acao) !== 'aprovacao_humana') return negado(`A pessoa ${ag.pessoa} não tem a ação "${acao}"; o agente ${slug} não pode propor escrita na base.`, ids);
+    if (de(papel.acoes, acao) !== 'aprovacao_humana') return negado(`O papel ${ag.papel} não tem a ação "${acao}"; o agente ${slug} não pode propor escrita na base.`, ids);
     return Object.assign({ decisao: 'aprovacao', campos: null, motivo: `a ação ${acao} na base ${nomeBase} precisa da aprovação de uma pessoa no painel`, escopo: base.escopo }, ids);
   } catch (e) {
     return { decisao: 'negado', campos: null, motivo: `Falha interna na decisão de acesso (${e && e.message}); por segurança o pedido foi negado.`, pessoa: null, papel: null };
