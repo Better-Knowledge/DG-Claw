@@ -27,11 +27,18 @@ case "${1:-}" in
         echo running > "$est/c-$2"
         # Simula o container que cai na partida (falta de inotify): estado exited, codigo 255.
         if [ -f "$est/saida-255" ]; then echo exited > "$est/c-$2"; echo 255 > "$est/codigo-$2"; fi ;;
+    unpause)
+        nome="${*: -1}"
+        [ -f "$est/c-$nome" ] && [ "$(cat "$est/c-$nome")" = paused ] && echo running > "$est/c-$nome" ;;
     stop)
         nome="${*: -1}"
+        # Como o podman de verdade: container pausado recusa o stop.
+        if [ -f "$est/c-$nome" ] && [ "$(cat "$est/c-$nome")" = paused ]; then echo "Error: container state improper" >&2; exit 125; fi
         [ -f "$est/c-$nome" ] || exit 0
         # stop-trava-<container> = N: o stop devolve, mas o estado fica "stopping" por N consultas
         # (depois vira exited); = sempre: fica "stopping" para sempre (o caso real do podman 4.9.3).
+        # stop-nao-para-<container>: o stop devolve 0 mas o container continua running (processo que ignora o sinal).
+        if [ -f "$est/stop-nao-para-$nome" ]; then exit 0; fi
         if [ -f "$est/stop-trava-$nome" ]; then
             echo stopping > "$est/c-$nome"; cp "$est/stop-trava-$nome" "$est/stopping-resta-$nome"
         else echo exited > "$est/c-$nome"; fi ;;

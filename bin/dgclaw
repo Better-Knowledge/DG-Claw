@@ -1595,12 +1595,14 @@ _recriar_remover_container() {
         return 0
     fi
     case "$est" in
-        running|stopping)
+        running|stopping|paused)
+            # Container pausado recusa o stop: despausa antes.
+            [ "$est" != paused ] || podman unpause "$c" >/dev/null 2>&1 || aviso "o 'podman unpause $c' devolveu erro."
             podman stop -t 60 "$c" >/dev/null 2>&1 \
                 || aviso "o 'podman stop -t 60 $c' devolveu erro; vou esperar o estado do container mesmo assim."
             for ((i = 0; i < tempo; i++)); do
                 est="$(estado_container "$slug")"
-                case "$est" in running|stopping) sleep 1 ;; *) break ;; esac
+                case "$est" in running|stopping|paused) sleep 1 ;; *) break ;; esac
             done ;;
     esac
     est="$(estado_container "$slug")"
@@ -2257,6 +2259,8 @@ pessoa_desligar() {
         est="$(_pessoa_estado_agente "$slug")"
         case "$est" in
             running|stopping|initialized|paused)
+                # Container pausado recusa o stop: despausa antes.
+                [ "$est" != paused ] || podman unpause "dgclaw-$slug" >/dev/null 2>&1 || aviso "o 'podman unpause' do agente $slug devolveu erro"
                 podman stop -t 60 "dgclaw-$slug" >/dev/null 2>&1 || aviso "o 'podman stop' do agente $slug devolveu erro; vou esperar o estado dele mesmo assim"
                 for ((i = 0; i < tempo; i++)); do
                     est="$(_pessoa_estado_agente "$slug")"
@@ -2265,7 +2269,14 @@ pessoa_desligar() {
                 est="$(_pessoa_estado_agente "$slug")"
                 case "$est" in
                     ausente|exited|stopped|created) ok "agente $slug parado (a casa dele fica inteira)" ;;
-                    stopping) aviso "o agente $slug ficou preso em 'stopping' (um defeito conhecido do podman). Quem resolve e: dgclaw agente recriar $slug (a casa fica; depois pare com: dgclaw agente parar $slug)"; parou_tudo=0 ;;
+                    stopping)
+                        # Defeito conhecido do podman: o container fica preso em "stopping". Remover so o container
+                        # (a casa, o cofre e os segredos sao pastas do host) e o que resolve, e deixa o agente parado
+                        # de verdade; mandar a pessoa ao "agente recriar" religaria o agente de quem acabou de sair.
+                        aviso "o agente $slug ficou preso em 'stopping' (defeito conhecido do podman); removo so o container para a entrega seguir. Para o sucessor usar esse agente depois: dgclaw agente recriar $slug --forcar"
+                        if _recriar_remover_container "$slug" && [ "$(_pessoa_estado_agente "$slug")" = ausente ]; then ok "container do agente $slug removido (a casa dele fica inteira)"
+                        else aviso "nao consegui remover o container do agente $slug"; parou_tudo=0; fi ;;
+                    erro:*) aviso "o podman deixou de responder enquanto o agente $slug parava ($est)"; parou_tudo=0 ;;
                     *) aviso "o agente $slug continua em '$est' depois de ${tempo}s"; parou_tudo=0 ;;
                 esac ;;
             ausente|exited|stopped|created) info "agente $slug ja estava parado ($est)" ;;

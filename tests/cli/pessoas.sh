@@ -89,19 +89,38 @@ afirma "caio (sem grupo) para base empresa: pode" dgclaw pessoa desligar caio --
 afirma "copiou para la" test -f "$LIB/bases/manual-rh/bia/MEMORY.md"
 jq '.pessoas.caio.estado = "ativa"' "$PAP" >"$TMP/p3.json" && cp "$TMP/p3.json" "$PAP"
 
-echo "agente que nao para: a memoria nao e copiada com ele vivo"
+echo "agente preso em stopping: o container e removido (a casa fica) e a entrega segue, sem religar o agente"
 jq '.pessoas.marta.estado = "ativa"' "$PAP" >"$TMP/p4.json" && cp "$TMP/p4.json" "$PAP"
 echo running >"$STUB_ESTADO/c-dgclaw-ana"; echo sempre >"$STUB_ESTADO/stop-trava-dgclaw-ana"
-rm -rf "$LIB/bases/entrega-marta"
-nega "desligar com um agente que fica em stopping: falha" dgclaw pessoa desligar marta --sim
+rm -rf "$LIB/bases/entrega-marta"; : >"$STUB_LOG"
+dgclaw pessoa desligar marta --sim >"$TMP/preso.txt" 2>&1
+afirma "desligar com um agente preso em stopping completa" test $? -eq 0
+afirma "removeu so o container (rm -f)" grep -q '^podman rm -f dgclaw-ana' "$STUB_LOG"
+nega "o container nao existe mais" test -e "$STUB_ESTADO/c-dgclaw-ana"
+nega "nao religou o agente" grep -q '^podman start' "$STUB_LOG"
+afirma "a memoria foi entregue" test -f "$LIB/bases/entrega-marta/ana/MEMORY.md"
+afirma "diz ao sucessor como voltar o agente" grep -q 'dgclaw agente recriar ana --forcar' "$TMP/preso.txt"
+afirma "a casa da Ana continua inteira" test -f "$H/MEMORY.md"
+rm -f "$STUB_ESTADO/stop-trava-dgclaw-ana"; echo exited >"$STUB_ESTADO/c-dgclaw-ana"
+jq '.pessoas.marta.estado = "ativa"' "$PAP" >"$TMP/p5.json" && cp "$TMP/p5.json" "$PAP"
+
+echo "agente pausado: despausa, para e entrega"
+echo paused >"$STUB_ESTADO/c-dgclaw-ana"; rm -rf "$LIB/bases/entrega-marta"; : >"$STUB_LOG"
+afirma "desligar com agente pausado completa" dgclaw pessoa desligar marta --sim
+afirma "despausou antes de parar" bash -c "grep -q '^podman unpause dgclaw-ana' '$STUB_LOG' && grep -q '^podman stop .*dgclaw-ana' '$STUB_LOG'"
+igual "container parado" "exited" "$(cat "$STUB_ESTADO/c-dgclaw-ana")"
+afirma "a memoria foi entregue" test -f "$LIB/bases/entrega-marta/ana/MEMORY.md"
+jq '.pessoas.marta.estado = "ativa"' "$PAP" >"$TMP/p5b.json" && cp "$TMP/p5b.json" "$PAP"
+
+echo "agente que o podman nao consegue parar: a memoria nao e copiada com ele vivo"
+echo running >"$STUB_ESTADO/c-dgclaw-ana"; touch "$STUB_ESTADO/stop-nao-para-dgclaw-ana"; rm -rf "$LIB/bases/entrega-marta"
+nega "desligar com um agente que continua running: falha" dgclaw pessoa desligar marta --sim
 igual "a pessoa FICA desligada (o acesso ja foi negado pelo Web)" "desligada" "$(jq -r .pessoas.marta.estado "$PAP")"
 nega "nada foi copiado" test -e "$LIB/bases/entrega-marta/ana"
-dgclaw pessoa desligar marta --sim >"$TMP/preso.txt" 2>&1 || true
-afirma "a dica aponta o comando que resolve o stopping preso" grep -q 'dgclaw agente recriar ana' "$TMP/preso.txt"
-rm -f "$STUB_ESTADO/stop-trava-dgclaw-ana"; echo exited >"$STUB_ESTADO/c-dgclaw-ana"
+rm -f "$STUB_ESTADO/stop-nao-para-dgclaw-ana"; echo exited >"$STUB_ESTADO/c-dgclaw-ana"
 afirma "rodar de novo com o agente parado completa a entrega" dgclaw pessoa desligar marta --sim
 afirma "agora copiou" test -f "$LIB/bases/entrega-marta/ana/MEMORY.md"
-jq '.pessoas.marta.estado = "ativa"' "$PAP" >"$TMP/p5.json" && cp "$TMP/p5.json" "$PAP"
+jq '.pessoas.marta.estado = "ativa"' "$PAP" >"$TMP/p5c.json" && cp "$TMP/p5c.json" "$PAP"
 
 echo "podman que nao responde: nada e copiado (erro nao vale como 'parado')"
 rm -rf "$LIB/bases/entrega-marta"
