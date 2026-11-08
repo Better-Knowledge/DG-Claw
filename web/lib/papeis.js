@@ -31,9 +31,12 @@ const RX_SLUG = /^[a-z0-9][a-z0-9-]{0,31}$/;
 const RX_NOME = /^[a-z][a-z0-9_-]{0,39}$/;      // pessoas, papéis, fontes, ações, campos
 const NIVEIS_FONTE = ['negado', 'leitura'];
 const NIVEIS_ACAO = ['negado', 'aprovacao_humana'];
-const CAMPOS_RAIZ = ['versao', 'pessoas', 'papeis', 'agentes', 'comentario'];
-const CAMPOS_PESSOA = ['nome', 'fontes', 'acoes', 'comentario'];
-const CAMPOS_PAPEL = ['fontes', 'acoes', 'comentario'];
+const CAMPOS_RAIZ = ['versao', 'pessoas', 'papeis', 'agentes', 'grupos', 'comentario'];
+const CAMPOS_PESSOA = ['nome', 'fontes', 'acoes', 'grupos', 'estado', 'bases', 'comentario'];
+const CAMPOS_PAPEL = ['fontes', 'acoes', 'bases', 'comentario'];
+const CAMPOS_GRUPO = ['nome', 'tipo', 'comentario'];
+const TIPOS_GRUPO = ['departamento', 'projeto', 'equipe'];
+const ESTADOS_PESSOA = ['ativa', 'desligada'];
 const CAMPOS_AGENTE = ['pessoa', 'papel', 'comentario'];
 const CAMPOS_FONTE_OBJ = ['nivel', 'campos'];
 const MAX_ITENS = 500;
@@ -79,6 +82,19 @@ function normalizaFontes(bruto, onde, erros) {
   return saida;
 }
 
+/** Bloco "bases": { "<base>" | "*": "leitura" | "negado" } -> { nome: nivel }. */
+function normalizaBases(bruto, onde, erros) {
+  if (bruto === undefined) return {};
+  if (!ehObjeto(bruto)) { erros.push(`${onde}.bases precisa ser um objeto { "<base>" ou "*": "leitura" | "negado" }.`); return {}; }
+  const saida = {};
+  for (const [base, v] of Object.entries(bruto)) {
+    if (base !== '*' && !nomeValido(base, `${onde}.bases`, erros)) continue;
+    if (!NIVEIS_FONTE.includes(v)) { erros.push(`${onde}.bases.${base}: o nível ${JSON.stringify(v)} não existe. Níveis: ${NIVEIS_FONTE.join(', ')}.`); continue; }
+    saida[base] = v;
+  }
+  return saida;
+}
+
 function normalizaAcoes(bruto, onde, erros) {
   if (bruto === undefined) return {};
   if (!ehObjeto(bruto)) { erros.push(`${onde}.acoes precisa ser um objeto { "<acao>": "aprovacao_humana" | "negado" }.`); return {}; }
@@ -100,7 +116,22 @@ function validaPapeis(bruto) {
   if (!ehObjeto(bruto)) return { ok: false, erros: ['O arquivo de papéis precisa ser um objeto JSON {"versao":1,"pessoas":{},"papeis":{},"agentes":{}}.'] };
   soChaves(bruto, CAMPOS_RAIZ, 'A raiz', erros);
   if (bruto.versao !== 1) erros.push(`O campo "versao" precisa ser 1 (veio ${JSON.stringify(bruto.versao)}).`);
-  const pessoas = {}; const papeis = {}; const agentes = {};
+  const pessoas = {}; const papeis = {}; const agentes = {}; const grupos = {};
+
+  const bg = bruto.grupos === undefined ? {} : bruto.grupos;
+  if (!ehObjeto(bg)) erros.push('"grupos" precisa ser um objeto { "<grupo>": { "nome", "tipo" } }.');
+  else {
+    if (Object.keys(bg).length > MAX_ITENS) erros.push(`"grupos" tem mais de ${MAX_ITENS} itens.`);
+    for (const [nome, g] of Object.entries(bg)) {
+      const onde = `grupos.${String(nome).slice(0, 40)}`;
+      if (!nomeValido(nome, 'grupos', erros)) continue;
+      if (!ehObjeto(g)) { erros.push(`${onde} precisa ser um objeto.`); continue; }
+      soChaves(g, CAMPOS_GRUPO, onde, erros);
+      if (g.nome !== undefined && (typeof g.nome !== 'string' || g.nome.length > 120)) erros.push(`${onde}.nome precisa ser um texto de até 120 caracteres.`);
+      if (g.tipo !== undefined && !TIPOS_GRUPO.includes(g.tipo)) erros.push(`${onde}.tipo precisa ser um de: ${TIPOS_GRUPO.join(', ')}.`);
+      grupos[nome] = { nome: typeof g.nome === 'string' ? g.nome : nome, tipo: g.tipo || 'equipe' };
+    }
+  }
 
   const bp = bruto.pessoas === undefined ? {} : bruto.pessoas;
   if (!ehObjeto(bp)) erros.push('"pessoas" precisa ser um objeto { "<pessoa>": {...} }.');
@@ -112,7 +143,16 @@ function validaPapeis(bruto) {
       if (!ehObjeto(p)) { erros.push(`${onde} precisa ser um objeto.`); continue; }
       soChaves(p, CAMPOS_PESSOA, onde, erros);
       if (p.nome !== undefined && (typeof p.nome !== 'string' || p.nome.length > 120)) erros.push(`${onde}.nome precisa ser um texto de até 120 caracteres.`);
-      pessoas[nome] = { nome: typeof p.nome === 'string' ? p.nome : nome, fontes: normalizaFontes(p.fontes, onde, erros), acoes: normalizaAcoes(p.acoes, onde, erros) };
+      if (p.estado !== undefined && !ESTADOS_PESSOA.includes(p.estado)) erros.push(`${onde}.estado precisa ser "ativa" ou "desligada".`);
+      let gruposDaPessoa = [];
+      if (p.grupos !== undefined) {
+        if (!Array.isArray(p.grupos) || p.grupos.some((g) => typeof g !== 'string' || !RX_NOME.test(g))) erros.push(`${onde}.grupos precisa ser uma lista de nomes de grupos.`);
+        else {
+          for (const g of p.grupos) if (ehObjeto(bg) && !bg[g]) erros.push(`${onde}.grupos cita "${g}", que não existe em "grupos".`);
+          gruposDaPessoa = [...new Set(p.grupos)];
+        }
+      }
+      pessoas[nome] = { nome: typeof p.nome === 'string' ? p.nome : nome, estado: p.estado || 'ativa', grupos: gruposDaPessoa, fontes: normalizaFontes(p.fontes, onde, erros), acoes: normalizaAcoes(p.acoes, onde, erros), bases: normalizaBases(p.bases, onde, erros) };
     }
   }
 
@@ -125,7 +165,7 @@ function validaPapeis(bruto) {
       if (!nomeValido(nome, 'papeis', erros)) continue;
       if (!ehObjeto(p)) { erros.push(`${onde} precisa ser um objeto.`); continue; }
       soChaves(p, CAMPOS_PAPEL, onde, erros);
-      papeis[nome] = { fontes: normalizaFontes(p.fontes, onde, erros), acoes: normalizaAcoes(p.acoes, onde, erros) };
+      papeis[nome] = { fontes: normalizaFontes(p.fontes, onde, erros), acoes: normalizaAcoes(p.acoes, onde, erros), bases: normalizaBases(p.bases, onde, erros) };
     }
   }
 
@@ -149,10 +189,10 @@ function validaPapeis(bruto) {
   }
 
   if (erros.length) return { ok: false, erros };
-  return { ok: true, politica: { pessoas, papeis, agentes } };
+  return { ok: true, politica: { pessoas, papeis, agentes, grupos } };
 }
 
-const VAZIA = Object.freeze({ pessoas: {}, papeis: {}, agentes: {} });
+const VAZIA = Object.freeze({ pessoas: {}, papeis: {}, agentes: {}, grupos: {} });
 
 /**
  * Leitor do arquivo de papéis. `estado()` devolve { ok, erro, politica, origem, hash } já atualizado se o
@@ -204,7 +244,7 @@ function criarPapeis({ caminho, log }) {
     }
     estado = { ok: true, erro: null, politica: v.politica, origem: 'arquivo', hash };
     const n = (o) => Object.keys(o).length;
-    logaUmaVez('info', `Papéis de dados carregados de ${caminho} (sha256 ${hash}, modificado em ${new Date(st.mtimeMs).toISOString()}): ${n(v.politica.pessoas)} pessoa(s), ${n(v.politica.papeis)} papel(is), ${n(v.politica.agentes)} agente(s).`);
+    logaUmaVez('info', `Papéis de dados carregados de ${caminho} (sha256 ${hash}, modificado em ${new Date(st.mtimeMs).toISOString()}): ${n(v.politica.pessoas)} pessoa(s), ${n(v.politica.papeis)} papel(is), ${n(v.politica.agentes)} agente(s), ${n(v.politica.grupos)} grupo(s).`);
   }
 
   return {
