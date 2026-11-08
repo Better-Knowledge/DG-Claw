@@ -563,16 +563,53 @@ test('dois escritores: uma releitura no meio da transação não faz a gravaçã
   await assert.rejects(dupA, (e) => e.status === 409);
   arq = JSON.parse(fs.readFileSync(path.join(dir, 'colaboradores.json'), 'utf8'));
   assert.equal(arq.colaboradores.filter((c) => c.email === 'dup@x.com' && !c.revogado_em).length, 1, 'um registro ativo só para o e-mail');
-  // (3) gravação de B com o MESMO mtime da anterior (dois tiques iguais): A relê pelo inode/tamanho e não apaga a mudança
+  // (3) gravação de B com o MESMO mtime da anterior (dois tiques iguais): A relê pelo inode/tamanho e não apaga a mudança.
+  // utimes com segundos inteiros, porque Date só guarda milissegundos e o mtimeMs real tem fração (o mtime ficaria diferente).
   const caminho = path.join(dir, 'colaboradores.json');
+  fs.utimesSync(caminho, 1700000000, 1700000000);
   const antes = fs.statSync(caminho);
-  A.lista(); // A em dia com o arquivo atual
-  await B.alterar(maria.registro.id, { nome: 'Maria B' }, {});
-  fs.utimesSync(caminho, antes.atime, antes.mtime); // força o mesmo mtime de antes
-  await A.alterar(joao.registro.id, { nome: 'João A' }, {}).catch(() => {}); // revogado: 409 do próprio alterar, mas a leitura aconteceu
-  const r = await A.alterar(maria.registro.id, { nome: 'Maria A' }, {});
+  A.lista(); // A em dia com o arquivo atual (marca com o mtime fixo)
+  const dup = JSON.parse(fs.readFileSync(caminho, 'utf8')).colaboradores.find((c) => c.email === 'dup@x.com');
+  await B.revogar(dup.id); // a mudança de B
+  fs.utimesSync(caminho, 1700000000, 1700000000); // mesmo mtime de antes: só inode e tamanho denunciam a gravação
+  assert.equal(fs.statSync(caminho).mtimeMs, antes.mtimeMs, 'o mtime é de fato o mesmo');
+  const r = await A.alterar(maria.registro.id, { nome: 'Maria A' }, {}); // A mexe em OUTRO registro
   assert.equal(r.nome, 'Maria A');
-  arq = JSON.parse(fs.readFileSync(path.join(dir, 'colaboradores.json'), 'utf8'));
-  assert.ok(arq.colaboradores.find((c) => c.email === 'joao@x.com').revogado_em, 'a revogação não voltou');
-  assert.equal(arq.colaboradores.filter((c) => c.email === 'dup@x.com').length, 1);
+  arq = JSON.parse(fs.readFileSync(caminho, 'utf8'));
+  assert.ok(arq.colaboradores.find((c) => c.email === 'dup@x.com').revogado_em, 'a revogação de B, com o mesmo mtime, não foi apagada por A');
+  assert.ok(arq.colaboradores.find((c) => c.email === 'joao@x.com').revogado_em, 'a revogação anterior continua');
+  assert.equal(arq.colaboradores.find((c) => c.email === 'maria@x.com').nome, 'Maria A');
+});
+
+test('trava: uma trava nova levada por engano (parecia velha no stat) é devolvida, a gravação espera e sai com 503, sem sobra', async () => {
+  const { criarColaboradores } = require('../lib/colaboradores');
+  const { criarPapeisEditor } = require('../lib/papeis-editor');
+  const { gerarHashSenha } = require('../lib/auth');
+  const dir = pastaTemp('colab-trava-aba');
+  const B = criarColaboradores({ config: { dataDir: dir }, log: () => {}, gerarHash: gerarHashSenha });
+  const maria = await B.criar({ agentes: ['ana'], email: 'maria@x.com', instancias: { ana: 'i:1' } });
+  const arq = path.join(dir, 'colaboradores.json');
+  // a trava é de agora (outro processo acabou de criá-la), mas o PRIMEIRO stat a vê como velha (a janela entre stat e rename)
+  const real = fs.statSync;
+  const enganaUmaVez = (alvo) => { let vezes = 0; fs.statSync = function (p, ...resto) { const st = real.call(fs, p, ...resto); if (String(p) === alvo && vezes++ === 0) return Object.assign(Object.create(Object.getPrototypeOf(st)), st, { mtimeMs: st.mtimeMs - 60000 }); return st; }; };
+  try {
+    fs.mkdirSync(`${arq}.trava`);
+    enganaUmaVez(`${arq}.trava`);
+    const t0 = Date.now();
+    await assert.rejects(B.alterar(maria.registro.id, { nome: 'Maria' }, {}), (e) => e.status === 503, 'a gravação não rouba a trava nova: espera e desiste');
+    assert.ok(Date.now() - t0 >= 1500, 'esperou a janela da trava');
+    assert.ok(fs.existsSync(`${arq}.trava`), 'a trava do outro processo foi devolvida');
+    assert.ok(!fs.readdirSync(dir).some((n) => n.includes('.velha.')), 'nenhuma pasta .velha sobrou');
+    fs.rmdirSync(`${arq}.trava`);
+    assert.equal((await B.alterar(maria.registro.id, { nome: 'Maria' }, {})).nome, 'Maria', 'com a trava solta, grava');
+    // o mesmo no editor de papéis
+    const pap = path.join(dir, 'papeis.json');
+    fs.writeFileSync(pap, JSON.stringify({ versao: 1, pessoas: {}, papeis: {}, agentes: {} }));
+    const editor = criarPapeisEditor({ caminho: pap, log: () => {} });
+    fs.mkdirSync(`${pap}.trava`);
+    enganaUmaVez(`${pap}.trava`);
+    assert.throws(() => editor.editar((b) => { b.comentario = 'x'; }), (e) => e.status === 503);
+    assert.ok(fs.existsSync(`${pap}.trava`) && !fs.readdirSync(dir).some((n) => n.includes('.velha.')));
+    fs.rmdirSync(`${pap}.trava`);
+  } finally { fs.statSync = real; }
 });
