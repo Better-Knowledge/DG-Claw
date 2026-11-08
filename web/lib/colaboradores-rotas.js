@@ -226,6 +226,7 @@ function criarColaboradoresRotas({ colaboradores, auth, registro, email, config,
           const r = await colaboradores.revogar(id);
           const gravou = derruba(id);
           if (aoRevogar) await aoRevogar(id);
+          if (auth.esqueceIpsOk) auth.esqueceIpsOk(`colab:${id}`);
           log('info', `Acesso de ${r.email} (agentes ${r.agentes.join(', ')}) revogado (por ${sessao.usuario}).`);
           const contas = conta ? conta.contasDe(id).map((x) => x.agente) : [];
           const enc = conta ? await conta.encerraPendencias(id, (slug) => registro.obter(slug)) : { avisos: [], agentes: [] };

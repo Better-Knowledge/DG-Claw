@@ -7,6 +7,11 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Não lançado]
 
+**Força bruta contra uma conta, vinda de muitos endereços.** Além dos limites por endereço, cada login passa a ter
+um teto de 20 senhas erradas em 15 minutos somando todos os endereços. Quando esse teto é atingido, a conta continua
+aberta para os aparelhos de onde a pessoa já entrou nos últimos 30 dias (a sua casa, o seu celular), e fica fechada
+para endereços novos até a janela passar. Nada precisa ser configurado.
+
 **Acessos dos agentes.** A tela nova (menu ☰, `/acessos`) mostra, agente por agente, o que ele alcança de fato nos
 dados (fontes e campos, bases, ferramentas, skills e ações com aprovação) e quem conversa com ele no painel (você e
 os colaboradores convidados). Ali você escolhe a pessoa e o papel de cada agente e monta os papéis, as pessoas e os
