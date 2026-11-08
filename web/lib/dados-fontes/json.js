@@ -40,7 +40,9 @@ function normalizaId(v) {
 
 // Caracteres de formatação e controle (Cf/Cc: zero-width, marcas bidi, BOM...) que fazem a pessoa ler na tela algo
 // diferente do que está nos bytes. Recusados em tudo que uma pessoa aprova.
-const RX_INVISIVEL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff\ufff9-\ufffb]/;
+// Por categoria Unicode (Cc, Cf, Co e os separadores de linha/parágrafo), não por lista: as tags U+E0000-E007F e
+// qualquer Cf novo caem também. Tab, quebra de linha e retorno continuam valendo.
+const RX_INVISIVEL = /(?![\t\n\r])[\p{Cc}\p{Cf}\p{Co}\u2028\u2029]/u;
 function semInvisivel(v, onde) {
   if (typeof v === 'string' && RX_INVISIVEL.test(v)) throw new ErroFonte(400, `${onde} tem caracteres invisíveis ou de formatação (zero-width, marca de direção, controle), que a tela não mostra. Tire-os e mande de novo.`);
   return v;

@@ -114,8 +114,10 @@ test('email: validar limpa os campos e recusa o resto; executar só registra, nu
     lanca(() => a.validar({ para: 'x@exemplo.test', assunto: 'a\nBcc: outro', texto: 'b' }), 400, /"assunto"/);
     lanca(() => a.validar({ para: 'x@exemplo.test', assunto: 'a', texto: '' }), 400, /"texto"/);
     lanca(() => a.validar({ para: 'x@exemplo.test', assunto: 'a', texto: 'b', cc: 'y@exemplo.test' }), 400, /campo "cc" não existe/);
+    for (const ruim of ['a\u202eb', 'x\u200by', 't\udb40\udc01a', 'a\u061cb', 'p\u2028q']) lanca(() => a.validar({ para: 'x@exemplo.test', assunto: 'a', texto: ruim }), 400, /invisíveis/);
+    assert.equal(a.validar({ para: 'x@exemplo.test', assunto: 'a', texto: 'linha 1\n\tlinha 2\r\n' }).texto, 'linha 1\n\tlinha 2\r\n', 'tab e quebra de linha valem');
     const r = a.executar({ para: 'x@exemplo.test', assunto: 'Olá', texto: 'oi' }, { agente: 'ana', aprovado_por: 'dono', aprovacao: 'ap1' });
-    assert.equal(r.enviado, false); assert.equal(r.simulado, true);
+    assert.deepEqual(r, { enviado: false, simulado: true, para: 'x@exemplo.test', assunto: 'Olá' }, 'sem caminho do host');
     const linhas = fs.readFileSync(path.join(c.dir, 'email-enviados.jsonl'), 'utf8').trim().split('\n');
     assert.equal(linhas.length, 1);
     const reg = JSON.parse(linhas[0]);

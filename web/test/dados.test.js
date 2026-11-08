@@ -357,3 +357,42 @@ test('pelo Web inteiro: a caixa só alcança fontes, pedidos e docs.md; o slug v
     assert.equal(fs.statSync(path.join(t.dados, 'dados', 'log')).mode & 0o777, 0o700);
   } finally { await t.fechar(); fs.rmSync(base, { recursive: true, force: true }); }
 });
+
+test('o pedido do próprio dono sobrevive a edição dos papéis e a reinício do Web, e só o dono o decide', async () => {
+  const s = await subir();
+  try {
+    const e = await s.pedir('POST', '/api/v1/dados/fontes/email/enviar', { para: 'x@exemplo.test', assunto: 'Do dono', texto: 't' }, DONO);
+    assert.equal(e.status, 202, e.texto);
+    const id = e.json.pedido.id;
+    // edita os papéis (só um comentário): os pendentes de agente são conferidos; o do dono fica
+    fs.writeFileSync(s.arqPapeis, JSON.stringify(Object.assign({ comentario: 'editado' }, PAPEIS)));
+    let v = await s.pedir('GET', `/api/v1/dados/pedidos/${id}`, undefined, DONO);
+    assert.equal(v.json.pedido.estado, 'pendente');
+    assert.equal(v.json.pedido.pedido_por, 'dono:dono');
+    // reinício: outro criarDados sobre a mesma pasta
+    const { criarDados } = require('../lib/dados');
+    const outro = criarDados({ dir: s.dir, papeis: criarPapeis({ caminho: s.arqPapeis, log: s.cap.log }), push: null, log: s.cap.log, agora: () => s.relogio.t });
+    const fake = { res: null };
+    const res = { writeHead() {}, setHeader() {}, end(t) { fake.res = JSON.parse(t); } };
+    await outro.rotas({ method: 'GET', headers: {} }, res, new URL(`http://local/api/v1/dados/pedidos/${id}`), DONO);
+    assert.equal(fake.res.pedido.estado, 'pendente', 'o reinício não revoga o pedido do dono');
+    // o agente ana não vê o pedido do dono
+    assert.equal((await s.pedir('GET', `/api/v1/dados/pedidos/${id}`, undefined, CAIXA('ana'))).status, 404);
+    const hash = (await s.pedir('GET', '/api/v1/dados/aprovacoes?estado=pendente', undefined, DONO)).json.aprovacoes[0].hash;
+    const a = await s.pedir('POST', `/api/v1/dados/aprovacoes/${id}/aprovar`, { hash }, DONO);
+    assert.equal(a.status, 200, a.texto); assert.equal(a.json.pedido.estado, 'executada');
+    assert.equal(a.json.pedido.resultado.registrado_em, undefined, 'sem caminho do host no resultado');
+  } finally { s.fechar(); }
+});
+
+test('revogação automática aparece ao agente como "sistema", não como "dono"', async () => {
+  const s = await subir();
+  try {
+    const e = await s.pedir('POST', '/api/v1/dados/fontes/email/enviar', { para: 'x@exemplo.test', assunto: 'a', texto: 't' }, CAIXA('ana'));
+    const sem = JSON.parse(JSON.stringify(PAPEIS)); delete sem.agentes.ana;
+    fs.writeFileSync(s.arqPapeis, JSON.stringify(sem));
+    await s.pedir('GET', '/api/v1/dados/fontes', undefined, CAIXA('bia'));
+    const v = await s.pedir('GET', `/api/v1/dados/pedidos/${e.json.pedido.id}`, undefined, CAIXA('ana'));
+    assert.equal(v.json.pedido.estado, 'revogada'); assert.equal(v.json.pedido.decidido_por, 'sistema');
+  } finally { s.fechar(); }
+});

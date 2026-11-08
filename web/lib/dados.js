@@ -68,8 +68,10 @@ function criarDados({ dir, papeis, push, log, agora, retencaoDias, prazoAprovaca
   }
 
   /** Revoga pendentes de quem já não pode: agente fora dos papéis ou política fechada. */
+  // O pedido do próprio dono (pela sessão do navegador) não passa pelos papéis: só os de agente são conferidos.
+  const ehDoDono = (p) => typeof p.pedido_por === 'string' && p.pedido_por.startsWith('dono:');
   function varrePendentes(estado) {
-    return aprovacoes.revogar((p) => decidir({ estado, slug: p.agente, fonte: p.fonte, operacao: p.operacao, acao: p.acao }).decisao !== 'aprovacao',
+    return aprovacoes.revogar((p) => !ehDoDono(p) && decidir({ estado, slug: p.agente, fonte: p.fonte, operacao: p.operacao, acao: p.acao }).decisao !== 'aprovacao',
       'a pessoa, o papel ou a ação deixaram de liberar este pedido antes da aprovação', 'sistema');
   }
 
@@ -230,7 +232,8 @@ function criarDados({ dir, papeis, push, log, agora, retencaoDias, prazoAprovaca
 
   /** O que o agente vê de um pedido: sem o login do dono (quem decidiu aparece só como "dono"). */
   function pedidoParaAgente(a) {
-    return Object.assign({}, a, { decidido_por: a.decidido_por ? 'dono' : null, pedido_por: a.pedido_por && a.pedido_por.startsWith('dono:') ? 'dono' : a.pedido_por });
+    const mascara = (v) => (v == null ? null : v === 'sistema' ? 'sistema' : 'dono');
+    return Object.assign({}, a, { decidido_por: mascara(a.decidido_por), pedido_por: ehDoDono(a) ? 'dono' : a.pedido_por });
   }
 
   async function rotas(req, res, url, sessao) {
@@ -291,7 +294,7 @@ function criarDados({ dir, papeis, push, log, agora, retencaoDias, prazoAprovaca
         const estado = papeis.estado();
         const interno = aprovacoes.aprovar(ap[1], {
           hash: corpo.hash, por,
-          conferir: (pd) => (pd.pedido_por.startsWith('dono:') ? null : (() => { const dd = decidir({ estado, slug: pd.agente, fonte: pd.fonte, operacao: pd.operacao, acao: pd.acao }); return dd.decisao === 'aprovacao' ? null : dd.motivo; })()),
+          conferir: (pd) => (ehDoDono(pd) ? null : (() => { const dd = decidir({ estado, slug: pd.agente, fonte: pd.fonte, operacao: pd.operacao, acao: pd.acao }); return dd.decisao === 'aprovacao' ? null : dd.motivo; })()),
         });
         return H.enviaJson(res, 200, { ok: true, pedido: executaAprovado(interno, por) }), true;
       }

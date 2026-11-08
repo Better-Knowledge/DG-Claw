@@ -35,9 +35,9 @@ function fonteEmail({ dir, nome, agora, catalogo }) {
             fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
             fs.appendFileSync(arquivo, linha + '\n', { mode: 0o600 });
           } catch (e) {
-            throw new ErroFonte(503, `Não consegui registrar o e-mail em ${arquivo} (${e.code || e.message}). Nada foi enviado.`);
+            throw new ErroFonte(503, `Não consegui registrar o e-mail simulado (${e.code || 'falha de gravação'}). Nada foi enviado; avise o dono para conferir a pasta de dados do Web.`);
           }
-          return { enviado: false, simulado: true, registrado_em: arquivo, para: p.para, assunto: p.assunto };
+          return { enviado: false, simulado: true, para: p.para, assunto: p.assunto };
         },
       },
     },

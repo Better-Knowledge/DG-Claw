@@ -94,6 +94,14 @@ test('criarPapeis: ausente é política vazia e válida; inválido fecha; corrig
     p.estado(); p.estado();
     assert.equal(cap.linhas.length, antes);
 
+    // troca por uma cópia com o MESMO tamanho e o MESMO mtime (cp -p): ainda é vista, pelo inode/ctime
+    const copia = JSON.stringify(EXEMPLO, null, 2).replace('"recepcao"', '"recepcap"');
+    const st = fs.statSync(arq);
+    fs.writeFileSync(arq + '.novo', copia); fs.utimesSync(arq + '.novo', st.atime, st.mtime); fs.renameSync(arq + '.novo', arq);
+    assert.equal(Math.round(fs.statSync(arq).mtimeMs / 1000), Math.round(st.mtimeMs / 1000)); assert.equal(fs.statSync(arq).size, st.size);
+    assert.equal(p.estado().ok, false, 'a cópia aponta para um papel que não existe e foi lida mesmo com mtime e tamanho iguais');
+    fs.writeFileSync(arq, JSON.stringify(EXEMPLO, null, 2));
+    assert.equal(p.estado().ok, true);
     // apagar o arquivo volta ao vazio
     fs.unlinkSync(arq);
     e = p.estado();

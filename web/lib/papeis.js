@@ -177,7 +177,8 @@ function criarPapeis({ caminho, log }) {
       logaUmaVez('info', `Papéis de dados: não existe ${caminho} (${e.code || e.name}); nenhum agente alcança fonte alguma até o dono criar o arquivo (rode o instalador ou veja web/docs/DADOS-POR-PAPEL.md).`);
       return;
     }
-    const nova = `${st.mtimeMs}:${st.size}`;
+    // ino e ctime entram na assinatura: uma troca de arquivo que preserve mtime e tamanho (cp -p, touch -d) ainda é vista.
+    const nova = `${st.ino}:${st.ctimeMs}:${st.mtimeMs}:${st.size}`;
     if (nova === assinatura) return;
     assinatura = nova;
     let texto;
