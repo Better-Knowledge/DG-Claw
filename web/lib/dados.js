@@ -103,9 +103,17 @@ function criarDados({ dir, papeis, bases, basesDir, push, log, agora, retencaoDi
     const espera = esperaDoTeto(chave);
     if (espera) nega(429, `Pedidos demais: o teto da rota de dados é ${TETO_POR_MINUTO} por minuto por agente. Espere ${espera} s.`, 'teto de pedidos por minuto');
     const fonte = fontes.obter(nomeFonte);
-    if (!fonte) nega(404, `Não existe a fonte "${nomeFonte}". As fontes estão em GET ${BASE}/fontes.`);
-    const ehLeitura = OPERACOES_LEITURA.has(operacao) && !!fonte.operacoes[operacao];
-    const acaoDef = !ehLeitura && fonte.acoes ? fonte.acoes[operacao] : null;
+    const naoExiste = () => nega(404, `Não existe a fonte "${nomeFonte}". As fontes estão em GET ${BASE}/fontes.`);
+    if (!fonte) naoExiste();
+    // Base fora do alcance do agente: a MESMA resposta de base inexistente, decidida aqui, antes de olhar a operação
+    // ou o corpo, para nenhuma outra resposta (400 de campo, 404 de operação) denunciar que a base existe.
+    if (fonte.base && quem.tipo === 'agente') {
+      const vis = decideFonte(papeis.estado(), slug, fonte, 'listar', null);
+      if (vis.decisao === 'negado' && vis.invisivel) { Object.assign(base, { pessoa: vis.pessoa, papel: vis.papel }); nega(404, `Não existe a fonte "${nomeFonte}". As fontes estão em GET ${BASE}/fontes.`, vis.motivo); }
+    }
+    const temOp = (o, k) => !!o && Object.prototype.hasOwnProperty.call(o, k);
+    const ehLeitura = OPERACOES_LEITURA.has(operacao) && temOp(fonte.operacoes, operacao);
+    const acaoDef = !ehLeitura && temOp(fonte.acoes, operacao) ? fonte.acoes[operacao] : null;
     if (!ehLeitura && !acaoDef) nega(404, `A fonte "${nomeFonte}" não tem a operação "${operacao}". Operações: ${[...Object.keys(fonte.operacoes), ...Object.keys(fonte.acoes || {})].join(', ') || 'nenhuma'}.`);
 
     let corpo;
@@ -123,8 +131,7 @@ function criarDados({ dir, papeis, bases, basesDir, push, log, agora, retencaoDi
       d = { decisao: ehLeitura ? 'permitido' : 'aprovacao', campos: null, motivo: 'sessão do dono do painel', pessoa: 'dono', papel: 'dono' };
     }
     Object.assign(base, { pessoa: d.pessoa, papel: d.papel, acao: acaoDef ? acaoDef.acao : undefined, escopo: d.escopo });
-    // Base fora do alcance do agente parece inexistente para ele (404), como em GET /fontes; o motivo real vai ao log.
-    if (d.decisao === 'negado' && d.invisivel) nega(404, `Não existe a fonte "${nomeFonte}". As fontes estão em GET ${BASE}/fontes.`, d.motivo);
+    if (d.decisao === 'negado' && d.invisivel) naoExiste();
     if (d.decisao === 'negado') nega(403, d.motivo);
 
     if (ehLeitura) {
@@ -186,7 +193,7 @@ function criarDados({ dir, papeis, bases, basesDir, push, log, agora, retencaoDi
   // ── aprovação (só o dono) ────────────────────────────────────────────────────
   function executaAprovado(p, por) {
     const fonte = fontes.obter(p.fonte);
-    const def = fonte && fonte.acoes && fonte.acoes[p.operacao];
+    const def = fonte && fonte.acoes && Object.prototype.hasOwnProperty.call(fonte.acoes, p.operacao) ? fonte.acoes[p.operacao] : null;
     const base = { agente: p.agente, por: `dono:${por}`, pessoa: p.pessoa, papel: p.papel, fonte: p.fonte, operacao: p.operacao, acao: p.acao, aprovacao: p.id };
     if (!def || def.acao !== p.acao) {
       const r = aprovacoes.concluir(p.id, { ok: false, erro: `a fonte "${p.fonte}" já não tem a ação "${p.acao}"` });

@@ -192,6 +192,16 @@ test('rota: cada agente vê e lê só as bases do seu escopo; o conteúdo volta 
     r = await s.pedir('POST', '/api/v1/dados/fontes/base-notas-marta/listar', {}, CAIXA('bia'));
     assert.equal(r.status, 404); assert.ok(!r.texto.includes('pessoal.md') && !r.texto.includes('privada') && !r.texto.includes('pessoa'));
     assert.equal((await s.pedir('POST', '/api/v1/dados/fontes/base-nada/listar', {}, CAIXA('bia'))).texto.replace('base-nada', 'X'), r.texto.replace('base-notas-marta', 'X'), 'mesma resposta para base inexistente e base fora do alcance');
+    // ...também com campo de identidade no corpo, operação desconhecida e corpo que não é JSON: nada denuncia que a base existe
+    for (const [op, corpo] of [['listar', { agente: 'x' }], ['apagar', {}], ['listar', '{ quebrado']]) {
+      const a = await s.pedir('POST', `/api/v1/dados/fontes/base-notas-marta/${op}`, corpo, CAIXA('bia'));
+      const b = await s.pedir('POST', `/api/v1/dados/fontes/base-nada/${op}`, corpo, CAIXA('bia'));
+      assert.equal(a.status, 404, `${op}: ${a.texto}`); assert.equal(a.texto.replace('base-notas-marta', 'X'), b.texto.replace('base-nada', 'X'), op);
+    }
+    // operação com nome do protótipo não é operação, nem para o dono
+    assert.equal((await s.pedir('POST', '/api/v1/dados/fontes/base-manual-rh/constructor', {}, DONO)).status, 404);
+    assert.equal((await s.pedir('POST', '/api/v1/dados/fontes/email/constructor', {}, DONO)).status, 404);
+    assert.ok(!s.cap.texto().includes('falha inesperada'));
     r = await s.pedir('POST', '/api/v1/dados/fontes/base-manual-rh/listar', {}, CAIXA('duda'));
     assert.equal(r.status, 403); assert.match(r.json.erro, /desligada/);
     r = await s.pedir('POST', '/api/v1/dados/fontes/base-nada/listar', {}, CAIXA('ana'));
@@ -297,5 +307,14 @@ test('busca grande: avisa que truncou e não lê mais que o teto de arquivos', (
     assert.equal(r.total, 0); assert.equal(r.truncado, true); assert.equal(r.arquivos_lidos, 500);
     const p = fontes.obter('base-grande').operacoes.buscar({ termo: 'palha', limit: 2 });
     assert.equal(p.itens.length, 2); assert.equal(p.total, 500); assert.equal(p.truncado, true);
+    // um arquivo grande no começo da ordem não zera a busca: é pulado e os pequenos continuam lidos
+    fs.writeFileSync(path.join(basesDir, 'grande', '00-export.csv'), Buffer.alloc(300 * 1024, 120));
+    const g = fontes.obter('base-grande').operacoes.buscar({ termo: 'palha', limit: 1 });
+    assert.equal(g.itens.length, 1); assert.ok(g.arquivos_lidos >= 499);
+    // e um que não cabe no orçamento de bytes também é pulado sem parar a busca
+    for (let i = 0; i < 20; i++) fs.writeFileSync(path.join(basesDir, 'grande', `0${i}-med.txt`), Buffer.alloc(250 * 1024, 121));
+    fs.writeFileSync(path.join(basesDir, 'grande', 'zz-agulha.md'), 'agulha no fim');
+    const h = fontes.obter('base-grande').operacoes.buscar({ termo: 'agulha' });
+    assert.equal(h.total, 0, 'a agulha está além dos 500 arquivos'); assert.equal(h.truncado, true);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
