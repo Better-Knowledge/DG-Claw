@@ -205,9 +205,9 @@
     if (o.colaborador) {
       return [{
         alvo: '#mlMoldura', antes: abre, titulo: 'O menu',
-        oque: 'A foto e o nome de ' + nome + ', o agente com quem você conversa, e as páginas dele: a Conversa, as Sessões de trabalho, as páginas do painel (Rotinas, Memória, Pasta e as outras, reunidas em grupos que abrem e fecham) e Conectar conta.',
-        como: (o.naConversa ? 'O item Conversa (esta tela) fica no alto.' : 'O item Conversa, no alto, leva de volta ao chat.') + ' Cada página do painel abre na mesma janela. Conectar conta serve para ligar a sua conta de IA ao agente, quando ele ainda não tem uma. Face ID liga a trava do app neste aparelho. No fim do menu, o botão Sair encerra a sua sessão.',
-        porque: 'Você tem acesso a tudo deste agente. Os outros agentes e as configurações do sistema inteiro (chaves, colaboradores, cofre) ficam com o dono.',
+        oque: 'A foto e o nome de ' + nome + ', o agente com quem você conversa, e as páginas dele: a Conversa, as Sessões de trabalho, as páginas do painel (Rotinas, Memória, Pasta e as outras, reunidas em grupos que abrem e fecham) e Conectar conta.' + (o.comTroca ? ' Se você usa mais de um agente, a troca fica no alto, pelo nome dele.' : ''),
+        como: (o.naConversa ? 'O item Conversa (esta tela) fica no alto.' : 'O item Conversa, no alto, leva de volta ao chat.') + ' Cada página do painel abre na mesma janela. Conectar conta serve para ligar a sua conta de IA ao agente, quando ele ainda não tem uma. No fim do menu, o botão Sair encerra a sua sessão.',
+        porque: 'Você tem acesso a tudo dos agentes para os quais foi convidado(a). Os demais agentes e as configurações do ' + (typeof dsMarca !== 'undefined' ? dsMarca.nome : 'DG Claw') + ' inteiro (chaves, colaboradores, cofre) ficam com o dono.',
       }];
     }
     const passos = [{
@@ -757,19 +757,19 @@
       : (ag.subtitulo || [ag.provedor, ag.modelo].filter(Boolean).join(' · '));
     document.documentElement.classList.add('ml-ativo');
 
-    // Colaborador: a troca de agente nem existe na página (casca.js não injeta o bloco), então não há o que ligar.
-    if (!colab) {
-      const troca = $('mlTroca'), btn = $('mlTrocaBtn');
-      const abre = sim => { troca.classList.toggle('aberto', sim); btn.setAttribute('aria-expanded', String(sim)); };
-      btn.onclick = () => abre(!troca.classList.contains('aberto'));
-      document.addEventListener('keydown', ev => {
-        if (ev.key === 'Escape' && troca.classList.contains('aberto')) { abre(false); ev.stopPropagation(); }
-      }, true);
-      ligaAcoes(opcoes, troca);
-      if (opcoes.erroLista) { pintaLista(ag, [], opcoes.erroLista); abre(true); }   // a lista não veio: o erro aparece já aberto
-      else if (Array.isArray(opcoes.agentes)) pintaLista(ag, opcoes.agentes, null);
-      else recarrega(ag);
-      /* Agente criado ou apagado em outra aba aparece sem recarregar a página: a cada 30 s e quando a aba volta a ficar visível. */
+    const troca = $('mlTroca'), btn = $('mlTrocaBtn');
+    const abre = sim => { troca.classList.toggle('aberto', sim); btn.setAttribute('aria-expanded', String(sim)); };
+    btn.onclick = () => abre(!troca.classList.contains('aberto'));
+    document.addEventListener('keydown', ev => {
+      if (ev.key === 'Escape' && troca.classList.contains('aberto')) { abre(false); ev.stopPropagation(); }
+    }, true);
+    ligaAcoes(opcoes, troca);
+    if (opcoes.erroLista) { pintaLista(ag, [], opcoes.erroLista); abre(true); }   // a lista não veio: o erro aparece já aberto
+    else if (Array.isArray(opcoes.agentes)) pintaLista(ag, opcoes.agentes, null);
+    else recarrega(ag);
+    /* Agente criado ou apagado em outra aba aparece sem recarregar a página: a cada 30 s e quando a aba volta a ficar visível.
+       Para o colaborador a lista é só a dos agentes dele (o servidor filtra): se o dono acrescentar um, ele aparece aqui. */
+    {
       const atualiza = () => { if (document.visibilityState === 'visible') recarrega(ag, true); };
       document.addEventListener('visibilitychange', atualiza);
       setInterval(atualiza, 30000);

@@ -7,6 +7,12 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Não lançado]
 
+**Colaboradores com vários agentes.** Uma pessoa convidada pode usar mais de um agente de trabalho, e um agente
+pode ter várias pessoas: no convite você marca os agentes que ela vai usar, e o botão **Editar agentes** (tela
+Colaboradores) muda a lista depois, sem derrubar a sessão dela. Com mais de um agente, ela troca de agente pelo menu,
+como você. O que ela não alcança continua igual: o Admin, os agentes que não foram marcados e as telas da caixa
+inteira. Quem já tinha convidado alguém não precisa fazer nada: o convite antigo continua valendo para o agente dele.
+
 **Observabilidade e conhecimento que fica na empresa.** O menu ganhou a tela **Observabilidade**: quantos
 pedidos os agentes fizeram às fontes, bases e ferramentas nos últimos 30 dias, quantos foram permitidos,
 negados ou viraram aprovação, as contagens por agente, fonte e pessoa, e a lista linha a linha com filtros e
