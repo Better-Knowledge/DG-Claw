@@ -27,6 +27,8 @@ DG_UNITS="$R/etc/systemd/system"
 DG_BIN="$R/usr/local/bin"
 DG_AGENTES_JSON="$DG_ETC/agentes.json"
 DG_PAPEIS_JSON="$DG_ETC/papeis.json"
+DG_BASES_JSON="$DG_ETC/bases.json"
+DG_BASES_DIR="$DG_LIB/bases"
 DG_REGISTRO="$DG_ETC/registro.tsv"
 DG_TRAVA="$DG_ETC/.agentes.lock"
 DG_IMAGEM_PADRAO="localhost/dgclaw-agente:latest"
@@ -34,7 +36,7 @@ DG_IMAGEM_PADRAO="localhost/dgclaw-agente:latest"
 # trocados na instalacao (--porta-painel, --faixa-rede) e ficam no dgclaw.env.
 DG_PORTA_PAINEL_PADRAO=8300
 DG_FAIXA_REDE_PADRAO="10.89.0.0/16"
-export R DG_ETC DG_OPT DG_APP DG_ADMIN DG_LIB DG_LOG DG_UNITS DG_BIN DG_AGENTES_JSON DG_PAPEIS_JSON DG_REGISTRO DG_TRAVA
+export R DG_ETC DG_OPT DG_APP DG_ADMIN DG_LIB DG_LOG DG_UNITS DG_BIN DG_AGENTES_JSON DG_PAPEIS_JSON DG_BASES_JSON DG_BASES_DIR DG_REGISTRO DG_TRAVA
 
 ENSAIO="${ENSAIO:-0}"
 
