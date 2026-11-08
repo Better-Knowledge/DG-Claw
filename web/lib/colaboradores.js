@@ -94,6 +94,8 @@ function comTrava(arquivo, fn) {
           fs.renameSync(trava, velha);
           // O stat e o rename não são atômicos juntos: se o que veio é uma trava NOVA (outro processo acabou de criá-la),
           // devolve e volta a esperar; só uma trava de fato velha é apagada.
+          // (No Linux o rename de volta passa por cima de uma pasta vazia criada por um terceiro nesse microssegundo; o
+          // risco residual, que exige uma trava órfã mais esse timing, é aceito e está no SEGURANCA.)
           if (Date.now() - fs.statSync(velha).mtimeMs > TRAVA_VELHA_MS) { fs.rmdirSync(velha); continue; }
           try { fs.renameSync(velha, trava); } catch (_) { fs.rmdirSync(velha); }
         }
