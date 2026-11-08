@@ -19,6 +19,7 @@ const { fontePasta } = require('./pasta');
 const { fonteEmail } = require('./email');
 const { fonteBase } = require('./base');
 const { fonteFerramenta } = require('./ferramenta');
+const { fonteSkills } = require('./skills');
 
 const RX_BASE = /^base-([a-z][a-z0-9_-]{0,39})$/;
 const RX_FERRAMENTA = /^ferramenta-([a-z][a-z0-9_-]{0,39})$/;
@@ -27,7 +28,7 @@ const RX_FERRAMENTA = /^ferramenta-([a-z][a-z0-9_-]{0,39})$/;
  * `bases` (opcional): o leitor de web/lib/bases.js e a pasta das bases. Cada base do catálogo vira a fonte
  * dinâmica "base-<nome>", lida da pasta <basesDir>/<nome>/. Base fora do catálogo não é fonte.
  */
-function criarFontes({ dir, log, agora, bases, basesDir, ferramentas, cofreSistemas }) {
+function criarFontes({ dir, log, agora, bases, basesDir, ferramentas, cofreSistemas, skillsDir, papeis }) {
   const lista = [
     fonteJson({ dir, nome: 'agenda', campos: ['id', 'data', 'hora', 'titulo', 'com', 'local'], busca: ['titulo', 'com', 'local'],
       catalogo: { dono: 'secretaria', classificacao: 'interno', finalidade: 'marcar e consultar compromissos', retencao_dias: 365 } }),
@@ -40,6 +41,7 @@ function criarFontes({ dir, log, agora, bases, basesDir, ferramentas, cofreSiste
     fonteEmail({ dir, nome: 'email', agora,
       catalogo: { dono: 'comunicacao', classificacao: 'interno', finalidade: 'envio de e-mail em nome da pessoa (simulado nesta versão)', retencao_dias: 90 } }),
   ];
+  if (skillsDir) lista.push(fonteSkills({ dir: skillsDir, papeis, log, catalogo: { dono: 'dono-do-dg-claw', classificacao: 'interno', finalidade: 'skills compartilhadas (roteiros que os agentes seguem)', retencao_dias: 0 } }));
   const mapa = new Map(lista.map((f) => [f.nome, f]));
   const descreve = (f) => ({ nome: f.nome, base: f.base || null, campos: f.campos, operacoes: Object.keys(f.operacoes), acoes: Object.fromEntries(Object.entries(f.acoes || {}).map(([op, a]) => [op, a.acao])), catalogo: f.catalogo });
 

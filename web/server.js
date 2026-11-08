@@ -147,7 +147,7 @@ function criarServidor(opcoes) {
   // Ferramentas (API, MCP, banco): catálogo em /etc/dgclaw/ferramentas.json; credenciais só em /etc/dgclaw/cofre-sistemas (web/docs/FERRAMENTAS-POR-ESCOPO.md).
   const ferramentas = opcoes.ferramentas || criarFerramentas({ caminho: config.ferramentasPath, log });
   const cofreSistemas = opcoes.cofreSistemas || criarCofreSistemas({ dir: config.cofreSistemasDir });
-  const dados = criarDados({ dir: path.join(config.dataDir, 'dados'), papeis, bases, basesDir: config.basesDir, ferramentas, cofreSistemas, push: opcoes.push || push, log, agora: opcoes.agora, retencaoDias: config.dadosLogDias, prazoAprovacaoMs: opcoes.prazoAprovacaoMs });
+  const dados = criarDados({ dir: path.join(config.dataDir, 'dados'), papeis, bases, basesDir: config.basesDir, ferramentas, cofreSistemas, skillsDir: config.skillsDir, push: opcoes.push || push, log, agora: opcoes.agora, retencaoDias: config.dadosLogDias, prazoAprovacaoMs: opcoes.prazoAprovacaoMs });
   caixa.permitir('/api/v1/dados/fontes');
   caixa.permitir('/api/v1/dados/pedidos');
   caixa.permitir('/api/v1/dados/docs.md');
