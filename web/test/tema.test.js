@@ -77,9 +77,9 @@ test('nenhum JS ou HTML de tela pinta cor fixa em estilo inline ou em <style> (s
   assert.deepEqual(achados, [], `Cor fixa em estilo inline (use uma classe com token; marque com cor-fixa só o que for de marca ou desenho):\n${achados.join('\n')}`);
 });
 
-test('o seletor de tema está no menu e na conta', () => {
+test('o seletor de tema está no menu (Configurações), inclusive para o colaborador', () => {
   assert.ok(pub('casca.js').includes('id="mlTemaSeletor"'));
   assert.ok(pub('menu-lado.js').includes("raiz.DGTema.monta($('mlTemaSeletor'))"));
-  assert.ok(pub('conta.html').includes('id="temaSeletor"'));
-  assert.ok(pub('conta.js').includes('DGTema.monta'));
+  // o bloco Configurações do menu não é só do dono: o colaborador também escolhe o tema
+  assert.ok(!/papel-colab[^\n]*mlTemaSeletor/.test(pub('papel.css')), 'papel.css não esconde o seletor do colaborador');
 });
