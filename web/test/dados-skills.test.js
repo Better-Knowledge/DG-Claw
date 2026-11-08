@@ -146,11 +146,18 @@ test('rota: propor skill vira aprovação; o dono aprova e o arquivo nasce no gr
     const d2 = await pedir('POST', `/api/v1/dados/aprovacoes/${d1.json.pedido.id}/aprovar`, { hash: hd });
     assert.equal(d2.status, 200, d2.texto); assert.equal(d2.json.pedido.estado, 'executada', JSON.stringify(d2.json.pedido));
     assert.ok(fs.existsSync(path.join(c.skillsDir, 'grupos', 'projeto-x', 'do-dono', 'SKILL.md')));
-    // nome de skill global: a de grupo tomaria o lugar dela para o grupo inteiro; recusado
+    // nome de skill global: o pedido nasce igual (sem oráculo de nomes), mas na aprovação a de grupo não é gravada
     fs.mkdirSync(path.join(c.skillsDir, 'globais', 'fechamento'), { recursive: true });
     fs.writeFileSync(path.join(c.skillsDir, 'globais', 'fechamento', 'SKILL.md'), SKILL('fechamento'));
     const g = await pedir('POST', '/api/v1/dados/fontes/skills/propor', { nome: 'fechamento', grupo: 'financeiro', conteudo: SKILL('fechamento') }, CAIXA('ana'));
-    assert.equal(g.status, 409, g.texto); assert.doesNotMatch(g.json.erro || g.texto, /global/, 'a mensagem não revela que existe uma global');
+    assert.equal(g.status, 202, g.texto);
+    const hg = (await pedir('GET', '/api/v1/dados/aprovacoes?estado=pendente')).json.aprovacoes.find((x) => x.id === g.json.pedido.id).hash;
+    const ga = await pedir('POST', `/api/v1/dados/aprovacoes/${g.json.pedido.id}/aprovar`, { hash: hg });
+    assert.equal(ga.json.pedido.estado, 'falhou', ga.texto);
+    const visto = await pedir('GET', `/api/v1/dados/pedidos/${g.json.pedido.id}`, undefined, CAIXA('ana'));
+    assert.doesNotMatch(JSON.stringify(visto.json), /global/, 'o agente não lê que existe uma global');
+    assert.ok(!fs.existsSync(path.join(c.skillsDir, 'grupos', 'financeiro', 'fechamento')));
+    assert.match(c.cap.texto(), /já existe uma skill global com esse nome/, 'o motivo de verdade vai para o log do dono');
   } finally { srv.close(); c.fim(); }
 });
 
@@ -176,6 +183,9 @@ test('os padrões de segredo são os mesmos para a CLI (grep -Eif) e para o Web 
     const grepC = (t) => spawnSync('bash', ['-c', 'grep -Eiq -f <(grep -Ev \'^[[:space:]]*(#|$)\' "$1")', '_', comComentario], { input: t + '\n' }).status === 0;
     for (const t of ['sk-abcdefghijklmnopqrst']) { assert.ok(rxC.test(t)); assert.ok(grepC(t)); }
     for (const t of ['nada aqui', '# comentário']) { assert.ok(!rxC.test(t), 'web: ' + t); assert.ok(!grepC(t), 'cli: ' + t); }
+    // arquivo só de comentários: os dois lados fecham (erro), em vez de "sem segredo"
+    fs.writeFileSync(path.join(base, 'so-comentario'), '# nada\n\n');
+    assert.throws(() => carregaSegredos(path.join(base, 'so-comentario')), /vazia/);
     // nomes reservados: lista fixa mesmo sem a pasta skills/, e ok:false para o propor fechar
     const r = nomesReservados(base);
     assert.equal(r.ok, false); assert.ok(r.nomes.has('memory') && r.nomes.has('dgclaw'));

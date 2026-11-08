@@ -37,7 +37,9 @@ nega "atalho dentro da skill" dgclaw skill publicar "$TMP/com-atalho" --escopo g
 mk_skill "$TMP/com-binario" com-binario; printf '\x00\x01' >"$TMP/com-binario/foto.png"
 nega "arquivo que nao e texto" dgclaw skill publicar "$TMP/com-binario" --escopo global
 mk_skill "$TMP/com-segredo" com-segredo; printf 'use api_key = "abcdefghijklmnopqrstuvwxyz123"\n' >>"$TMP/com-segredo/SKILL.md"
+mk_skill "$TMP/com-nul" com-nul; printf 'texto\0\napi_key = "abcdefghijklmnopqrstuvwxyz123"\n' >>"$TMP/com-nul/notas.md"
 nega "segredo no texto" dgclaw skill publicar "$TMP/com-segredo" --escopo global
+nega "byte nulo no texto nao esconde o segredo do grep" dgclaw skill publicar "$TMP/com-nul" --escopo global
 mk_skill "$TMP/Maiuscula" Maiuscula
 nega "nome com maiuscula" dgclaw skill publicar "$TMP/Maiuscula" --escopo global
 nega "nada disso entrou" bash -c "ls '$SK/globais' | grep -qE 'nome-errado|com-|Maiuscula'"
