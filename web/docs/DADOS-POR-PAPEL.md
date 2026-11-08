@@ -150,7 +150,7 @@ dgclaw-api GET  /api/v1/dados/pedidos/<id>
 
 Uma linha JSON por pedido em `/var/lib/dgclaw/web/dados/log/acessos-AAAA-MM-DD.jsonl` (root, 600):
 `quando, agente, pessoa, papel, fonte, escopo, operacao, acao, decisao, motivo, status, itens, bytes, aprovacao, por,
-credencial` (o nome da credencial que uma chamada a ferramenta usou; nunca o valor).
+credencial` (o nome da credencial que a operação da ferramenta usa; nunca o valor).
 **Sem parâmetros, sem conteúdo, sem segredo.** Quando a recusa veio de um parâmetro inválido, o `motivo`
 no log é um código fixo ("a fonte recusou os parâmetros (400)"), nunca o valor que o agente mandou; a frase
 completa vai só na resposta ao agente. O que o agente vê de um pedido de aprovação nunca traz o login do

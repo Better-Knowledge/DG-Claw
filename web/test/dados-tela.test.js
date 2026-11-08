@@ -64,6 +64,10 @@ test('histórico, log e papéis viram HTML seguro', () => {
   const hf = T.htmlFerramentas({ valido: true, credenciais: ['crm'], ferramentas: { crm: { titulo: 'CRM <x>', tipo: 'api', credencial: 'crm', operacoes: { listar: { escopo: 'crm:ler', acao: false }, criar: { escopo: 'crm:escrever', acao: true } } }, notion: { titulo: 'notion', tipo: 'mcp', credencial: 'notion', operacoes: {} } } });
   assert.ok(hf.includes('<code>crm</code> CRM &lt;x&gt; · api · credencial crm<br>listar <small>crm:ler</small>, criar (ação) <small>crm:escrever</small>'));
   assert.ok(hf.includes('credencial notion não está no cofre'));
+  // credenciais por escopo: o padrão marcado, cada escopo com o seu nome, e todas conferidas no cofre
+  const he = T.htmlFerramentas({ valido: true, credenciais: ['a'], ferramentas: { crm: { titulo: 'crm', tipo: 'api', credencial: 'a', credenciais: { 'crm:ler': 'a', 'crm:escrever': 'b<x>' }, operacoes: {} } } });
+  assert.ok(he.includes('credencial a (padrão)') && he.includes('crm:ler → a') && he.includes('crm:escrever → b&lt;x&gt;'), he);
+  assert.ok(he.includes('credencial b&lt;x&gt; não está no cofre'), he);
   assert.ok(fs.readFileSync(path.join(__dirname, '../public/dados.html'), 'utf8').includes('id="secFerramentas"'));
   assert.match(T.htmlBases({ valido: false, erro: '<x>' }), /dp-erro.*&lt;x&gt;/);
   assert.match(T.htmlBases({ valido: true, bases: {} }), /Nenhuma base cadastrada/);

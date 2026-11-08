@@ -7,7 +7,7 @@
 //
 // Limites de propósito: sem seguir redirecionamento, sem credencial em log ou erro, resposta até 1 MB, tempo
 // até timeout_s (máximo 25 s, porque a caixa do agente responde em 30 s), ambiente do MCP limpo (só PATH, o
-// env do catálogo e a credencial na variável combinada).
+// env do catálogo, a credencial na variável combinada e, se o catálogo pedir, o slug do agente em env_agente).
 
 const http = require('node:http');
 const https = require('node:https');
@@ -42,6 +42,11 @@ function credencialDe(cofre, f, op) {
   try { return cofre.ler(nome); } catch (e) {
     throw new ErroFonte(503, `A ferramenta não pode ser usada agora: ${e.message}`);
   }
+}
+
+/** Mascara um texto com TODAS as credenciais da lista, da mais longa para a mais curta (um prefixo comum não deixa o resto à mostra). */
+function mascaraLista(texto, lista) {
+  return (lista || []).slice().sort((a, b) => String(b).length - String(a).length).reduce((acc, c) => mascara(acc, c), String(texto || ''));
 }
 
 /** Troca toda ocorrência da credencial (crua, em base64 e codificada para URL) por *** num texto. */
@@ -104,7 +109,7 @@ function montaUrl(f, op, params) {
   return { url: u, corpo };
 }
 
-function chamaApi(f, op, params, credencial, agente) {
+function chamaApi(f, op, params, credencial, agente, todas) {
   const { url, corpo } = montaUrl(f, op, params);
   const cab = { Accept: 'application/json', 'User-Agent': 'DG-Claw-gateway' };
   // O sistema de destino sabe qual agente chamou (só o slug, nunca a pessoa nem a credencial), se o catálogo pedir.
@@ -131,13 +136,13 @@ function chamaApi(f, op, params, credencial, agente) {
         if (res.statusCode === 401 || res.statusCode === 403) { reject(new ErroFonte(502, `O sistema recusou a credencial do gateway (${res.statusCode}). O dono precisa conferir a credencial no cofre de sistemas.`)); return; }
         if (res.statusCode >= 400) {
           // O corpo do erro pode ecoar o cabeçalho de autorização: vai só para o log do Web, mascarado, nunca ao agente.
-          if (f.log) f.log('aviso', `Ferramenta ${f.nomeF}/${op.nomeOp}: o sistema respondeu ${res.statusCode}: ${mascara(texto, credencial).slice(0, MAX_ECO_LOG).replace(/[\u0000-\u001f]/g, ' ')}`);
+          if (f.log) f.log('aviso', `Ferramenta ${f.nomeF}/${op.nomeOp}: o sistema respondeu ${res.statusCode}: ${mascaraLista(texto, todas || [credencial]).slice(0, MAX_ECO_LOG).replace(/[\u0000-\u001f]/g, ' ')}`);
           reject(new ErroFonte(502, `O sistema respondeu ${res.statusCode} a "${op.nomeOp}". O motivo ficou no log do Web; se repetir, avise o dono.`)); return;
         }
         if (!texto.trim()) { resolve(null); return; }
         try { resolve(JSON.parse(texto)); } catch (e) {
           // A mensagem do JSON.parse pode trazer um trecho do corpo: fica no log, mascarada; ao agente só o fato.
-          if (f.log) f.log('aviso', `Ferramenta ${f.nomeF}/${op.nomeOp}: resposta que não é JSON (${mascara(e.message, credencial).slice(0, MAX_ECO_LOG)})`);
+          if (f.log) f.log('aviso', `Ferramenta ${f.nomeF}/${op.nomeOp}: resposta que não é JSON (${mascaraLista(e.message, todas || [credencial]).slice(0, MAX_ECO_LOG)})`);
           reject(new ErroFonte(502, 'O sistema não respondeu em JSON; o gateway só repassa JSON. O detalhe ficou no log do Web.'));
         }
       });
@@ -183,7 +188,7 @@ function chamaBanco(f, op, params) {
 }
 
 // ── servidor MCP (stdio, JSON-RPC) ─────────────────────────────────────────
-function chamaMcp(f, op, params, credencial, agente) {
+function chamaMcp(f, op, params, credencial, agente, todas) {
   const env = Object.assign({ PATH: process.env.PATH || '/usr/local/bin:/usr/bin:/bin' }, f.env);
   if (f.credencial_env && credencial) env[f.credencial_env] = credencial;
   if (f.env_agente && agente) env[f.env_agente] = String(agente);
@@ -212,7 +217,7 @@ function chamaMcp(f, op, params, credencial, agente) {
     filho.stderr.on('data', (c) => { if (erros.length < 4000) erros += c.toString('utf8'); });
     filho.on('exit', () => fim(() => {
       // O stderr do servidor pode mostrar o ambiente (modo debug): vai só para o log do Web, mascarado.
-      if (f.log && erros.trim()) f.log('aviso', `Ferramenta ${f.nomeF}/${op.nomeOp}: o servidor MCP encerrou antes de responder; stderr: ${mascara(erros, credencial).trim().slice(0, MAX_ECO_LOG).replace(/[\u0000-\u001f]/g, ' ')}`);
+      if (f.log && erros.trim()) f.log('aviso', `Ferramenta ${f.nomeF}/${op.nomeOp}: o servidor MCP encerrou antes de responder; stderr: ${mascaraLista(erros, todas || [credencial]).trim().slice(0, MAX_ECO_LOG).replace(/[\u0000-\u001f]/g, ' ')}`);
       reject(new ErroFonte(502, 'O servidor MCP encerrou antes de responder. O motivo ficou no log do Web; se repetir, avise o dono.'));
     }));
     filho.stdin.on('error', () => { /* o servidor fechou o stdin: o exit/timeout cuida */ });
@@ -234,17 +239,17 @@ function chamaMcp(f, op, params, credencial, agente) {
       fim(() => resolve(r));
     })().catch((e) => fim(() => {
       const detalhe = e && e.message ? String(e.message) : JSON.stringify(e);
-      if (f.log) f.log('aviso', `Ferramenta ${f.nomeF}/${op.nomeOp}: o servidor MCP recusou a chamada: ${mascara(detalhe, credencial).slice(0, MAX_ECO_LOG).replace(/[\u0000-\u001f]/g, ' ')}`);
+      if (f.log) f.log('aviso', `Ferramenta ${f.nomeF}/${op.nomeOp}: o servidor MCP recusou a chamada: ${mascaraLista(detalhe, todas || [credencial]).slice(0, MAX_ECO_LOG).replace(/[\u0000-\u001f]/g, ' ')}`);
       reject(new ErroFonte(502, `O servidor MCP recusou a chamada "${op.nomeOp}". O motivo ficou no log do Web; se repetir, avise o dono.`));
     }));
   });
 }
 
 /** O resultado de tools/call: o texto dos blocos (JSON quando parsear) ou o objeto estruturado. */
-function desembrulhaMcp(r, f, op, credencial) {
+function desembrulhaMcp(r, f, op, todas) {
   if (!ehObjeto(r)) return r;
   if (r.isError) {
-    if (f && f.log) f.log('aviso', `Ferramenta ${f.nomeF}/${op.nomeOp}: a tool devolveu erro: ${mascara(JSON.stringify(r.content || r), credencial).slice(0, MAX_ECO_LOG)}`);
+    if (f && f.log) f.log('aviso', `Ferramenta ${f.nomeF}/${op.nomeOp}: a tool devolveu erro: ${mascaraLista(JSON.stringify(r.content || r), todas || [credencial]).slice(0, MAX_ECO_LOG)}`);
     throw new ErroFonte(502, `A tool "${op ? op.nomeOp : '?'}" do servidor MCP devolveu erro. O motivo ficou no log do Web; se repetir, avise o dono.`);
   }
   if (r.structuredContent !== undefined) return r.structuredContent;
@@ -266,11 +271,12 @@ function fonteFerramenta({ nome, ferramenta: fDef, cofre, log }) {
       // O que sai rumo ao agente passa pela máscara: um sistema que ecoa o próprio cabeçalho não entrega a credencial.
       // Com mais de uma credencial na ferramenta, TODAS são mascaradas (um endpoint que devolve as chaves da
       // conta não pode entregar a de escrita numa chamada de leitura); as não usadas são lidas de forma tolerante.
-      const todas = outrasCredenciais(cofre, f, cred);
+      // Da mais longa para a mais curta: uma chave que é prefixo de outra (sk-abc e sk-abc-rw) não deixa o resto à mostra.
+      const todas = outrasCredenciais(cofre, f, cred).sort((a, b) => b.length - a.length);
       const mascaraTudo = (v) => todas.reduce((acc, c) => mascaraObjeto(acc, c), v);
-      if (f.tipo === 'api') return mascaraTudo(normalizaResultado(await chamaApi(f, op, params, cred, agente), op));
+      if (f.tipo === 'api') return mascaraTudo(normalizaResultado(await chamaApi(f, op, params, cred, agente, todas), op));
       if (f.tipo === 'banco') return chamaBanco(f, op, params);
-      return mascaraTudo(normalizaResultado(desembrulhaMcp(await chamaMcp(f, op, params, cred, agente), f, op, cred), op));
+      return mascaraTudo(normalizaResultado(desembrulhaMcp(await chamaMcp(f, op, params, cred, agente, todas), f, op, todas), op));
     };
     const credencialDaOp = nomeDaCredencial(f, op);
     if (op.acao) {
@@ -299,4 +305,4 @@ function fonteFerramenta({ nome, ferramenta: fDef, cofre, log }) {
   };
 }
 
-module.exports = { fonteFerramenta, montaUrl, segmentoDeRota, mascara, mascaraObjeto, normalizaResultado, filtraCampos, desembrulhaMcp };
+module.exports = { fonteFerramenta, montaUrl, segmentoDeRota, mascara, mascaraLista, mascaraObjeto, normalizaResultado, filtraCampos, desembrulhaMcp };
