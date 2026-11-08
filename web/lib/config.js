@@ -52,6 +52,8 @@ function carregaConfig(opcoes, log) {
     porta: opcoes.porta != null ? opcoes.porta : num(env.DGCLAW_WEB_PORT, 8300),
     agentesPath: opcoes.agentesPath || env.DGCLAW_AGENTES || '/etc/dgclaw/agentes.json',
     papeisPath: opcoes.papeisPath || env.DGCLAW_PAPEIS || '/etc/dgclaw/papeis.json',
+    basesPath: opcoes.basesPath || env.DGCLAW_BASES || '/etc/dgclaw/bases.json',
+    basesDir: opcoes.basesDir || env.DGCLAW_BASES_DIR || '/var/lib/dgclaw/bases',
     dadosLogDias: Math.round(num(env.DGCLAW_DADOS_LOG_DIAS, 90)),
     dataDir: opcoes.dataDir || env.DGCLAW_WEB_DATA || '/var/lib/dgclaw/web',
     publicDir: opcoes.publicDir || path.join(__dirname, '..', 'public'),

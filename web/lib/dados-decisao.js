@@ -67,4 +67,60 @@ function decidir(entrada) {
   }
 }
 
-module.exports = { decidir, intersecao, OPERACOES_LEITURA };
+/** A pessoa alcança a base pelo escopo? Devolve null se sim, ou o motivo. */
+function foraDoEscopo(nomePessoa, pessoa, base) {
+  if (base.escopo === 'empresa' || base.escopo === 'publica') return null;
+  if (base.escopo === 'grupo') return pessoa.grupos.includes(base.grupo) ? null : `a base é do grupo "${base.grupo}" e a pessoa ${nomePessoa} não está nele`;
+  if (base.escopo === 'privada') return base.pessoa === nomePessoa ? null : `a base é privada de "${base.pessoa}", não de ${nomePessoa}`;
+  return `escopo "${base.escopo}" desconhecido`;
+}
+
+/** Nível de uma base num bloco "bases": o nome exato vence o "*"; sem nada = null. */
+function nivelDaBase(bloco, nome) {
+  if (!bloco) return null;
+  if (bloco[nome] !== undefined) return bloco[nome];
+  if (bloco['*'] !== undefined) return bloco['*'];
+  return null;
+}
+
+/**
+ * decidirBase({ estado, slug, base, nomeBase, operacao, acao })
+ *   base: a base do catálogo (web/lib/bases.js), já carregada; null se não existe
+ * Leitura: pessoa ativa, dentro do escopo da base, sem "negado" no bloco bases da pessoa, e o papel com
+ * "leitura" para a base (nome exato ou "*"). Ação (escrever_base): tudo isso E a ação em aprovacao_humana
+ * na pessoa e no papel => "aprovacao". O resto é negado.
+ */
+function decidirBase(entrada) {
+  try {
+    const { estado, slug, base, nomeBase, operacao, acao } = entrada || {};
+    const negado = (motivo, extra) => Object.assign({ decisao: 'negado', campos: null, motivo, pessoa: null, papel: null }, extra || {});
+    if (!estado || !estado.ok) return negado(estado && estado.erro ? estado.erro : 'A política de dados não está carregada; todo acesso está negado.');
+    if (typeof slug !== 'string' || !slug) return negado('Pedido sem identidade de agente.');
+    if (!base || typeof nomeBase !== 'string') return negado(`A base "${String(nomeBase).slice(0, 40)}" não está no catálogo.`);
+    const pol = estado.politica;
+    const ag = pol.agentes[slug];
+    if (!ag) return negado(`O agente ${slug} não está no arquivo de papéis; nenhuma base é liberada.`);
+    const pessoa = pol.pessoas[ag.pessoa];
+    const papel = pol.papeis[ag.papel];
+    const ids = { pessoa: ag.pessoa, papel: ag.papel };
+    if (!pessoa) return negado(`A pessoa "${ag.pessoa}" do agente ${slug} não existe mais nos papéis; acesso retirado.`, ids);
+    if (!papel) return negado(`O papel "${ag.papel}" do agente ${slug} não existe mais nos papéis; acesso retirado.`, ids);
+    if (pessoa.estado === 'desligada') return negado(`A pessoa ${ag.pessoa} está desligada; o agente ${slug} não alcança base nenhuma.`, ids);
+    const fora = foraDoEscopo(ag.pessoa, pessoa, base);
+    if (fora) return negado(`A base "${nomeBase}" está fora do alcance da pessoa ${ag.pessoa}: ${fora}.`, ids);
+    if (nivelDaBase(pessoa.bases, nomeBase) === 'negado') return negado(`A pessoa ${ag.pessoa} tem a base "${nomeBase}" como negada.`, ids);
+    const np = nivelDaBase(papel.bases, nomeBase);
+    if (np !== 'leitura') return negado(`O papel ${ag.papel} não tem leitura na base "${nomeBase}"${np ? ' (está como negado)' : ' (não está escrita; use o nome ou "*" no bloco "bases" do papel)'}.`, ids);
+    if (OPERACOES_LEITURA.has(operacao)) {
+      return Object.assign({ decisao: 'permitido', campos: null, motivo: `leitura da base ${nomeBase} (escopo ${base.escopo}) liberada para a pessoa ${ag.pessoa} e para o papel ${ag.papel}`, escopo: base.escopo }, ids);
+    }
+    if (typeof acao !== 'string' || !acao) return negado(`A operação "${String(operacao).slice(0, 40)}" na base "${nomeBase}" não é leitura nem uma ação conhecida.`, ids);
+    if (pessoa.acoes[acao] !== 'aprovacao_humana') return negado(`A pessoa ${ag.pessoa} não tem a ação "${acao}"; o agente ${slug} não pode propor escrita na base.`, ids);
+    if (papel.acoes[acao] !== 'aprovacao_humana') return negado(`O papel ${ag.papel} não tem a ação "${acao}"; o agente ${slug} não pode propor escrita na base.`, ids);
+    return Object.assign({ decisao: 'aprovacao', campos: null, motivo: `a ação ${acao} na base ${nomeBase} precisa da aprovação de uma pessoa no painel`, escopo: base.escopo }, ids);
+  } catch (e) {
+    return { decisao: 'negado', campos: null, motivo: `Falha interna na decisão de acesso (${e && e.message}); por segurança o pedido foi negado.`, pessoa: null, papel: null };
+  }
+}
+
+module.exports = { decidir, decidirBase, intersecao, foraDoEscopo, nivelDaBase, OPERACOES_LEITURA };

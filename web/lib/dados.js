@@ -14,6 +14,7 @@
 //   POST /api/v1/dados/aprovacoes/<id>/aprovar        só dono; corpo { "hash": "<o hash que a tela mostrou>" }
 //   POST /api/v1/dados/aprovacoes/<id>/recusar        só dono; corpo { "motivo"? }
 //   GET  /api/v1/dados/papeis                         só dono: estado do arquivo de papéis (válido, hash, resumo)
+//   GET  /api/v1/dados/bases                          só dono: o catálogo de bases de conhecimento (web/lib/bases.js)
 //   GET  /api/v1/dados/log?limit=                     só dono: últimas linhas do log de acesso
 // A caixa libera só /api/v1/dados/fontes, /api/v1/dados/pedidos e /api/v1/dados/docs.md (server.js). As rotas
 // do dono recusam sessão vinda da caixa também aqui (guarda dupla).
@@ -25,7 +26,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const H = require('./http');
 const { quemChamou } = require('./caixa-agente');
-const { decidir, OPERACOES_LEITURA } = require('./dados-decisao');
+const { decidir, decidirBase, OPERACOES_LEITURA } = require('./dados-decisao');
 const { criarFontes, ErroFonte } = require('./dados-fontes');
 const { criarAprovacoes, ErroAprovacao } = require('./dados-aprovacoes');
 const { criarDadosLog } = require('./dados-log');
@@ -43,9 +44,15 @@ class ErroDados extends Error {
   constructor(status, mensagem, extra) { super(mensagem); this.name = 'ErroDados'; this.status = status; this.extra = extra || null; }
 }
 
-function criarDados({ dir, papeis, push, log, agora, retencaoDias, prazoAprovacaoMs }) {
+function criarDados({ dir, papeis, bases, basesDir, push, log, agora, retencaoDias, prazoAprovacaoMs }) {
   const relogio = agora || (() => Date.now());
-  const fontes = criarFontes({ dir: path.join(dir, 'fontes'), log, agora: relogio });
+  const fontes = criarFontes({ dir: path.join(dir, 'fontes'), log, agora: relogio, bases, basesDir });
+
+  /** A decisão para uma fonte: pelos papéis (fonte fixa) ou pelo escopo da base (fonte "base-<nome>"). */
+  function decideFonte(estado, slug, fonte, operacao, acao) {
+    if (fonte.base) return decidirBase({ estado, slug, base: bases ? bases.obter(fonte.base) : null, nomeBase: fonte.base, operacao, acao });
+    return decidir({ estado, slug, fonte: fonte.nome, operacao, acao });
+  }
   const aprovacoes = criarAprovacoes({ dir, log, agora: relogio, prazoMs: prazoAprovacaoMs });
   const acessos = criarDadosLog({ dir: path.join(dir, 'log'), log, agora: relogio, retencaoDias });
   const janelas = new Map();
@@ -70,8 +77,13 @@ function criarDados({ dir, papeis, push, log, agora, retencaoDias, prazoAprovaca
   /** Revoga pendentes de quem já não pode: agente fora dos papéis ou política fechada. */
   // O pedido do próprio dono (pela sessão do navegador) não passa pelos papéis: só os de agente são conferidos.
   const ehDoDono = (p) => typeof p.pedido_por === 'string' && p.pedido_por.startsWith('dono:');
+  function decideDoPedido(estado, p) {
+    const f = fontes.obter(p.fonte);
+    if (!f) return { decisao: 'negado', motivo: `a fonte "${p.fonte}" não existe mais` };
+    return decideFonte(estado, p.agente, f, p.operacao, p.acao);
+  }
   function varrePendentes(estado) {
-    return aprovacoes.revogar((p) => !ehDoDono(p) && decidir({ estado, slug: p.agente, fonte: p.fonte, operacao: p.operacao, acao: p.acao }).decisao !== 'aprovacao',
+    return aprovacoes.revogar((p) => !ehDoDono(p) && decideDoPedido(estado, p).decisao !== 'aprovacao',
       'a pessoa, o papel ou a ação deixaram de liberar este pedido antes da aprovação', 'sistema');
   }
 
@@ -105,11 +117,11 @@ function criarDados({ dir, papeis, push, log, agora, retencaoDias, prazoAprovaca
     // Decisão. O dono do painel lê tudo e pede ação como qualquer pessoa; o agente passa pelos papéis.
     let d;
     if (quem.tipo === 'agente') {
-      d = decidir({ estado: papeis.estado(), slug, fonte: nomeFonte, operacao, acao: acaoDef ? acaoDef.acao : null });
+      d = decideFonte(papeis.estado(), slug, fonte, operacao, acaoDef ? acaoDef.acao : null);
     } else {
       d = { decisao: ehLeitura ? 'permitido' : 'aprovacao', campos: null, motivo: 'sessão do dono do painel', pessoa: 'dono', papel: 'dono' };
     }
-    Object.assign(base, { pessoa: d.pessoa, papel: d.papel, acao: acaoDef ? acaoDef.acao : undefined });
+    Object.assign(base, { pessoa: d.pessoa, papel: d.papel, acao: acaoDef ? acaoDef.acao : undefined, escopo: d.escopo });
     if (d.decisao === 'negado') nega(403, d.motivo);
 
     if (ehLeitura) {
@@ -153,6 +165,7 @@ function criarDados({ dir, papeis, push, log, agora, retencaoDias, prazoAprovaca
   /** Frase gerada pelo código a partir dos params validados; nunca texto livre do modelo. */
   function descreve(fonte, operacao, acao, params, agente) {
     if (acao === 'enviar_email') return `O agente ${agente} quer enviar um e-mail para ${params.para} com o assunto "${params.assunto}" (${params.texto.length} caracteres de texto).`;
+    if (acao === 'escrever_base') return `O agente ${agente} quer ${params.substituir ? 'substituir' : 'criar'} o arquivo ${params.caminho} na base ${fonte.replace(/^base-/, '')} (${Buffer.byteLength(params.conteudo, 'utf8')} bytes).`;
     return `O agente ${agente} quer executar ${acao} em ${fonte} (${operacao}).`;
   }
 
@@ -207,11 +220,12 @@ function criarDados({ dir, papeis, push, log, agora, retencaoDias, prazoAprovaca
     const estado = papeis.estado();
     const saida = [];
     for (const f of fontes.catalogo()) {
-      const leitura = f.operacoes.length ? decidir({ estado, slug, fonte: f.nome, operacao: 'listar' }) : { decisao: 'negado' };
+      const fonte = fontes.obter(f.nome);
+      const leitura = f.operacoes.length ? decideFonte(estado, slug, fonte, 'listar', null) : { decisao: 'negado' };
       const acoes = {};
-      for (const [op, acao] of Object.entries(f.acoes)) if (decidir({ estado, slug, fonte: f.nome, operacao: op, acao }).decisao === 'aprovacao') acoes[op] = acao;
+      for (const [op, acao] of Object.entries(f.acoes)) if (decideFonte(estado, slug, fonte, op, acao).decisao === 'aprovacao') acoes[op] = acao;
       if (leitura.decisao !== 'permitido' && !Object.keys(acoes).length) continue;
-      saida.push({ nome: f.nome, operacoes: leitura.decisao === 'permitido' ? f.operacoes : [], campos: leitura.decisao === 'permitido' ? (leitura.campos || f.campos) : [], acoes, catalogo: f.catalogo });
+      saida.push({ nome: f.nome, base: f.base, operacoes: leitura.decisao === 'permitido' ? f.operacoes : [], campos: leitura.decisao === 'permitido' ? (leitura.campos || f.campos) : [], acoes, catalogo: f.catalogo });
     }
     return saida;
   }
@@ -294,16 +308,21 @@ function criarDados({ dir, papeis, push, log, agora, retencaoDias, prazoAprovaca
         const estado = papeis.estado();
         const interno = aprovacoes.aprovar(ap[1], {
           hash: corpo.hash, por,
-          conferir: (pd) => (ehDoDono(pd) ? null : (() => { const dd = decidir({ estado, slug: pd.agente, fonte: pd.fonte, operacao: pd.operacao, acao: pd.acao }); return dd.decisao === 'aprovacao' ? null : dd.motivo; })()),
+          conferir: (pd) => (ehDoDono(pd) ? null : (() => { const dd = decideDoPedido(estado, pd); return dd.decisao === 'aprovacao' ? null : dd.motivo; })()),
         });
         return H.enviaJson(res, 200, { ok: true, pedido: executaAprovado(interno, por) }), true;
       }
 
+      if (sub === '/bases') {
+        metodo(['GET']); soDono(quem, sessao);
+        const e = bases ? bases.estado() : { ok: true, erro: null, bases: {}, origem: 'ausente', hash: null };
+        return H.enviaJson(res, 200, { ok: true, valido: e.ok, erro: e.erro, origem: e.origem, hash: e.hash, bases: e.ok ? e.bases : {} }), true;
+      }
       if (sub === '/papeis') {
         metodo(['GET']); soDono(quem, sessao);
         const e = papeis.estado();
         const n = (o) => Object.keys(o).length;
-        return H.enviaJson(res, 200, { ok: true, valido: e.ok, erro: e.erro, origem: e.origem, hash: e.hash, pessoas: n(e.politica.pessoas), papeis: n(e.politica.papeis), agentes: Object.keys(e.politica.agentes), politica: e.ok ? e.politica : null }), true;
+        return H.enviaJson(res, 200, { ok: true, valido: e.ok, erro: e.erro, origem: e.origem, hash: e.hash, pessoas: n(e.politica.pessoas), papeis: n(e.politica.papeis), grupos: n(e.politica.grupos || {}), agentes: Object.keys(e.politica.agentes), politica: e.ok ? e.politica : null }), true;
       }
       if (sub === '/log') {
         metodo(['GET']); soDono(quem, sessao);

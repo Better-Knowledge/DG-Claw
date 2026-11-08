@@ -9,7 +9,7 @@ const path = require('node:path');
 
 const RX_ARQ = /^acessos-(\d{4}-\d{2}-\d{2})\.jsonl$/;
 const MAX_MOTIVO = 300;
-const CAMPOS = ['agente', 'pessoa', 'papel', 'fonte', 'operacao', 'acao', 'decisao', 'motivo', 'status', 'itens', 'bytes', 'aprovacao', 'por'];
+const CAMPOS = ['agente', 'pessoa', 'papel', 'fonte', 'escopo', 'operacao', 'acao', 'decisao', 'motivo', 'status', 'itens', 'bytes', 'aprovacao', 'por'];
 
 function diaDe(ms) { return new Date(ms).toISOString().slice(0, 10); }
 

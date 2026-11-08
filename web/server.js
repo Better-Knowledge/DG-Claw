@@ -51,6 +51,7 @@ const { criarColaboradoresRotas } = require('./lib/colaboradores-rotas');
 const { criarEmail } = require('./lib/email');
 const escopo = require('./lib/escopo');
 const { criarPapeis } = require('./lib/papeis');
+const { criarBases } = require('./lib/bases');
 const { criarDados } = require('./lib/dados');
 
 const METODOS_QUE_ESCREVEM = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
@@ -139,7 +140,9 @@ function criarServidor(opcoes) {
   // Dados por papel: o agente pede pela caixa, o software decide pelos papéis (/etc/dgclaw/papeis.json). Só as
   // rotas do agente entram na caixa; aprovar, recusar, ver os papéis e o log são do dono (web/docs/DADOS-POR-PAPEL.md).
   const papeis = opcoes.papeis || criarPapeis({ caminho: config.papeisPath, log });
-  const dados = criarDados({ dir: path.join(config.dataDir, 'dados'), papeis, push: opcoes.push || push, log, agora: opcoes.agora, retencaoDias: config.dadosLogDias, prazoAprovacaoMs: opcoes.prazoAprovacaoMs });
+  // Bases de conhecimento: catálogo em /etc/dgclaw/bases.json, pastas em /var/lib/dgclaw/bases/<nome> (web/docs/BASES-DE-CONHECIMENTO.md).
+  const bases = opcoes.bases || criarBases({ caminho: config.basesPath, log });
+  const dados = criarDados({ dir: path.join(config.dataDir, 'dados'), papeis, bases, basesDir: config.basesDir, push: opcoes.push || push, log, agora: opcoes.agora, retencaoDias: config.dadosLogDias, prazoAprovacaoMs: opcoes.prazoAprovacaoMs });
   caixa.permitir('/api/v1/dados/fontes');
   caixa.permitir('/api/v1/dados/pedidos');
   caixa.permitir('/api/v1/dados/docs.md');
@@ -1252,7 +1255,7 @@ function criarServidor(opcoes) {
   });
 
   return {
-    servidor, config, registro, auth, colaboradores, proxy, midia, conversa, log, caixa, push, lembretes, avisos, estados, vigiaAtencao, prefsAtencao, dados, papeis,
+    servidor, config, registro, auth, colaboradores, proxy, midia, conversa, log, caixa, push, lembretes, avisos, estados, vigiaAtencao, prefsAtencao, dados, papeis, bases,
     ouvir(porta, host) {
       return new Promise((resolve, reject) => {
         servidor.once('error', reject);
