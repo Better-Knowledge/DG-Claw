@@ -105,9 +105,9 @@ Observabilidade mostra, por agente, qual sistema foi usado com qual escopo.
 Opcional. Em `api`, `cabecalho_agente` é o nome de um cabeçalho HTTP próprio, começando por `X-` (ex.:
 `X-DGClaw-Agente`; não pode ser o cabeçalho da `auth`, nem de proxy como `X-Forwarded-*`, nem de troca de método
 como `X-HTTP-Method-Override`, nem de identidade confiada por proxy como `X-Remote-User`, nem ter um segmento como
-`token`, `key`, `signature`, `cookie`, `session`, `user` ou `email`): o gateway manda nele o slug do agente que pediu (ou `dono`, se a
-pessoa pediu pelo painel), e nada mais. Em `mcp`, `env_agente` é o nome da variável de ambiente que recebe o slug: `DGCLAW_AGENTE` ou
-`DGCLAW_AGENTE_<algo>` (nunca outra variável do DG Claw nem uma que mude como o programa roda). Com isso o CRM pode registrar no lado dele quem acessou o quê, e uma estratégia mais fina (uma chave por
+`token`, `key`, `signature`, `cookie`, `session`, `user` ou `email`, mesmo colado, como `X-ApiKey`): o gateway manda nele o slug do agente que pediu (ou `dono`, se a
+pessoa pediu pelo painel), e nada mais. Em `mcp`, `env_agente` é o nome da variável de ambiente que recebe o slug: só `DGCLAW_AGENTE` ou
+`DGCLAW_AGENTE_SLUG` (nunca outra variável do DG Claw, como `DGCLAW_AGENTE_ID`, que o runner usa, nem uma que mude como o programa roda). Com isso o CRM pode registrar no lado dele quem acessou o quê, e uma estratégia mais fina (uma chave por
 agente, emitida pelo próprio sistema) pode vir depois sem mudar o catálogo.
 
 ### Esquema dos parâmetros

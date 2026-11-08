@@ -50,7 +50,7 @@ test('credenciais por escopo: a do escopo vence a padrão; cabecalho_agente e en
   assert.deepEqual(r.ferramentas.crm.credenciais, { 'crm:escrever': 'crm-escrita' }); assert.equal(r.ferramentas.crm.credencial, 'crm-leitura'); assert.equal(r.ferramentas.crm.cabecalho_agente, 'X-DGClaw-Agente');
   assert.equal(r.ferramentas.so.credencial, null); assert.deepEqual(r.ferramentas.so.credenciais, { 'so:ler': 'so-leitura' });
   assert.equal(r.ferramentas.m.env_agente, 'DGCLAW_AGENTE'); assert.equal(r.ferramentas.m.cabecalho_agente, undefined);
-  const ok2 = validaFerramentas({ versao: 1, ferramentas: { k: { tipo: 'api', base_url: 'https://a.test', auth: { tipo: 'bearer' }, credencial: 'c', cabecalho_agente: 'X-Keycloak-Agente', operacoes: {} }, m2: { tipo: 'mcp', comando: '/usr/bin/node', env_agente: 'DGCLAW_AGENTE_SLUG', operacoes: {} } } });
+  const ok2 = validaFerramentas({ versao: 1, ferramentas: { k: { tipo: 'api', base_url: 'https://a.test', auth: { tipo: 'bearer' }, credencial: 'c', cabecalho_agente: 'X-Keycloak-Agente', operacoes: {} }, k2: { tipo: 'api', base_url: 'https://a.test', auth: { tipo: 'bearer' }, credencial: 'c', cabecalho_agente: 'X-Request-Id', operacoes: {} }, k3: { tipo: 'api', base_url: 'https://a.test', auth: { tipo: 'bearer' }, credencial: 'c', cabecalho_agente: 'X-Caller-Id', operacoes: {} }, m2: { tipo: 'mcp', comando: '/usr/bin/node', env_agente: 'DGCLAW_AGENTE_SLUG', operacoes: {} } } });
   assert.equal(ok2.ok, true, JSON.stringify(ok2.erros));
 });
 
@@ -127,6 +127,20 @@ test('validaFerramentas recusa o que abriria uma brecha ou quebraria a chamada',
     [{ versao: 1, ferramentas: { m: { tipo: 'mcp', comando: '/usr/bin/node', env: { EXTRA: 'sim' }, env_agente: 'EXTRA', operacoes: {} } } }, /env_agente precisa ser/],
     [{ versao: 1, ferramentas: { m: { tipo: 'mcp', comando: '/usr/bin/node', credencial: 'n', credencial_env: 'T', env_agente: 'T', operacoes: {} } } }, /env_agente precisa ser/],
     [{ versao: 1, ferramentas: { m: { tipo: 'mcp', comando: '/usr/bin/node', env_agente: 'minuscula', operacoes: {} } } }, /env_agente precisa ser/],
+    // rodada 4: sufixo colado, identidade confiada por gateway, e DGCLAW_AGENTE_ID (lida pelo runner e pelo monitor)
+    [api({ auth: { tipo: 'bearer' }, credencial: 'c', cabecalho_agente: 'X-ApiKey' }), /cabecalho_agente precisa ser/],
+    [api({ auth: { tipo: 'bearer' }, credencial: 'c', cabecalho_agente: 'X-AccessToken' }), /cabecalho_agente precisa ser/],
+    [api({ auth: { tipo: 'bearer' }, credencial: 'c', cabecalho_agente: 'X-ClientSecret' }), /cabecalho_agente precisa ser/],
+    [api({ auth: { tipo: 'bearer' }, credencial: 'c', cabecalho_agente: 'X-Userid' }), /cabecalho_agente precisa ser/],
+    [api({ auth: { tipo: 'bearer' }, credencial: 'c', cabecalho_agente: 'X-Consumer-Custom-Id' }), /cabecalho_agente precisa ser/],
+    [api({ auth: { tipo: 'bearer' }, credencial: 'c', cabecalho_agente: 'X-MS-CLIENT-PRINCIPAL-NAME' }), /cabecalho_agente precisa ser/],
+    [api({ auth: { tipo: 'bearer' }, credencial: 'c', cabecalho_agente: 'X-Amzn-Oidc-Identity' }), /cabecalho_agente precisa ser/],
+    [api({ auth: { tipo: 'bearer' }, credencial: 'c', cabecalho_agente: 'X-Act-As' }), /cabecalho_agente precisa ser/],
+    [api({ auth: { tipo: 'bearer' }, credencial: 'c', cabecalho_agente: 'X-Bypass-Auth' }), /cabecalho_agente precisa ser/],
+    [api({ auth: { tipo: 'bearer' }, credencial: 'c', cabecalho_agente: 'X-JWT-Assertion' }), /cabecalho_agente precisa ser/],
+    [{ versao: 1, ferramentas: { m: { tipo: 'mcp', comando: '/usr/bin/node', env_agente: 'DGCLAW_AGENTE_ID', operacoes: {} } } }, /env_agente precisa ser/],
+    [{ versao: 1, ferramentas: { m: { tipo: 'mcp', comando: '/usr/bin/node', env_agente: 'DGCLAW_AGENTE__X', operacoes: {} } } }, /env_agente precisa ser/],
+    [{ versao: 1, ferramentas: { m: { tipo: 'mcp', comando: '/usr/bin/node', env_agente: 'DGCLAW_AGENTES', operacoes: {} } } }, /env_agente precisa ser/],
   ];
   for (const [entrada, rx] of casos) {
     const r = validaFerramentas(entrada);
