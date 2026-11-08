@@ -27,6 +27,14 @@ function nomeDaCredencial(f, op) {
   return f.credencial || null;
 }
 
+/** Todas as credenciais da ferramenta (a usada mais as dos outros escopos), para a máscara. Falha ao ler uma não usada só a deixa de fora. */
+function outrasCredenciais(cofre, f, usada) {
+  const nomes = new Set([f.credencial].concat(Object.values(f.credenciais || {})).filter(Boolean));
+  const valores = new Set(usada ? [usada] : []);
+  for (const n of nomes) { try { const v = cofre.ler(n); if (v) valores.add(v); } catch (_) { /* não usada nesta chamada: a operação segue */ } }
+  return [...valores];
+}
+
 /** Credencial que o adaptador precisa, lida na hora, pelo nome que a operação usa. Erro vira 503 sem o valor. */
 function credencialDe(cofre, f, op) {
   const nome = nomeDaCredencial(f, op);
@@ -256,9 +264,13 @@ function fonteFerramenta({ nome, ferramenta: fDef, cofre, log }) {
     const executa = async (params, agente) => {
       const cred = credencialDe(cofre, f, op);
       // O que sai rumo ao agente passa pela máscara: um sistema que ecoa o próprio cabeçalho não entrega a credencial.
-      if (f.tipo === 'api') return mascaraObjeto(normalizaResultado(await chamaApi(f, op, params, cred, agente), op), cred);
+      // Com mais de uma credencial na ferramenta, TODAS são mascaradas (um endpoint que devolve as chaves da
+      // conta não pode entregar a de escrita numa chamada de leitura); as não usadas são lidas de forma tolerante.
+      const todas = outrasCredenciais(cofre, f, cred);
+      const mascaraTudo = (v) => todas.reduce((acc, c) => mascaraObjeto(acc, c), v);
+      if (f.tipo === 'api') return mascaraTudo(normalizaResultado(await chamaApi(f, op, params, cred, agente), op));
       if (f.tipo === 'banco') return chamaBanco(f, op, params);
-      return mascaraObjeto(normalizaResultado(desembrulhaMcp(await chamaMcp(f, op, params, cred, agente), f, op, cred), op), cred);
+      return mascaraTudo(normalizaResultado(desembrulhaMcp(await chamaMcp(f, op, params, cred, agente), f, op, cred), op));
     };
     const credencialDaOp = nomeDaCredencial(f, op);
     if (op.acao) {

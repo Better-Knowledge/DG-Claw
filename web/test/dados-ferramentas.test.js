@@ -43,6 +43,7 @@ async function crmFalso() {
       if (!['Bearer segredo-do-crm-123', 'Bearer so-leitura-456', 'Bearer leitura-e-escrita-789'].includes(req.headers.authorization)) return j(401, { erro: 'sem credencial' });
       if (req.headers.authorization === 'Bearer so-leitura-456' && req.method !== 'GET') return j(403, { erro: 'chave só de leitura' });
       if (req.method === 'GET' && req.url.startsWith('/api/clientes/')) return j(200, { id: req.url.split('/').pop(), nome: 'Cliente Exemplo', cpf: 'oculto?' });
+      if (req.url === '/api/conta') return j(200, { chaves: ['so-leitura-456', 'leitura-e-escrita-789'], dica: 'leitura-e-escrita-789' });
       if (req.method === 'GET' && req.url.startsWith('/api/clientes')) return j(200, { items: [{ id: '1', nome: 'Um', cpf: '000' }, { id: '2', nome: 'Dois', cpf: '111' }] });
       if (req.method === 'POST' && req.url === '/api/propostas') return j(201, { id: 'p9', recebido: JSON.parse(corpo) });
       if (req.url === '/api/redireciona') { res.writeHead(302, { Location: 'http://127.0.0.1:1/x' }); return res.end(); }
@@ -184,6 +185,7 @@ async function subir() {
       credenciais: { 'crm2:ler': 'crm-leitura', 'crm2:escrever': 'crm-escrita' },
       operacoes: {
         clientes_listar: { metodo: 'GET', rota: '/clientes', escopo: 'crm2:ler', campos: ['id', 'nome'] },
+        conta: { metodo: 'GET', rota: '/conta', escopo: 'crm2:ler' },
         proposta_criar: { metodo: 'POST', rota: '/propostas', escopo: 'crm2:escrever', acao: true, params: { cliente_id: { tipo: 'texto', regex: '^[0-9]{1,6}$', obrigatorio: true }, valor: { tipo: 'numero', min: 0, obrigatorio: true } } },
       } },
     notas: { tipo: 'mcp', comando: process.execPath, args: [mcp], credencial: 'notas', credencial_env: 'NOTAS_TOKEN', env_agente: 'DGCLAW_AGENTE', env: { EXTRA: 'sim' }, timeout_s: 5, operacoes: {
@@ -392,5 +394,14 @@ test('credencial por escopo: ler usa a chave de leitura, escrever usa a outra; o
     // o CRM sem cabeçalho combinado não recebe o slug
     await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-crm/clientes_listar', {}, CAIXA('ana'));
     assert.equal(s.crm.chamadas[s.crm.chamadas.length - 1].agente, null);
+    // um endpoint de leitura que devolve as chaves da conta: TODAS as credenciais da ferramenta saem mascaradas
+    const conta = await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-crm2/conta', {}, CAIXA('ana'));
+    assert.equal(conta.status, 200, conta.texto);
+    assert.deepEqual(conta.json.item, { chaves: ['***', '***'], dica: '***' });
+    // pedido negado não leva credencial no log (nenhuma foi lida)
+    const neg = await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-crm2/clientes_listar', {}, CAIXA('bia'));
+    assert.equal(neg.status, 404);
+    const linhaNeg = s.dados.acessos.ultimas(5).find((l) => l.agente === 'bia' && l.fonte === 'ferramenta-crm2');
+    assert.equal(linhaNeg.credencial, undefined);
   } finally { await s.fechar(); }
 });
