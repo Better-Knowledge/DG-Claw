@@ -47,6 +47,8 @@ async function crmFalso() {
       if (req.url === '/api/redireciona') { res.writeHead(302, { Location: 'http://127.0.0.1:1/x' }); return res.end(); }
       if (req.url === '/api/texto') { res.writeHead(200, { 'content-type': 'text/plain' }); return res.end('não é json'); }
       if (req.url === '/api/lento') return setTimeout(() => j(200, {}), 3000);
+      if (req.url === '/api/goteja') { res.writeHead(200, { 'content-type': 'application/json' }); let n = 0; const t = setInterval(() => { res.write('x'); if (++n > 12) { clearInterval(t); res.end(); } }, 300); return; }
+      if (req.url === '/api/ecoa') return j(422, { erro: 'cabeçalho recebido: ' + req.headers.authorization });
       j(404, { erro: 'rota' });
     });
   });
@@ -101,8 +103,13 @@ test('decidirFerramenta: escopo na pessoa E no papel; "*" vale; ação vira apro
 
 test('montaUrl, normalizaResultado e desembrulhaMcp', () => {
   const f = { base_url: 'https://a.test/api' };
-  let u = montaUrl(f, { metodo: 'GET', rota: '/clientes/{id}/notas' }, { id: 'a/b?c', limit: 5 });
-  assert.equal(u.url.toString(), 'https://a.test/api/clientes/a%2Fb%3Fc/notas?limit=5'); assert.equal(u.corpo, null);
+  let u = montaUrl(f, { metodo: 'GET', rota: '/clientes/{id}/notas' }, { id: 'a b&c', limit: 5 });
+  assert.equal(u.url.toString(), 'https://a.test/api/clientes/a%20b%26c/notas?limit=5'); assert.equal(u.corpo, null);
+  // o que entra na rota nunca muda o caminho: vazio, ".", "..", barra, "?" e "#" são recusados no gateway, com ou sem regex no catálogo
+  for (const ruim of ['', '.', '..', '...', 'a/b', 'a?b', 'a#b', '../x']) {
+    assert.throws(() => montaUrl(f, { metodo: 'GET', rota: '/clientes/{id}' }, { id: ruim }), (e) => e instanceof ErroFonte && e.status === 400, JSON.stringify(ruim));
+  }
+  assert.equal(montaUrl({ base_url: 'https://a.test/api' }, { metodo: 'DELETE', rota: '/itens/{id}' }, { id: '42' }).url.pathname, '/api/itens/42');
   u = montaUrl(f, { metodo: 'POST', rota: '/x' }, { a: 1, b: 'y' });
   assert.equal(u.url.toString(), 'https://a.test/api/x'); assert.deepEqual(u.corpo, { a: 1, b: 'y' });
   assert.deepEqual(normalizaResultado([{ a: 1, b: 2 }, { a: 3 }], { campos: ['a'], max_itens: 1 }), { itens: [{ a: 1 }], total: 2, truncado: true });
@@ -136,6 +143,8 @@ async function subir() {
       if (m.method === 'initialize') process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: m.id, result: { protocolVersion: '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'falso', version: '1' } } }) + '\\n');
       else if (m.method === 'tools/call') {
         if (m.params.name === 'explode') process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: m.id, error: { code: -32000, message: 'tool explodiu' } }) + '\\n');
+        else if (m.params.name === 'trava') { setInterval(() => {}, 1000); return; }
+        else if (m.params.name === 'morre') { process.stderr.write('ENV-DEBUG NOTAS_TOKEN=' + process.env.NOTAS_TOKEN + '\\n'); process.exit(3); }
         else process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: m.id, result: { content: [{ type: 'text', text: JSON.stringify({ tool: m.params.name, args: m.params.arguments, token: process.env.NOTAS_TOKEN || null, extra: process.env.EXTRA || null, home: process.env.HOME || null }) }] } }) + '\\n');
       } });
   `);
@@ -149,10 +158,17 @@ async function subir() {
         redireciona: { metodo: 'GET', rota: '/redireciona', escopo: 'crm:ler' },
         texto: { metodo: 'GET', rota: '/texto', escopo: 'crm:ler' },
         lento: { metodo: 'GET', rota: '/lento', escopo: 'crm:ler' },
+        goteja: { metodo: 'GET', rota: '/goteja', escopo: 'crm:ler' },
+        ecoa: { metodo: 'GET', rota: '/ecoa', escopo: 'crm:ler' },
       } },
     vendas: { tipo: 'banco', arquivo: arqDb, operacoes: {
       resumo_mes: { sql: 'SELECT produto, SUM(valor) AS total FROM vendas WHERE mes = :mes GROUP BY produto ORDER BY produto', escopo: 'vendas:ler', params: { mes: { tipo: 'periodo', obrigatorio: true } } },
       apagar_mes: { sql: 'DELETE FROM vendas WHERE mes = :mes', escopo: 'vendas:escrever', acao: true, params: { mes: { tipo: 'periodo', obrigatorio: true } } },
+      lenta: { sql: 'WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM c WHERE x < 40000000) SELECT COUNT(*) AS n FROM c', escopo: 'vendas:ler' },
+    }, timeout_s: 1 },
+    wrapper: { tipo: 'mcp', comando: '/bin/sh', args: ['-c', `echo $$ > ${JSON.stringify(path.join(base, 'mcp-pid'))}; exec ${JSON.stringify(process.execPath)} ${JSON.stringify(mcp)}`], credencial: 'notas', credencial_env: 'NOTAS_TOKEN', timeout_s: 1, operacoes: {
+      trava: { tool: 'trava', escopo: 'notas:ler' },
+      morre: { tool: 'morre', escopo: 'notas:ler' },
     } },
     notas: { tipo: 'mcp', comando: process.execPath, args: [mcp], credencial: 'notas', credencial_env: 'NOTAS_TOKEN', env: { EXTRA: 'sim' }, timeout_s: 5, operacoes: {
       buscar: { tool: 'search', escopo: 'notas:ler', params: { query: { tipo: 'texto', obrigatorio: true } } },
@@ -180,7 +196,7 @@ async function subir() {
     });
     rq.on('error', reject); if (txt) rq.write(txt); rq.end();
   });
-  return { dados, pedir, crm, arqDb, arqPapeis, cap, fechar: async () => { srv.close(); await crm.fechar(); fs.rmSync(base, { recursive: true, force: true }); } };
+  return { dados, pedir, crm, arqDb, arqPapeis, base, cap, fechar: async () => { srv.close(); await crm.fechar(); fs.rmSync(base, { recursive: true, force: true }); } };
 }
 const CAIXA = (slug) => ({ usuario: 'agente:' + slug, via: 'caixa', agente: slug });
 const DONO = { usuario: 'dono' };
@@ -190,7 +206,7 @@ test('API: a credencial sai do cofre para o cabeçalho e nunca para o agente; ca
   try {
     const f = await s.pedir('GET', '/api/v1/dados/fontes', undefined, CAIXA('ana'));
     const crm = f.json.fontes.find((x) => x.nome === 'ferramenta-crm');
-    assert.deepEqual(crm.operacoes.sort(), ['cliente_ler', 'clientes_listar', 'lento', 'redireciona', 'texto']);
+    assert.deepEqual(crm.operacoes.sort(), ['cliente_ler', 'clientes_listar', 'ecoa', 'goteja', 'lento', 'redireciona', 'texto']);
     assert.deepEqual(crm.acoes, { proposta_criar: 'ferramenta:proposta_criar' });
     assert.equal(crm.operacoes_detalhe.cliente_ler.params.id.regex, '^[0-9]{1,6}$');
     assert.ok(!JSON.stringify(f.json).includes('segredo-do-crm'));
@@ -210,7 +226,17 @@ test('API: a credencial sai do cofre para o cabeçalho e nunca para o agente; ca
     const tx = await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-crm/texto', {}, CAIXA('ana'));
     assert.equal(tx.status, 502); assert.match(tx.json.erro, /só repassa JSON/);
     const le = await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-crm/lento', {}, CAIXA('ana'));
-    assert.equal(le.status, 502); assert.match(le.json.erro, /tempo esgotado/);
+    assert.equal(le.status, 504); assert.match(le.json.erro, /não respondeu em 1 s/);
+    // um sistema que goteja bytes também cai no prazo total (não só na inatividade)
+    const go = await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-crm/goteja', {}, CAIXA('ana'));
+    assert.equal(go.status, 504);
+    // o corpo do erro do sistema (que ecoa o Authorization) nunca chega ao agente; no log do Web vai mascarado
+    const ec = await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-crm/ecoa', {}, CAIXA('ana'));
+    assert.equal(ec.status, 502); assert.ok(!ec.texto.includes('segredo') && !ec.texto.includes('Bearer'), ec.texto);
+    assert.match(s.cap.texto(), /respondeu 422: .*Bearer \*\*\*/); assert.ok(!s.cap.texto().includes('segredo-do-crm'));
+    // operação que não existe: a dica lista só o que o agente alcança
+    const inex = await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-crm/nada', {}, CAIXA('bia'));
+    assert.equal(inex.status, 404); assert.ok(!inex.json.erro.includes('proposta_criar'), inex.json.erro);
     // caio tem crm:ler; bia (caio) lê, mas não cria
     assert.equal((await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-crm/clientes_listar', {}, CAIXA('bia'))).status, 200);
     const nb = await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-crm/proposta_criar', { cliente_id: '1', valor: 10 }, CAIXA('bia'));
@@ -260,8 +286,13 @@ test('banco SQLite: consulta parametrizada só leitura; escrita só por aprovaç
     assert.equal((await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-vendas/resumo_mes', { mes: "2026-10' OR 1=1 --" }, CAIXA('ana'))).status, 400);
     // ana não tem vendas:escrever
     assert.equal((await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-vendas/apagar_mes', { mes: '2026-10' }, CAIXA('ana'))).status, 403);
-    // bia (papel *, pessoa só crm:ler) não lê vendas
-    assert.equal((await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-vendas/resumo_mes', { mes: '2026-10' }, CAIXA('bia'))).status, 403);
+    // bia (papel *, pessoa só crm:ler) não tem escopo nenhum em vendas: para ela a ferramenta não existe
+    assert.equal((await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-vendas/resumo_mes', { mes: '2026-10' }, CAIXA('bia'))).status, 404);
+    assert.equal((await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-vendas/nada', {}, CAIXA('bia'))).status, 404);
+    // consulta pesada passa do prazo: o worker é encerrado e o Web continua de pé
+    const lenta = await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-vendas/lenta', {}, CAIXA('ana'));
+    assert.equal(lenta.status, 504, lenta.texto); assert.match(lenta.json.erro, /não terminou em 1 s/);
+    assert.equal((await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-vendas/resumo_mes', { mes: '2026-10' }, CAIXA('ana'))).status, 200, 'o Web responde logo depois');
     // o dono pede a escrita, aprova e o banco muda
     const e = await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-vendas/apagar_mes', { mes: '2026-11' }, DONO);
     assert.equal(e.status, 202, e.texto);
@@ -281,9 +312,19 @@ test('MCP: o servidor nasce com ambiente limpo mais a credencial na variável co
     assert.ok(!r.texto.includes('NOTAS_TOKEN=') );
     const x = await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-notas/explode', {}, CAIXA('ana'));
     assert.equal(x.status, 502); assert.match(x.json.erro, /tool explodiu/);
-    assert.equal((await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-notas/buscar', { query: 'x' }, CAIXA('bia'))).status, 403);
+    assert.equal((await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-notas/buscar', { query: 'x' }, CAIXA('bia'))).status, 404, 'sem escopo nenhum, a ferramenta não existe para bia');
+    // servidor atrás de um wrapper (sh -c) que não responde: 504, e o neto morre junto (a credencial não fica num processo órfão)
+    const tr = await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-wrapper/trava', {}, CAIXA('ana'));
+    assert.equal(tr.status, 504, tr.texto);
+    await new Promise((r) => setTimeout(r, 2600));
+    const pid = Number(fs.readFileSync(path.join(s.base, 'mcp-pid'), 'utf8'));
+    assert.throws(() => process.kill(pid, 0), 'o servidor MCP neto foi encerrado');
+    // stderr do servidor que encerra não chega ao agente
+    const morto = await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-wrapper/morre', {}, CAIXA('ana'));
+    assert.equal(morto.status, 502); assert.ok(!morto.texto.includes('token-notas'), morto.texto); assert.ok(!morto.texto.includes('ENV-DEBUG'));
+    assert.match(s.cap.texto(), /stderr: .*ENV-DEBUG/); assert.ok(!s.cap.texto().includes('token-notas-xyz'));
     const cat = await s.pedir('GET', '/api/v1/dados/ferramentas', undefined, DONO);
-    assert.equal(cat.json.valido, true); assert.deepEqual(Object.keys(cat.json.ferramentas).sort(), ['crm', 'notas', 'vendas']); assert.deepEqual(cat.json.credenciais, ['crm', 'notas']);
+    assert.equal(cat.json.valido, true); assert.deepEqual(Object.keys(cat.json.ferramentas).sort(), ['crm', 'notas', 'vendas', 'wrapper']); assert.deepEqual(cat.json.credenciais, ['crm', 'notas']);
     assert.ok(!cat.texto.includes('segredo-do-crm') && !cat.texto.includes('token-notas'));
     assert.equal((await s.pedir('GET', '/api/v1/dados/ferramentas', undefined, CAIXA('ana'))).status, 403);
   } finally { await s.fechar(); }

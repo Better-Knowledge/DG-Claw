@@ -57,7 +57,9 @@ function api(metodo, rota, corpo) {
   return new Promise((resolve) => {
     const args = [metodo, rota];
     if (corpo !== undefined) args.push('-');
-    const filho = execFile(API_BIN, args.concat(['--com-status']), { maxBuffer: 9 * 1024 * 1024, timeout: 125000 }, (err, stdout, stderr) => {
+    // --espera 30: a ferramenta pode levar até 25 s (timeout_s máximo) e o Web mais um pouco; desistir antes deixaria
+    // uma resposta órfã na caixa e o agente repetiria a chamada ao sistema.
+    const filho = execFile(API_BIN, args.concat(['--com-status', '--espera', '30']), { maxBuffer: 9 * 1024 * 1024, timeout: 125000 }, (err, stdout, stderr) => {
       let j = null;
       try { j = JSON.parse(String(stdout || '').trim()); } catch (_) { j = null; }
       if (j && typeof j.status === 'number') { resolve({ status: j.status, corpo: j.corpo }); return; }

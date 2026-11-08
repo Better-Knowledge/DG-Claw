@@ -157,8 +157,9 @@ function decidirFerramenta(entrada) {
     if (!pessoa) return negado(`A pessoa "${ag.pessoa}" do agente ${slug} não existe mais nos papéis; acesso retirado.`, ids);
     if (!papel) return negado(`O papel "${ag.papel}" do agente ${slug} não existe mais nos papéis; acesso retirado.`, ids);
     if (pessoa.estado === 'desligada') return negado(`A pessoa ${ag.pessoa} está desligada; o agente ${slug} não alcança ferramenta nenhuma.`, ids);
-    if (!temEscopo(pessoa.ferramentas, op.escopo)) return negado(`A pessoa ${ag.pessoa} não tem o escopo "${op.escopo}" (ferramenta ${nomeFerramenta}, operação ${operacao}); o agente ${slug} não o alcança, qualquer que seja o papel.`, ids);
-    if (!temEscopo(papel.ferramentas, op.escopo)) return negado(`O papel ${ag.papel} não tem o escopo "${op.escopo}" (ferramenta ${nomeFerramenta}, operação ${operacao}).`, ids);
+    // `invisivel`: para a rota, ferramenta em que o agente não alcança operação nenhuma parece inexistente.
+    if (!temEscopo(pessoa.ferramentas, op.escopo)) return negado(`A pessoa ${ag.pessoa} não tem o escopo "${op.escopo}" (ferramenta ${nomeFerramenta}, operação ${operacao}); o agente ${slug} não o alcança, qualquer que seja o papel.`, Object.assign({ invisivel: true }, ids));
+    if (!temEscopo(papel.ferramentas, op.escopo)) return negado(`O papel ${ag.papel} não tem o escopo "${op.escopo}" (ferramenta ${nomeFerramenta}, operação ${operacao}).`, Object.assign({ invisivel: true }, ids));
     if (op.acao) return Object.assign({ decisao: 'aprovacao', campos: null, motivo: `a operação ${operacao} de ${nomeFerramenta} escreve no sistema e precisa da aprovação de uma pessoa no painel` }, ids);
     return Object.assign({ decisao: 'permitido', campos: null, motivo: `escopo ${op.escopo} liberado para a pessoa ${ag.pessoa} e para o papel ${ag.papel}` }, ids);
   } catch (e) {

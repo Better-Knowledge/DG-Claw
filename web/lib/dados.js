@@ -36,6 +36,7 @@ const BASE = '/api/v1/dados';
 const DOC = path.join(__dirname, '..', 'docs', 'DADOS-POR-PAPEL.md');
 const MAX_CORPO = 64 * 1024;
 const MAX_RESPOSTA = 512 * 1024;
+const MAX_RESULTADO_GUARDADO = 32 * 1024;   // resultado de ação guardado em aprovacoes.json
 const TETO_POR_MINUTO = 60;
 const RX_NOME = /^[a-z][a-z0-9_-]{0,39}$/;
 const RX_FONTE = /^(base-|ferramenta-)?[a-z][a-z0-9_-]{0,39}$/;     // fonte fixa, base-<nome> ou ferramenta-<nome> (até 51 caracteres)
@@ -113,11 +114,22 @@ function criarDados({ dir, papeis, bases, basesDir, ferramentas, cofreSistemas, 
       const vis = decideFonte(papeis.estado(), slug, fonte, 'listar', null);
       if (vis.decisao === 'negado' && vis.invisivel) { Object.assign(base, { pessoa: vis.pessoa, papel: vis.papel }); nega(404, `Não existe a fonte "${nomeFonte}". As fontes estão em GET ${BASE}/fontes.`, vis.motivo); }
     }
+    // Ferramenta em que o agente não tem escopo nenhum também parece inexistente: nem o catálogo de operações vaza.
+    if (fonte.ferramenta && quem.tipo === 'agente') {
+      const estadoF = papeis.estado();
+      const alguma = Object.keys(fonte.descricaoOps()).some((n) => { const dd = decideFonte(estadoF, slug, fonte, n, null); return !(dd.decisao === 'negado' && dd.invisivel); });
+      if (!alguma) nega(404, `Não existe a fonte "${nomeFonte}". As fontes estão em GET ${BASE}/fontes.`, `o agente não tem escopo nenhum em ${nomeFonte}`);
+    }
     const temOp = (o, k) => !!o && Object.prototype.hasOwnProperty.call(o, k);
     // Fonte fixa e base: as leituras são listar/buscar/ler. Ferramenta: toda operação do catálogo que não é ação.
     const ehLeitura = fonte.ferramenta ? temOp(fonte.operacoes, operacao) : (OPERACOES_LEITURA.has(operacao) && temOp(fonte.operacoes, operacao));
     const acaoDef = !ehLeitura && temOp(fonte.acoes, operacao) ? fonte.acoes[operacao] : null;
-    if (!ehLeitura && !acaoDef) nega(404, `A fonte "${nomeFonte}" não tem a operação "${operacao}". Operações: ${[...Object.keys(fonte.operacoes), ...Object.keys(fonte.acoes || {})].join(', ') || 'nenhuma'}.`);
+    if (!ehLeitura && !acaoDef) {
+      let lista = [...Object.keys(fonte.operacoes), ...Object.keys(fonte.acoes || {})];
+      // Para o agente, só as operações que ele alcança entram na dica.
+      if (quem.tipo === 'agente') { const est = papeis.estado(); lista = lista.filter((n) => ['permitido', 'aprovacao'].includes(decideFonte(est, slug, fonte, n, fonte.acoes && fonte.acoes[n] ? fonte.acoes[n].acao : null).decisao)); }
+      nega(404, `A fonte "${nomeFonte}" não tem a operação "${operacao}". Operações: ${lista.join(', ') || 'nenhuma'}.`, 'operação inexistente');
+    }
 
     let corpo;
     try { corpo = await H.lerJson(req, MAX_CORPO); } catch (e) { nega(e.status || 400, e.message, 'corpo inválido ou grande demais'); }
@@ -134,7 +146,8 @@ function criarDados({ dir, papeis, bases, basesDir, ferramentas, cofreSistemas, 
       d = { decisao: ehLeitura ? 'permitido' : 'aprovacao', campos: null, motivo: 'sessão do dono do painel', pessoa: 'dono', papel: 'dono' };
     }
     Object.assign(base, { pessoa: d.pessoa, papel: d.papel, acao: acaoDef ? acaoDef.acao : undefined, escopo: d.escopo });
-    if (d.decisao === 'negado' && d.invisivel) naoExiste();
+    // Ferramenta: escopo que falta para ESTA operação (mas o agente alcança outras) é 403 com o motivo; base: invisível.
+    if (d.decisao === 'negado' && d.invisivel && !fonte.ferramenta) naoExiste();
     if (d.decisao === 'negado') nega(403, d.motivo);
 
     if (ehLeitura) {
@@ -208,7 +221,12 @@ function criarDados({ dir, papeis, bases, basesDir, ferramentas, cofreSistemas, 
       return r;
     }
     try {
-      const resultado = await def.executar(p.params, { agente: p.agente, aprovado_por: por, aprovacao: p.id });
+      let resultado = await def.executar(p.params, { agente: p.agente, aprovado_por: por, aprovacao: p.id });
+      // O que fica guardado no arquivo de aprovações tem teto: um resultado grande de ferramenta vira um resumo.
+      if (Buffer.byteLength(JSON.stringify(resultado === undefined ? null : resultado)) > MAX_RESULTADO_GUARDADO) {
+        const itens = resultado && Array.isArray(resultado.itens) ? resultado.itens.length : undefined;
+        resultado = { truncado: true, aviso: `O resultado passou de ${MAX_RESULTADO_GUARDADO} bytes e não foi guardado inteiro.`, itens_total: itens };
+      }
       const r = aprovacoes.concluir(p.id, { ok: true, resultado });
       registra(Object.assign({}, base, { decisao: 'executada', motivo: 'aprovada pela pessoa', status: 200 }));
       return r;
