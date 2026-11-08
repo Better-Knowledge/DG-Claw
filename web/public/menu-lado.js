@@ -33,6 +33,7 @@
   const ehColaborador = () => !!(raiz.DGPapel && raiz.DGPapel.colaborador);
   const LINK_DADOS = { nome: 'Dados', ico: '🗂', href: '/dados' };
   const LINK_OBSERVABILIDADE = { nome: 'Observabilidade', ico: '📈', href: '/observabilidade' };
+  const LINK_ACESSOS = { nome: 'Acessos dos agentes', ico: '🔐', href: '/acessos' };
 
   /* Sessões é item fixo para todo agente com painel (a tela fica no painel dele). Devolve o link do menu e os
      endereços que o menu consulta (config: a aba está ligada? pedidos: quantas sessões esperam o dono), ou null. */
@@ -70,6 +71,7 @@
     if (caminho === '/seguranca') return 'seguranca';
     if (caminho === '/conectar') return 'conectar';
     if (caminho === '/colaboradores') return 'colaboradores';
+    if (caminho === '/acessos') return 'acessos';
     if (/^\/a\/[^/]+$/.test(caminho)) return 'conversa';
     return '';
   }
@@ -279,7 +281,7 @@
     return { tipo: 'sem', texto: 'Este navegador não oferece a instalação por aqui. No Chrome ou no Edge, abra o menu do navegador e procure Instalar app. No Firefox para computador, o recurso não existe.' };
   }
 
-  if (!raiz.document) return { corUso, quandoZeraUso, miniBarraUso, itemUso, ABAS_PAINEL, LINK_LEMBRETES, LINK_AVISOS, LINK_SEGURANCA, LINK_CONECTAR, LINK_COLABORADOR, LINK_DADOS, LINK_OBSERVABILIDADE, linkSessoes, linkTela, itemAgente, bolinhaMenu, seloDe, totalNaoLidas, totalPrecisam, horaCurta, linksPainel, linksExtras, comAgente, chaveDoHref, passosMenu, instrucaoInstalar };
+  if (!raiz.document) return { corUso, quandoZeraUso, miniBarraUso, itemUso, ABAS_PAINEL, LINK_LEMBRETES, LINK_AVISOS, LINK_SEGURANCA, LINK_CONECTAR, LINK_COLABORADOR, LINK_DADOS, LINK_OBSERVABILIDADE, LINK_ACESSOS, linkSessoes, linkTela, itemAgente, bolinhaMenu, seloDe, totalNaoLidas, totalPrecisam, horaCurta, linksPainel, linksExtras, comAgente, chaveDoHref, passosMenu, instrucaoInstalar };
 
   /* ── Parte com DOM ─────────────────────────────────────────────────────── */
   const $ = id => document.getElementById(id);
@@ -609,6 +611,8 @@
         `<span class="ml-ico" aria-hidden="true">${LINK_DADOS.ico}</span>${LINK_DADOS.nome}</a></div>`);
       $('mlTabs').insertAdjacentHTML('beforeend', `<div data-tour="gm-observabilidade"><a class="ml-tab" href="${comAgente(LINK_OBSERVABILIDADE.href, ag.id)}">` +
         `<span class="ml-ico" aria-hidden="true">${LINK_OBSERVABILIDADE.ico}</span>${LINK_OBSERVABILIDADE.nome}</a></div>`);
+      $('mlTabs').insertAdjacentHTML('beforeend', `<div data-tour="gm-acessos"><a class="ml-tab" href="${comAgente(LINK_ACESSOS.href, ag.id)}">` +
+        `<span class="ml-ico" aria-hidden="true">${LINK_ACESSOS.ico}</span>${LINK_ACESSOS.nome}</a></div>`);
     }
     // Convidar colaborador: só o dono, e nunca para o Admin (o Admin mexe no servidor inteiro)
     if (!colab && ag.tipo !== 'admin' && ag.id) {
@@ -672,5 +676,5 @@
       .catch(e => { console.warn('menu-lado: não consegui saber quem está logado (' + e.message + '); o menu segue sem o nome.'); });
   }
 
-  return { corUso, quandoZeraUso, miniBarraUso, itemUso, ABAS_PAINEL, LINK_LEMBRETES, LINK_AVISOS, LINK_SEGURANCA, LINK_CONECTAR, LINK_COLABORADOR, linkSessoes, linkTela, itemAgente, linksPainel, linksExtras, comAgente, chaveDoHref, passosMenu, instrucaoInstalar, inicia, marca, extras, defineNaoLidas, totalNaoLidas, totalPrecisam, seloDe };
+  return { corUso, quandoZeraUso, miniBarraUso, itemUso, ABAS_PAINEL, LINK_LEMBRETES, LINK_AVISOS, LINK_SEGURANCA, LINK_CONECTAR, LINK_COLABORADOR, LINK_DADOS, LINK_OBSERVABILIDADE, LINK_ACESSOS, linkSessoes, linkTela, itemAgente, linksPainel, linksExtras, comAgente, chaveDoHref, passosMenu, instrucaoInstalar, inicia, marca, extras, defineNaoLidas, totalNaoLidas, totalPrecisam, seloDe };
 });

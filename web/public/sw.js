@@ -15,7 +15,7 @@ const ESTATICOS = [
   '/avisos-aparelho.js',
   '/lembretes-faixa.js', '/lembretes.js', '/lembretes.css',
   '/dados.js', '/dados.css',
-  '/observabilidade.js', '/observabilidade.css',
+  '/observabilidade.js', '/observabilidade.css', '/acessos.js', '/acessos.css',
   '/atualizacao-faixa.js', '/atualizacao-faixa.css',
   '/seguranca-resumo.js', '/seguranca-resumo.css',
   '/seguranca.js', '/seguranca.css', '/ronda-comum.js',

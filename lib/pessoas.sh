@@ -42,11 +42,31 @@ _pessoas_validar_e_gravar() {
 }
 
 # _pessoas_mudar_estado <pessoa> <estado>: le, edita e grava DENTRO da trava, para uma edicao concorrente do
-# papeis.json (outro comando, o dono no editor) nao ser perdida entre a leitura e a escrita.
+# papeis.json (outro comando, o dono no editor) nao ser perdida entre a leitura e a escrita. Alem da trava da CLI
+# (flock), toma a MESMA trava do Web (a pasta papeis.json.trava, web/lib/papeis-editor.js): o painel /acessos e a
+# CLI nunca gravam ao mesmo tempo. Trava com mais de 10 s e de processo que morreu.
 _pessoas_mudar_estado() {
-    local novo
+    local novo trava="$DG_PAPEIS_JSON.trava" i=0 ino_trava marca_antes marca_depois
+    while ! mkdir "$trava" 2>/dev/null; do
+        # trava velha (processo morto): so remove se ainda for A MESMA pasta que medimos (inode igual), para nao
+        # derrubar uma trava recem-criada por outro processo no meio do caminho
+        ino_trava="$(stat -c %i "$trava" 2>/dev/null || echo '')"
+        if [ -n "$ino_trava" ] && [ "$(( $(date +%s) - $(stat -c %Y "$trava" 2>/dev/null || date +%s) ))" -gt 10 ]; then
+            [ "$(stat -c %i "$trava" 2>/dev/null || echo '')" = "$ino_trava" ] && rmdir "$trava" 2>/dev/null \
+                || { i=$((i + 1)); [ "$i" -le 100 ] || falha "a trava $trava nao e uma pasta vazia e nao consegui remove-la." "confira e apague-a a mao: ls -la $trava"; sleep 0.1; }
+            continue
+        fi
+        i=$((i + 1)); [ "$i" -le 100 ] || falha "o painel esta editando ${DG_PAPEIS_JSON#"$R"} agora (trava $trava)." "espere alguns segundos e rode de novo"
+        sleep 0.1
+    done
+    # EXIT, nao RETURN: esta funcao roda no subshell do com_trava, e o `falha` sai com exit (o RETURN nao dispararia).
+    # shellcheck disable=SC2064 # expandir agora e de proposito: a variavel local nao existe mais quando o EXIT dispara
+    trap "rmdir '$trava' 2>/dev/null || true" EXIT
+    marca_antes="$(stat -c '%i:%Y:%s' "$DG_PAPEIS_JSON" 2>/dev/null || echo ausente)"
     novo="$(jq --arg n "$1" --arg e "$2" '.pessoas[$n].estado = $e' "$DG_PAPEIS_JSON")" \
         || falha "nao consegui editar ${DG_PAPEIS_JSON#"$R"} (o jq recusou o conteudo)." "confira com: jq . $DG_PAPEIS_JSON"
+    marca_depois="$(stat -c '%i:%Y:%s' "$DG_PAPEIS_JSON" 2>/dev/null || echo ausente)"
+    [ "$marca_antes" = "$marca_depois" ] || falha "o arquivo de papeis mudou enquanto eu o editava (o painel ou outro comando gravou)." "rode de novo"
     _pessoas_validar_e_gravar "$novo"
 }
 

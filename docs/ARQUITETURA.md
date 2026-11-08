@@ -21,13 +21,16 @@ DG Claw Web (127.0.0.1:8300)
                                 (no container do agente)
 ```
 
-O **Web** apresenta o chat, autentica o dono, encaminha mensagens e entrega arquivos.
+O **Web** apresenta o chat, autentica o dono e os colaboradores (pessoas convidadas para um ou mais
+agentes; `web/docs/COLABORADORES.md`), encaminha mensagens e entrega arquivos.
 O **runner** mantém a sessão do programa de IA, recebe os pedidos e acompanha seu estado.
 O **MCP dgchat** permite que a sessão envie respostas e anexos para a conversa certa.
 As respostas e os registros da sessão alimentam a conversa exibida no navegador.
 
 O painel de cada agente, em `/p/<nome>/`, reúne configurações como assinatura, conexões,
-arquivos e memória. O chat fica em `/a/<nome>`. O Admin tem a conversa `/a/admin`.
+arquivos e memória. O chat fica em `/a/<nome>`. O Admin tem a conversa `/a/admin`, que só o dono abre;
+um colaborador vê só os agentes marcados para ele. O dono edita o que cada agente alcança nos dados em
+`/acessos` (`web/docs/ACESSOS.md`).
 
 ## Admin e agentes de trabalho
 

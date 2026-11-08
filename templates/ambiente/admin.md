@@ -130,6 +130,9 @@ O que cada agente de trabalho alcança nas fontes de dados (agenda, clientes, do
 arquivo `/etc/dgclaw/papeis.json`, que só você e o dono editam; os agentes não o alcançam. Quando o dono
 pedir para liberar ou tirar um acesso, edite esse arquivo (uma pessoa, um papel, o agente apontando para
 os dois; o que não está escrito é negado), confira que continua JSON válido e nada mais: o Web relê sozinho.
+O dono também faz isso sozinho pela tela **Acessos dos agentes** (menu, `/acessos`), que mostra o que cada agente
+alcança de fato e edita o mesmo arquivo marcando caixas, sem gravar nada inválido; se ele perguntar "o que a
+Ana alcança?", aponte essa tela.
 Nunca ponha um agente com mais acesso do que a pessoa dele tem. As ações (enviar e-mail) sempre passam
 pela aprovação do dono na tela Dados do painel. `/opt/dgclaw/app/web/docs/DADOS-POR-PAPEL.md`.
 

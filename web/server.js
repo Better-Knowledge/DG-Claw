@@ -55,6 +55,7 @@ const { criarBases } = require('./lib/bases');
 const { criarFerramentas } = require('./lib/ferramentas');
 const { criarCofreSistemas } = require('./lib/cofre-sistemas');
 const { criarDados } = require('./lib/dados');
+const { criarAcessos } = require('./lib/acessos');
 
 const METODOS_QUE_ESCREVEM = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const TIPOS_ESTATICOS = {
@@ -153,6 +154,8 @@ function criarServidor(opcoes) {
   caixa.permitir('/api/v1/dados/docs.md');
   // Aviso de versão nova: só o dono, pelo painel. De propósito NÃO entra em caixa.permitir (agente em container não usa).
   const estados = criarEstados({ conversa, naoLidas, registro, log });
+  // Painel de acessos (web/docs/ACESSOS.md): o dono edita o papeis.json pelo Web e vê o que cada agente alcança.
+  const acessos = criarAcessos({ papeis, bases, ferramentas, skillsDir: config.skillsDir, registro, colaboradores, fontes: dados.fontes, config, log, servirArquivo });
   const prefsAtencao = criarPrefsAtencao({ arquivo: path.join(config.dataDir, 'push', 'preferencias.json'), log });
   const vigiaAtencao = criarVigiaAtencao({ registro, estados, lerThread: conversa.threadCompartilhada, push: opcoes.push || push, prefs: prefsAtencao, relogio: opcoes.agora, log, intervaloMs: opcoes.vigiaIntervaloMs });
   // /api/v1/estados NÃO entra na caixa: ela só atende agentes de trabalho, e um agente não tem por que
@@ -417,6 +420,7 @@ function criarServidor(opcoes) {
     if ((p === '/api/v1/lembretes' || p.startsWith('/api/v1/lembretes/')) && await lembretes.rotas(req, res, url, sessao)) return undefined;
 
     if ((p === '/api/v1/dados' || p.startsWith('/api/v1/dados/')) && await dados.rotas(req, res, url, sessao)) return undefined;
+    if ((p === '/api/v1/acessos' || p.startsWith('/api/v1/acessos/')) && await acessos.rotas(req, res, url, sessao)) return undefined;
 
     if ((p === '/api/v1/atualizacao' || p.startsWith('/api/v1/atualizacao/')) && await atualizacao.rotas(req, res, url, sessao)) return undefined;
 
@@ -1155,6 +1159,11 @@ function criarServidor(opcoes) {
         H.paginaErro(res, 500, 'Tela não instalada', 'O arquivo da tela de lembretes não foi encontrado no servidor. Reinstale o DG Claw Web.');
       }
       return undefined;
+    }
+
+    if ((p === '/acessos' || p === '/acessos/') && (m === 'GET' || m === 'HEAD')) {
+      if (!sessao) return semSessaoPagina(req, res, url);
+      if (await acessos.rotas(req, res, url, sessao)) return undefined;
     }
 
     if (p === '/observabilidade' && (m === 'GET' || m === 'HEAD')) {

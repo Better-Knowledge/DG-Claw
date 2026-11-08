@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Acessos dos agentes - DG Claw</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#2f9e5e">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="stylesheet" href="/lembretes.css">
+<link rel="stylesheet" href="/dados.css">
+<link rel="stylesheet" href="/usuarios.css">
+<link rel="stylesheet" href="/acessos.css">
+<link rel="stylesheet" href="/casca.css">
+<link rel="stylesheet" href="/menu-lado.css">
+<link rel="stylesheet" href="/sem-zoom.css">
+<script src="/sem-zoom.js"></script>
+</head>
+<body class="lp ac">
+<main class="lp-main">
+  <p class="lp-msg erro" id="msgGeral" role="alert" hidden></p>
+  <p class="lp-msg ok" id="msgOk" role="status" hidden></p>
+
+  <section class="lp-sec" id="secAgentes" aria-label="Acesso de cada agente">
+    <h2><span>O que cada agente alcança</span><button type="button" class="lp-ajuda" data-ajuda="agentes" aria-label="Tutorial dos agentes">?</button></h2>
+    <p class="lp-fraco" id="estadoPolitica">Conferindo o arquivo de papéis…</p>
+    <div id="agentes"><p class="lp-vazio">Carregando…</p></div>
+  </section>
+
+  <section class="lp-sec" id="secPapeis" aria-label="Papéis">
+    <h2><span>Papéis</span><button type="button" class="lp-ajuda" data-ajuda="papeis" aria-label="Tutorial dos papéis">?</button></h2>
+    <p class="lp-fraco">Um papel diz o que um tipo de agente pode alcançar. Vários agentes usam o mesmo papel; mudar o papel muda todos na hora. O acesso efetivo é a interseção do papel com a pessoa.</p>
+    <div class="lp-linha ac-escolha"><label>Papel <select id="pSel"></select></label><label>ou novo <input id="pNovo" placeholder="nome-do-papel" autocomplete="off" autocapitalize="none" spellcheck="false"></label><button type="button" class="lp-btn" id="pAbrir">Abrir</button></div>
+    <form id="formPapel" class="ac-form" hidden></form>
+  </section>
+
+  <section class="lp-sec" id="secPessoas" aria-label="Pessoas">
+    <h2><span>Pessoas</span><button type="button" class="lp-ajuda" data-ajuda="pessoas" aria-label="Tutorial das pessoas">?</button></h2>
+    <p class="lp-fraco">A pessoa é quem o agente representa: os grupos dela definem as bases e skills de grupo que ela alcança; o que ela libera aqui é o teto do agente, qualquer que seja o papel. Uma pessoa pode negar algo por nome.</p>
+    <div class="lp-linha ac-escolha"><label>Pessoa <select id="psSel"></select></label><label>ou nova <input id="psNovo" placeholder="nome-da-pessoa" autocomplete="off" autocapitalize="none" spellcheck="false"></label><button type="button" class="lp-btn" id="psAbrir">Abrir</button></div>
+    <form id="formPessoa" class="ac-form" hidden></form>
+  </section>
+
+  <section class="lp-sec" id="secGrupos" aria-label="Grupos">
+    <h2><span>Grupos</span></h2>
+    <p class="lp-fraco">Departamentos, projetos e equipes. Bases e skills com escopo de grupo só chegam a quem está no grupo.</p>
+    <div id="grupos"></div>
+    <form class="lp-form" id="formGrupo" novalidate>
+      <label>Nome curto <input id="gNome" placeholder="financeiro" autocomplete="off" autocapitalize="none" spellcheck="false"></label>
+      <label>Tipo <select id="gTipo"><option value="departamento">departamento</option><option value="projeto">projeto</option><option value="equipe">equipe</option></select></label>
+      <label>Nome completo (opcional) <input id="gTitulo" placeholder="Financeiro" autocomplete="off"></label>
+      <div class="lp-linha larga"><button type="submit" class="lp-btn pri">Criar grupo</button></div>
+    </form>
+  </section>
+</main>
+
+<script src="/tour.js"></script>
+<script src="/menu-lado.js"></script>
+<script src="/casca.js"></script>
+<script src="/acessos.js"></script>
+<script>
+DGCasca.monta({ pagina: 'acessos', titulo: 'Acessos dos agentes', aoTutorial: function () { if (window.DGAcessosTutorial) window.DGAcessosTutorial(); } });
+</script>
+</body>
+</html>

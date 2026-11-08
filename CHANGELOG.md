@@ -13,6 +13,12 @@ Colaboradores) muda a lista depois, sem derrubar a sessão dela. Com mais de um 
 como você. O que ela não alcança continua igual: o Admin, os agentes que não foram marcados e as telas da caixa
 inteira. Quem já tinha convidado alguém não precisa fazer nada: o convite antigo continua valendo para o agente dele.
 
+**Acessos dos agentes.** A tela nova (menu ☰, `/acessos`) mostra, agente por agente, o que ele alcança de fato nos
+dados (fontes e campos, bases, ferramentas, skills e ações com aprovação) e quem conversa com ele no painel (você e
+os colaboradores convidados). Ali você escolhe a pessoa e o papel de cada agente e monta os papéis, as pessoas e os
+grupos marcando caixas, sem editar o arquivo de papéis à mão: nada é gravado se o arquivo ficar inválido, e o que
+você escreveu no arquivo e a tela não conhece fica como está. Detalhes em `web/docs/ACESSOS.md`.
+
 **A Tela do agente (o navegador dele, onde você faz os logins) ficou sempre à mão e passou a explicar o que falta.**
 Alunos relataram que não tinham tela nenhuma. Havia quatro causas, e as quatro foram tratadas:
 
