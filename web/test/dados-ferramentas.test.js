@@ -119,6 +119,12 @@ test('montaUrl, normalizaResultado e desembrulhaMcp', () => {
   assert.deepEqual(normalizaResultado({ x: 1, y: 2 }, { campos: ['y'] }), { item: { y: 2 } });
   assert.equal(mascara('Basic dXNlcjpwYXNz e user%3Apass e user:pass', 'user:pass'), 'Basic *** e *** e ***', 'máscara cobre base64 e a forma codificada');
   assert.equal(mascaraLista('chave-maior e chave', ['chave', 'chave-maior']), '*** e ***', 'a mais longa primeiro: o prefixo comum não deixa o resto à mostra');
+  // erro da tool com log e sem lista de credenciais: 502 (e não um ReferenceError), com o detalhe só no log
+  const capL = []; const fLog = { log: (n, m) => capL.push(m), nomeF: 'x' };
+  assert.throws(() => desembrulhaMcp({ isError: true, content: [{ type: 'text', text: 'tool explodiu segredo-abc' }] }, fLog, { nomeOp: 'op' }), (e) => e instanceof ErroFonte && e.status === 502);
+  assert.ok(capL.some((m) => m.includes('tool explodiu')));
+  assert.throws(() => desembrulhaMcp({ isError: true, content: [{ type: 'text', text: 'tool explodiu segredo-abc' }] }, fLog, { nomeOp: 'op' }, ['segredo-abc']), (e) => e instanceof ErroFonte && e.status === 502);
+  assert.ok(capL[capL.length - 1].includes('***') && !capL[capL.length - 1].includes('segredo-abc'));
   // credencial só de dígitos não quebra números; credencial com aspas ou barra é mascarada crua; chaves também
   assert.deepEqual(mascaraObjeto({ item: { id: 7391, ano: 2026, ok: true, nota: 'chave 7391 aqui' } }, '7391'), { item: { id: 7391, ano: 2026, ok: true, nota: 'chave *** aqui' } });
   assert.deepEqual(mascaraObjeto({ itens: [{ s: 'x ab"cd y', 'ab"cd': 1 }], n: null }, 'ab"cd'), { itens: [{ s: 'x *** y', '***': 1 }], n: null });

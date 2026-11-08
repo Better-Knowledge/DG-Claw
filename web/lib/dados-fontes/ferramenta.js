@@ -136,13 +136,13 @@ function chamaApi(f, op, params, credencial, agente, todas) {
         if (res.statusCode === 401 || res.statusCode === 403) { reject(new ErroFonte(502, `O sistema recusou a credencial do gateway (${res.statusCode}). O dono precisa conferir a credencial no cofre de sistemas.`)); return; }
         if (res.statusCode >= 400) {
           // O corpo do erro pode ecoar o cabeçalho de autorização: vai só para o log do Web, mascarado, nunca ao agente.
-          if (f.log) f.log('aviso', `Ferramenta ${f.nomeF}/${op.nomeOp}: o sistema respondeu ${res.statusCode}: ${mascaraLista(texto, todas || [credencial]).slice(0, MAX_ECO_LOG).replace(/[\u0000-\u001f]/g, ' ')}`);
+          if (f.log) f.log('aviso', `Ferramenta ${f.nomeF}/${op.nomeOp}: o sistema respondeu ${res.statusCode}: ${mascaraLista(texto, todas).slice(0, MAX_ECO_LOG).replace(/[\u0000-\u001f]/g, ' ')}`);
           reject(new ErroFonte(502, `O sistema respondeu ${res.statusCode} a "${op.nomeOp}". O motivo ficou no log do Web; se repetir, avise o dono.`)); return;
         }
         if (!texto.trim()) { resolve(null); return; }
         try { resolve(JSON.parse(texto)); } catch (e) {
           // A mensagem do JSON.parse pode trazer um trecho do corpo: fica no log, mascarada; ao agente só o fato.
-          if (f.log) f.log('aviso', `Ferramenta ${f.nomeF}/${op.nomeOp}: resposta que não é JSON (${mascaraLista(e.message, todas || [credencial]).slice(0, MAX_ECO_LOG)})`);
+          if (f.log) f.log('aviso', `Ferramenta ${f.nomeF}/${op.nomeOp}: resposta que não é JSON (${mascaraLista(e.message, todas).slice(0, MAX_ECO_LOG)})`);
           reject(new ErroFonte(502, 'O sistema não respondeu em JSON; o gateway só repassa JSON. O detalhe ficou no log do Web.'));
         }
       });
@@ -217,7 +217,7 @@ function chamaMcp(f, op, params, credencial, agente, todas) {
     filho.stderr.on('data', (c) => { if (erros.length < 4000) erros += c.toString('utf8'); });
     filho.on('exit', () => fim(() => {
       // O stderr do servidor pode mostrar o ambiente (modo debug): vai só para o log do Web, mascarado.
-      if (f.log && erros.trim()) f.log('aviso', `Ferramenta ${f.nomeF}/${op.nomeOp}: o servidor MCP encerrou antes de responder; stderr: ${mascaraLista(erros, todas || [credencial]).trim().slice(0, MAX_ECO_LOG).replace(/[\u0000-\u001f]/g, ' ')}`);
+      if (f.log && erros.trim()) f.log('aviso', `Ferramenta ${f.nomeF}/${op.nomeOp}: o servidor MCP encerrou antes de responder; stderr: ${mascaraLista(erros, todas).trim().slice(0, MAX_ECO_LOG).replace(/[\u0000-\u001f]/g, ' ')}`);
       reject(new ErroFonte(502, 'O servidor MCP encerrou antes de responder. O motivo ficou no log do Web; se repetir, avise o dono.'));
     }));
     filho.stdin.on('error', () => { /* o servidor fechou o stdin: o exit/timeout cuida */ });
@@ -239,7 +239,7 @@ function chamaMcp(f, op, params, credencial, agente, todas) {
       fim(() => resolve(r));
     })().catch((e) => fim(() => {
       const detalhe = e && e.message ? String(e.message) : JSON.stringify(e);
-      if (f.log) f.log('aviso', `Ferramenta ${f.nomeF}/${op.nomeOp}: o servidor MCP recusou a chamada: ${mascaraLista(detalhe, todas || [credencial]).slice(0, MAX_ECO_LOG).replace(/[\u0000-\u001f]/g, ' ')}`);
+      if (f.log) f.log('aviso', `Ferramenta ${f.nomeF}/${op.nomeOp}: o servidor MCP recusou a chamada: ${mascaraLista(detalhe, todas).slice(0, MAX_ECO_LOG).replace(/[\u0000-\u001f]/g, ' ')}`);
       reject(new ErroFonte(502, `O servidor MCP recusou a chamada "${op.nomeOp}". O motivo ficou no log do Web; se repetir, avise o dono.`));
     }));
   });
@@ -249,7 +249,7 @@ function chamaMcp(f, op, params, credencial, agente, todas) {
 function desembrulhaMcp(r, f, op, todas) {
   if (!ehObjeto(r)) return r;
   if (r.isError) {
-    if (f && f.log) f.log('aviso', `Ferramenta ${f.nomeF}/${op.nomeOp}: a tool devolveu erro: ${mascaraLista(JSON.stringify(r.content || r), todas || [credencial]).slice(0, MAX_ECO_LOG)}`);
+    if (f && f.log) f.log('aviso', `Ferramenta ${f.nomeF}/${op.nomeOp}: a tool devolveu erro: ${mascaraLista(JSON.stringify(r.content || r), todas).slice(0, MAX_ECO_LOG)}`);
     throw new ErroFonte(502, `A tool "${op ? op.nomeOp : '?'}" do servidor MCP devolveu erro. O motivo ficou no log do Web; se repetir, avise o dono.`);
   }
   if (r.structuredContent !== undefined) return r.structuredContent;
