@@ -29,7 +29,9 @@
   --t-linha: #dfe7e1;
   --t-linha-suave: rgba(0, 0, 0, .08);
   --t-acento: var(--accent);
-  --t-acento-forte: #23814a;
+  --t-acento-forte: #23814a;       /* texto e borda em tom de acento (claro no escuro) */
+  --t-acento-solido: #23814a;      /* fundo sob --t-sobre-acento (escuro nos dois temas) */
+  --t-info-texto: #1b5aa0;         /* azul para texto pequeno sobre --t-info-fundo */
   --t-sobre-acento: #ffffff;
   --t-ok: #1d6b3c;
   --t-ok-fundo: #e3f5ea;
@@ -70,6 +72,8 @@ html[data-tema="escuro"] {
   --t-linha: #2c3c32;
   --t-linha-suave: rgba(255, 255, 255, .14);
   --t-acento-forte: #57c98a;
+  --t-acento-solido: #1f7a47;
+  --t-info-texto: #8ab8ff;
   --t-sobre-acento: #ffffff;
   --t-ok: #7fd9a3;
   --t-ok-fundo: #193a28;
@@ -104,6 +108,8 @@ html[data-tema="escuro"] {
     --t-linha: #2c3c32;
     --t-linha-suave: rgba(255, 255, 255, .14);
     --t-acento-forte: #57c98a;
+    --t-acento-solido: #1f7a47;
+    --t-info-texto: #8ab8ff;
     --t-sobre-acento: #ffffff;
     --t-ok: #7fd9a3;
     --t-ok-fundo: #193a28;

@@ -27,3 +27,6 @@ button:active{opacity:.85}
 
 /* No iPhone, campo com fonte abaixo de 16px dá zoom quando recebe o foco. Regra: nada dá zoom no app instalado. */
 @media (pointer:coarse){input,textarea,select{font-size:16px!important}}
+
+/* aviso em tom neutro (instalação sem senha ainda), no lugar da caixa de erro */
+.erro.aviso-neutro{background:var(--t-ok-fundo);color:var(--t-ok);border-color:var(--t-ok-borda)}

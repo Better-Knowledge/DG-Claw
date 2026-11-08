@@ -258,8 +258,8 @@
         x.fillStyle = cor[1]; x.beginPath(); x.roundRect(70,82,180,158,55); x.fill();
         x.lineWidth = 9; x.strokeStyle = cor[1]; x.beginPath(); x.moveTo(160,82); x.lineTo(160,56); x.stroke();
         x.beginPath(); x.arc(160,48,13,0,Math.PI*2); x.fill();
-        x.fillStyle = '#fffefa'; [125,195].forEach(v => { x.beginPath(); x.arc(v,147,17,0,Math.PI*2); x.fill(); });
-        x.strokeStyle = '#fffefa'; x.lineWidth = 8; x.lineCap = 'round'; x.beginPath(); x.arc(160,175,30,.15,Math.PI-.15); x.stroke();
+        x.fillStyle = '#fffefa'; [125,195].forEach(v => { x.beginPath(); x.arc(v,147,17,0,Math.PI*2); x.fill(); }); /* cor-fixa: desenho da mascote no canvas */
+        x.strokeStyle = '#fffefa'; x.lineWidth = 8; x.lineCap = 'round'; x.beginPath(); x.arc(160,175,30,.15,Math.PI-.15); x.stroke(); /* cor-fixa: desenho da mascote no canvas */
         x.fillStyle = cor[1]; x.beginPath(); x.roundRect(95,257,130,65,24); x.fill();
         c.toBlob(blob => {
           if (!blob || tela !== 'formulario') return;

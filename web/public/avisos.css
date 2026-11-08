@@ -1,3 +1,5 @@
+/* o fundo da página acompanha o tema (sem isto o color-scheme escuro cairia no cinza do navegador) */
+body.lp{background:var(--t-fundo)}
 /* avisos.css: a tela do quadro de avisos (classes av-). Celular primeiro. */
 .av-raiz{--av-linha:var(--t-linha);--av-texto:var(--t-texto);--av-fraco:var(--t-fraco);--av-fundo2:var(--t-superficie-2);--av-acento:var(--t-acento);
   max-width:760px;margin:0 auto;padding:12px 12px 40px;color:var(--av-texto);box-sizing:border-box;
@@ -13,7 +15,7 @@
 .av-btn:hover{background:var(--av-fundo2)}
 .av-btn:disabled{opacity:.5;cursor:default}
 .av-primario{background:var(--av-acento);border-color:var(--av-acento);color:var(--t-sobre-acento);font-weight:600;min-height:40px}
-.av-primario:hover{background:var(--t-acento-forte)}
+.av-primario:hover{background:var(--t-acento-solido)}
 .av-perigo{background:var(--t-perigo);border-color:var(--t-perigo);color:var(--t-sobre-acento)}
 .av-perigo:hover{background:var(--t-perigo)}
 .av-mini{min-height:32px;padding:0 12px;font-size:13px}

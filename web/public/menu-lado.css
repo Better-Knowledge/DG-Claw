@@ -9,7 +9,7 @@
    Computador (>= 1100px): barra fixa de 240px à esquerda, sem ☰ e sem véu. */
 aside#menu{
   --ml-painel:var(--t-superficie); --ml-fundo2:var(--t-superficie-2); --ml-linha:var(--t-linha); --ml-texto:var(--t-texto); --ml-fraco:var(--t-fraco);
-  --ml-a1:var(--accent); --ml-a2:color-mix(in srgb,var(--accent) 70%,var(--t-info));
+  --ml-a1:var(--accent); --ml-a2:color-mix(in srgb,var(--accent) 70%,var(--t-escuro-fundo));
   background:var(--ml-painel);color:var(--ml-texto);overflow-y:auto;overflow-x:hidden;
   padding:22px 14px 10px;gap:14px;
 }

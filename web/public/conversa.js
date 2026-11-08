@@ -254,7 +254,7 @@ if (!caps.voz) document.documentElement.classList.add('sem-voz');
 /* ── Texto de estado, faixas, utilidades ──────────────────────────────────── */
 function setEstado(txt, ehErro) {
   estadoEl.textContent = txt;
-  estadoEl.style.color = ehErro ? '#c0392b' : '';
+  estadoEl.classList.toggle('erro-txt', !!ehErro);
   pintaAtividade();
 }
 
@@ -1495,13 +1495,13 @@ function metaPendente(p) {
     return `<span class="meta" title="entregue">✓ ${esc(p.hhmm)}</span>`;
   }
   if (p.estado === 'falhou' && p.recusado) {   // comando recusado: reenviar daria o mesmo erro
-    return `<span class="meta"><span style="color:#c0392b;font-weight:600">recusado</span> ` +
+    return `<span class="meta"><span class="erro-txt">recusado</span> ` +
            `${esc(p.erro || 'motivo desconhecido')} ` +
            `<button class="mini descartar" data-pend="${p.n}">descartar</button></span>`;
   }
   if (p.estado === 'falhou') {
     const ocupado = p.conferindo ? ' disabled' : '';
-    return `<span class="meta"><span style="color:#c0392b;font-weight:600" ` +
+    return `<span class="meta"><span class="erro-txt" ` +
            `title="${esc(p.erro || 'motivo desconhecido')}">não foi enviada</span> ` +
            `<button class="mini reenviar" data-pend="${p.n}"${ocupado}>reenviar</button> ` +
            `<button class="mini descartar" data-pend="${p.n}"${ocupado}>descartar</button></span>`;
@@ -1804,10 +1804,13 @@ const VIS_PRONTO_MS = 12000;
 const VIS_ALT_MIN = 40;
 const visuais = new Map();          // contentWindow -> estado (balão e tela cheia)
 const visEstados = new Set();       // estados dos balões na conversa
+// trocou o tema (seletor, aparelho ou outra aba): os visuais abertos acompanham
+document.addEventListener('dgclaw:tema', () => { for (const est of visEstados) enviaAoVisual(est, { tipo: 'tema', valor: temaApp() }); });
 const visPorCaixa = new WeakMap();  // .visq -> estado
 const visAlturas = new Map();       // id da mídia -> última altura (sobrevive ao nó refeito)
 
-const temaApp = () => document.documentElement.dataset.tema === 'escuro' ? 'escuro' : 'claro';
+/* o tema que está valendo de fato (escolha ou aparelho), pelo tema.js; sem ele, o atributo ou o aparelho */
+const temaApp = () => (window.DGTema ? window.DGTema.atual() : (document.documentElement.dataset.tema === 'escuro' || (!document.documentElement.dataset.tema && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'escuro' : 'claro'));
 /* Teto alto de propósito (12/10/2026): com 80% da tela, o relatório inteiro rolava
    DENTRO do balão, e no iPhone o dedo em cima do visual rolava o visual e não a
    conversa. O visual ocupa a altura que precisa; só um gigante rola por dentro. */

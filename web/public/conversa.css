@@ -68,7 +68,7 @@
            font-size:18px;text-shadow:0 1px 3px var(--t-veu-forte);pointer-events:none}
   .anxest{position:absolute;left:0;right:0;bottom:0;background:var(--t-veu-forte);color:var(--t-sobre-acento);
           font-size:11.5px;font-weight:600;text-align:center;padding:2px 0}
-  .anx[data-estado="pronto"] .anxest{background:var(--t-acento-forte)}
+  .anx[data-estado="pronto"] .anxest{background:var(--t-acento-solido)}
   .anx[data-estado="falhou"] .anxest{background:var(--t-perigo)}
   .anx[data-estado="falhou"] .anxmid{outline:2px solid var(--t-perigo);outline-offset:-2px}
   .anxnome,.anxtam{font-size:11.5px;line-height:1.25;overflow:hidden;text-overflow:ellipsis;
@@ -256,7 +256,7 @@
   .midaudio{min-width:min(260px,62vw)}
 
   /* ── Seta verde durante a gravação: "envia direto" ── */
-  #btnEnviar.direto{background:var(--t-acento-forte);box-shadow:0 0 0 3px var(--t-acento-fundo)}
+  #btnEnviar.direto{background:var(--t-acento-solido);box-shadow:0 0 0 3px var(--t-acento-fundo)}
 
   /* ── BL-365: seta pro fim, busca e painel de compartilhados ── */
   /* A seta fica acima da barra E das faixas: a posição sai do JS (posicionaSeta),
@@ -460,7 +460,7 @@
 .lbcorpo .vcard .ico{font-size:46px;line-height:1}
 .lbcorpo .vcard b{display:block;margin:12px 0 4px;font-size:16px}
 .lbcorpo .vcard small{display:block;color:var(--t-fraco);font-size:13px;line-height:1.45}
-.lbcorpo .vcard a{display:inline-block;margin-top:16px;border-radius:12px;background:var(--t-acento-forte);color:var(--t-sobre-acento);
+.lbcorpo .vcard a{display:inline-block;margin-top:16px;border-radius:12px;background:var(--t-acento-solido);color:var(--t-sobre-acento);
   padding:12px 18px;font-weight:600;text-decoration:none;min-height:44px;box-sizing:border-box}
 .lbcorpo .vcard a.sec{background:var(--t-ok-fundo);color:var(--t-acento-forte);margin-left:6px}
 
@@ -581,18 +581,18 @@
 
 /* ── Cartão de permissão ── */
 .pc{position:relative;max-width:880px;margin:14px auto 4px;padding:14px;border:2px solid var(--t-aviso-borda);border-radius:16px;
-    background:var(--t-aviso-fundo);color:var(--t-aviso);box-sizing:border-box;overflow-wrap:anywhere}
+    background:var(--t-aviso-fundo);color:var(--t-texto);box-sizing:border-box;overflow-wrap:anywhere}
 .pc[hidden]{display:none}
 .pc:focus{outline:none}
 .pc.entra{animation:lcEntra .22s ease-out}
-.pc-titulo{display:block;font-size:16px;line-height:1.3}
+.pc-titulo{display:block;font-size:16px;line-height:1.3;color:var(--t-aviso)}
 .pc-texto{margin:6px 0 8px;font-size:14px;line-height:1.45}
 .pc-pedido{margin:0 0 10px;padding:10px 12px;max-height:200px;overflow:auto;border-radius:10px;background:var(--t-codigo-fundo);
   font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere;box-sizing:border-box}
 .pc-botoes{display:flex;gap:10px;flex-wrap:wrap}
 .pc-btn{flex:1 1 140px;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:48px;
   padding:0 16px;border-radius:24px;border:1px solid transparent;font:inherit;font-size:16px;font-weight:700;cursor:pointer}
-.pc-aprova{background:var(--t-acento-forte);color:var(--t-sobre-acento)}
+.pc-aprova{background:var(--t-acento-solido);color:var(--t-sobre-acento)}
 .pc-nega{background:var(--t-superficie);color:var(--t-erro);border-color:var(--t-erro)}
 .pc-btn:active{opacity:.7}
 .pc-btn:disabled{opacity:.55;cursor:default}
@@ -639,3 +639,6 @@ body:not(.ler-on) .fone{display:none}
 .selo-fila{display:block;margin-top:4px;font-size:12px;line-height:1.3;opacity:.75;overflow-wrap:anywhere}
 .row.fila-tocando .selo-fila{opacity:1;font-weight:600}
 .row.fila-pausada .selo-fila{opacity:.9}
+
+/* texto de erro curto (estado da barra, 'recusado' nos metadados) */
+.erro-txt{color:var(--t-erro);font-weight:600}

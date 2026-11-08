@@ -160,6 +160,9 @@ bloco `"skills"` do `papeis.json`. Depois de publicar, remover ou mudar um papel
 Quando o dono aprova uma skill proposta por um agente, ela já está no catálogo: só falta o `skill aplicar`.
 `/opt/dgclaw/app/web/docs/SKILLS-POR-ESCOPO.md`.
 
+O painel tem tema claro, escuro ou como o aparelho: a pessoa escolhe no menu ☰, em Configurações; a escolha fica
+no aparelho dela.
+
 Quando uma pessoa sai da empresa, o dono pede e você roda `sudo dgclaw pessoa desligar <pessoa>`: o acesso dela
 é negado na hora, os agentes dela param e a memória de trabalho deles vai para a base `entrega-<pessoa>` do
 grupo dela. Nada é apagado; para voltar atrás há o `pessoa religar`. Se o nome da pessoa for longo, o comando
