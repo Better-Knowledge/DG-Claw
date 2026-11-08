@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Observabilidade - DG Claw</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#2f9e5e">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="stylesheet" href="/lembretes.css">
+<link rel="stylesheet" href="/dados.css">
+<link rel="stylesheet" href="/observabilidade.css">
+<link rel="stylesheet" href="/casca.css">
+<link rel="stylesheet" href="/menu-lado.css">
+<link rel="stylesheet" href="/sem-zoom.css">
+<script src="/sem-zoom.js"></script>
+</head>
+<body class="lp ob">
+<main class="lp-main">
+  <p class="lp-msg erro" id="msgGeral" role="alert" hidden></p>
+
+  <section class="lp-sec" id="secResumo" aria-label="Resumo dos acessos">
+    <h2><span>Uso dos dados nos últimos 30 dias</span><button type="button" class="lp-ajuda" data-ajuda="resumo" aria-label="Tutorial do resumo">?</button></h2>
+    <div class="ob-tiles" id="tiles"><p class="lp-vazio">Carregando…</p></div>
+    <div class="ob-colunas">
+      <div><h3>Por agente</h3><div id="porAgente"></div></div>
+      <div><h3>Por fonte</h3><div id="porFonte"></div></div>
+      <div><h3>Por pessoa</h3><div id="porPessoa"></div></div>
+    </div>
+  </section>
+
+  <section class="lp-sec" id="secLinhas" aria-label="Linhas do log de acesso">
+    <h2><span>Quem leu o quê</span><button type="button" class="lp-ajuda" data-ajuda="linhas" aria-label="Tutorial do log">?</button></h2>
+    <form class="lp-form ob-filtros" id="filtros" novalidate>
+      <label>Agente <input id="fAgente" placeholder="ana" autocomplete="off"></label>
+      <label>Pessoa <input id="fPessoa" placeholder="marta" autocomplete="off"></label>
+      <label>Fonte <input id="fFonte" placeholder="clientes, base-manual-rh, ferramenta-crm" autocomplete="off"></label>
+      <label>Decisão
+        <select id="fDecisao"><option value="">todas</option><option value="permitido">permitido</option><option value="negado">negado</option><option value="aprovacao">aprovação pedida</option><option value="executada">executada</option><option value="recusada">recusada</option><option value="falhou">falhou</option></select>
+      </label>
+      <label>Desde <input id="fDesde" type="date"></label>
+      <label>Até <input id="fAte" type="date"></label>
+      <div class="lp-linha">
+        <button type="submit" class="lp-btn pri">Filtrar</button>
+        <a class="lp-btn" id="btnCsv" href="/api/v1/dados/log.csv" download>Baixar CSV</a>
+      </div>
+    </form>
+    <div id="linhas"><p class="lp-vazio">Carregando…</p></div>
+  </section>
+</main>
+
+<script src="/tour.js"></script>
+<script src="/menu-lado.js"></script>
+<script src="/casca.js"></script>
+<script src="/observabilidade.js"></script>
+<script>
+DGCasca.monta({ pagina: 'observabilidade', titulo: 'Observabilidade', aoTutorial: function () { if (window.DGObservabilidadeTutorial) window.DGObservabilidadeTutorial(); } });
+</script>
+</body>
+</html>

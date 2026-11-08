@@ -70,7 +70,63 @@ function criarDadosLog({ dir, log, agora, retencaoDias }) {
     return saida;
   }
 
-  return { registrar, ultimas, get dir() { return dir; } };
+  /** Percorre as linhas do mais novo para o mais velho, parando em `ate` arquivos velhos demais. `fn(l)` devolve false para parar. */
+  function percorre(desde, fn) {
+    let nomes;
+    try { nomes = fs.readdirSync(dir).filter((x) => RX_ARQ.test(x)).sort().reverse(); } catch (e) { if (e.code === 'ENOENT') return; throw e; }
+    for (const nome of nomes) {
+      const dia = RX_ARQ.exec(nome)[1];
+      if (desde && dia < desde) return;
+      const linhas = fs.readFileSync(path.join(dir, nome), 'utf8').split('\n').filter(Boolean).reverse();
+      for (const l of linhas) {
+        let o; try { o = JSON.parse(l); } catch (_) { continue; }
+        if (fn(o) === false) return;
+      }
+    }
+  }
+
+  /**
+   * As linhas que batem com o filtro (mais novas primeiro). `filtro`: { limit, agente, pessoa, fonte, decisao,
+   * operacao, desde (AAAA-MM-DD), ate (AAAA-MM-DD) }. Cada campo de texto é igualdade exata.
+   */
+  function filtrar(filtro) {
+    const f = filtro || {};
+    const max = Number.isInteger(f.limit) && f.limit > 0 ? Math.min(f.limit, 1000) : 100;
+    const saida = [];
+    percorre(f.desde, (o) => {
+      const dia = String(o.quando || '').slice(0, 10);
+      if (f.ate && dia > f.ate) return true;
+      if (f.desde && dia < f.desde) return true;
+      for (const k of ['agente', 'pessoa', 'fonte', 'decisao', 'operacao']) if (f[k] && o[k] !== f[k]) return true;
+      saida.push(o);
+      return saida.length < max;
+    });
+    return saida;
+  }
+
+  /** Contagens por agente, por fonte e por decisão desde `desde` (padrão: 30 dias), até 100 mil linhas. */
+  function resumo(desde) {
+    const r = { desde: desde || diaDe(relogio() - 30 * 86400000), linhas: 0, por_decisao: {}, por_agente: {}, por_fonte: {}, por_pessoa: {} };
+    const soma = (o, k) => { o[k] = (o[k] || 0) + 1; };
+    percorre(r.desde, (o) => {
+      r.linhas++;
+      soma(r.por_decisao, o.decisao || '?');
+      soma(r.por_agente, o.agente || '?');
+      soma(r.por_fonte, o.fonte || '?');
+      if (o.pessoa) soma(r.por_pessoa, o.pessoa);
+      return r.linhas < 100000;
+    });
+    return r;
+  }
+
+  /** CSV das linhas (cabeçalho fixo), para planilha. Sem conteúdo porque o log não o tem. */
+  function csv(linhas) {
+    const cols = ['quando', ...CAMPOS];
+    const cel = (v) => { if (v === undefined || v === null) return ''; const t = String(v); return /[",\n\r;]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+    return [cols.join(','), ...linhas.map((l) => cols.map((c) => cel(l[c])).join(','))].join('\r\n') + '\r\n';
+  }
+
+  return { registrar, ultimas, filtrar, resumo, csv, get dir() { return dir; } };
 }
 
 module.exports = { criarDadosLog, CAMPOS };

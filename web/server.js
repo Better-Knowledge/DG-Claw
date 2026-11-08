@@ -1147,6 +1147,16 @@ function criarServidor(opcoes) {
       return undefined;
     }
 
+    if (p === '/observabilidade' && (m === 'GET' || m === 'HEAD')) {
+      if (!sessao) return semSessaoPagina(req, res, url);
+      if (sessao.via === 'caixa') return H.erroJson(res, 403, 'A tela de observabilidade é do dono, pelo painel.');
+      if (!servirArquivo(req, res, path.join(config.publicDir, 'observabilidade.html'), 'no-store')) {
+        log('erro', `A tela de observabilidade não está instalada: falta ${path.join(config.publicDir, 'observabilidade.html')}.`);
+        H.paginaErro(res, 500, 'Tela não instalada', 'O arquivo da tela de observabilidade não foi encontrado no servidor. Reinstale o DG Claw Web.');
+      }
+      return undefined;
+    }
+
     if (p === '/dados' && (m === 'GET' || m === 'HEAD')) {
       if (!sessao) return semSessaoPagina(req, res, url);
       if (sessao.via === 'caixa') return H.erroJson(res, 403, 'A tela de aprovações é do dono, pelo painel.');
