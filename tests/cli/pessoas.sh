@@ -68,6 +68,34 @@ afirma "o catalogo continua valido para o Web" node -e '
   process.exit(validaBases(JSON.parse(fs.readFileSync(process.argv[2], "utf8"))).ok ? 0 : 1);' "$REPO/web/lib/bases.js" "$ETC/bases.json"
 nega "--base invalido recusado" dgclaw pessoa desligar caio --sim --base "Maiuscula"
 nega "--base sem nome recusado" dgclaw pessoa desligar caio --sim --base
+nega "--base vazio recusado" dgclaw pessoa desligar caio --sim --base ""
+nega "--base= vazio recusado" dgclaw pessoa desligar caio --sim --base=
+
+echo "--base apontando para uma base que abriria a memoria para mais gente: recusado antes de mudar algo"
+afirma "base da empresa existe" dgclaw base criar manual-rh --escopo empresa
+afirma "base publica existe" dgclaw base criar site --escopo publica
+afirma "base privada de outra pessoa existe" dgclaw base criar diario-caio --escopo pessoa:caio
+jq '.pessoas.marta.estado = "ativa"' "$PAP" >"$TMP/p2.json" && cp "$TMP/p2.json" "$PAP"
+: >"$STUB_LOG"
+nega "marta (grupo financeiro) para base empresa: recusado" dgclaw pessoa desligar marta --sim --base manual-rh
+nega "para base publica: recusado" dgclaw pessoa desligar marta --sim --base site
+nega "para a privada de outra pessoa: recusado" dgclaw pessoa desligar marta --sim --base diario-caio
+igual "marta continua ativa" "ativa" "$(jq -r '.pessoas.marta.estado' "$PAP")"
+nega "nenhum agente parado" grep -q '^podman stop' "$STUB_LOG"
+nega "nada foi copiado para a base da empresa" test -e "$LIB/bases/manual-rh/ana"
+mkdir -p "$LIB/agentes/bia/home"; printf 'x\n' >"$LIB/agentes/bia/home/MEMORY.md"
+afirma "caio (sem grupo) para base empresa: pode" dgclaw pessoa desligar caio --sim --base manual-rh
+afirma "copiou para la" test -f "$LIB/bases/manual-rh/bia/MEMORY.md"
+jq '.pessoas.caio.estado = "ativa"' "$PAP" >"$TMP/p3.json" && cp "$TMP/p3.json" "$PAP"
+
+echo "catalogo de bases invalido: desligar recusa antes de mudar algo (a entrega falharia depois)"
+cp "$ETC/bases.json" "$TMP/bases.ok"
+jq '.bases["Nome Invalido"] = {"escopo": "empresa"}' "$ETC/bases.json" >"$TMP/b2.json" && cp "$TMP/b2.json" "$ETC/bases.json"
+: >"$STUB_LOG"
+nega "desligar marta com catalogo invalido: recusado" dgclaw pessoa desligar marta --sim
+igual "marta continua ativa" "ativa" "$(jq -r '.pessoas.marta.estado' "$PAP")"
+nega "nenhum agente parado" grep -q '^podman stop' "$STUB_LOG"
+cp "$TMP/bases.ok" "$ETC/bases.json"
 
 echo "desligar quem nao tem grupo: base da empresa"
 : >"$STUB_LOG"

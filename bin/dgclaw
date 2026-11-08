@@ -2212,16 +2212,19 @@ pessoa_desligar() {
         esac
     done
     [ -z "$esperando" ] || falha "faltou o nome depois de --base." "exemplo: dgclaw pessoa desligar $nome --base entrega-$nome"
+    if [ -n "$base" ] || [[ " $* " == *" --base "* ]] || [[ " $* " == *" --base= "* ]]; then [ -n "$base" ] || falha "faltou o nome depois de --base." "exemplo: dgclaw pessoa desligar $nome --base entrega-$nome"; fi
     exigir_ferramentas jq node
     [[ "$nome" =~ $RX_NOME_PESSOA ]] || falha "o nome '$nome' nao e valido." "veja as pessoas com: dgclaw pessoa listar"
     [ -s "$DG_PAPEIS_JSON" ] && jq -e --arg n "$nome" '.pessoas[$n] != null' "$DG_PAPEIS_JSON" >/dev/null 2>&1 \
         || falha "a pessoa '$nome' nao esta em ${DG_PAPEIS_JSON#"$R"}." "veja as pessoas com: dgclaw pessoa listar"
-    # O nome da base e conferido antes de qualquer mudanca: falhar no passo 3 deixaria a pessoa desligada e
-    # os agentes parados sem a entrega.
+    # O nome da base, o escopo em que a memoria vai ficar e o catalogo atual sao conferidos antes de qualquer
+    # mudanca: falhar no passo 3 deixaria a pessoa desligada e os agentes parados sem a entrega.
+    local escopo
     base="$(pessoas_base_entrega "$nome" "$base")"
+    escopo="$(pessoas_escopo_entrega "$nome" "$base")"
     if [ "$sim" != 1 ]; then
         [ -t 0 ] || falha "sem terminal para confirmar." "rode com --sim para desligar sem perguntar: dgclaw pessoa desligar $nome --sim"
-        printf 'Vou desligar %s: todo acesso dela e negado, os agentes dela (%s) param e a memoria deles vai para a base %s.\nNada e apagado. Digite o nome (%s) para confirmar: ' "$nome" "$(pessoas_agentes "$nome" | tr '\n' ' ')" "$base" "$nome"
+        printf 'Vou desligar %s: todo acesso dela e negado, os agentes dela (%s) param e a memoria deles vai para a base %s (escopo %s).\nNada e apagado. Digite o nome (%s) para confirmar: ' "$nome" "$(pessoas_agentes "$nome" | tr '\n' ' ')" "$base" "$escopo" "$nome"
         local resp; read -r resp
         [ "$resp" = "$nome" ] || falha "a confirmacao nao confere (digitado: '$resp')." "nada foi feito. Rode de novo e digite $nome."
     fi
@@ -2235,10 +2238,11 @@ pessoa_desligar() {
             podman stop "dgclaw-$slug" >/dev/null && ok "agente $slug parado (a casa dele fica inteira)" || aviso "nao consegui parar o agente $slug; pare com: dgclaw agente parar $slug"
         else info "agente $slug ja estava parado"; fi
     done
-    passo "Entregando a memoria de trabalho dos agentes para a base $base"
-    if [ "$ENSAIO" = 1 ]; then pessoas_entregar_memoria "$nome" "$base" 2>&1; return 0; fi
-    n="$(pessoas_entregar_memoria "$nome" "$base")"
-    if [ "${n:-0}" -gt 0 ]; then ok "$n arquivo(s) copiado(s) para ${DG_BASES_DIR#"$R"}/$base (base $base, para o grupo dela ou a empresa)"
+    passo "Entregando a memoria de trabalho dos agentes para a base $base (escopo $escopo)"
+    if [ "$ENSAIO" = 1 ]; then pessoas_entregar_memoria "$nome" "$base" "$escopo" 2>&1; return 0; fi
+    n="$(pessoas_entregar_memoria "$nome" "$base" "$escopo")" \
+        || falha "a entrega da memoria para a base $base nao terminou (a pessoa ja esta desligada e os agentes parados)." "veja o aviso acima, corrija e rode de novo: dgclaw pessoa desligar $nome --sim${base:+ --base $base}"
+    if [ "${n:-0}" -gt 0 ]; then ok "$n arquivo(s) copiado(s) para ${DG_BASES_DIR#"$R"}/$base (base $base, escopo $escopo)"
     else info "nenhum arquivo de memoria para entregar (agentes sem memoria ou sem casa)"; fi
     info "para voltar atras: dgclaw pessoa religar $nome, e depois dgclaw agente iniciar <slug> para cada agente"
 }
