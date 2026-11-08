@@ -11,7 +11,7 @@ const { validaPapeis, criarPapeis } = require('../lib/papeis');
 const { validaFerramentas, criarFerramentas } = require('../lib/ferramentas');
 const { criarCofreSistemas, ErroCredencial } = require('../lib/cofre-sistemas');
 const { criarFontes, ErroFonte } = require('../lib/dados-fontes');
-const { montaUrl, normalizaResultado, desembrulhaMcp, mascara } = require('../lib/dados-fontes/ferramenta');
+const { montaUrl, normalizaResultado, desembrulhaMcp, mascara, mascaraObjeto } = require('../lib/dados-fontes/ferramenta');
 const { criarDados } = require('../lib/dados');
 const { pastaTemp, capturaLog } = require('./ajuda');
 
@@ -116,6 +116,10 @@ test('montaUrl, normalizaResultado e desembrulhaMcp', () => {
   assert.deepEqual(normalizaResultado({ data: [{ x: 1 }] }, {}), { itens: [{ x: 1 }], total: 1, truncado: false });
   assert.deepEqual(normalizaResultado({ x: 1, y: 2 }, { campos: ['y'] }), { item: { y: 2 } });
   assert.equal(mascara('Basic dXNlcjpwYXNz e user%3Apass e user:pass', 'user:pass'), 'Basic *** e *** e ***', 'máscara cobre base64 e a forma codificada');
+  // credencial só de dígitos não quebra números; credencial com aspas ou barra é mascarada crua; chaves também
+  assert.deepEqual(mascaraObjeto({ item: { id: 7391, ano: 2026, ok: true, nota: 'chave 7391 aqui' } }, '7391'), { item: { id: 7391, ano: 2026, ok: true, nota: 'chave *** aqui' } });
+  assert.deepEqual(mascaraObjeto({ itens: [{ s: 'x ab"cd y', 'ab"cd': 1 }], n: null }, 'ab"cd'), { itens: [{ s: 'x *** y', '***': 1 }], n: null });
+  assert.deepEqual(mascaraObjeto({ s: 'x ab\\cd y' }, 'ab\\cd'), { s: 'x *** y' });
   assert.deepEqual(desembrulhaMcp({ content: [{ type: 'text', text: '{"a":1}' }] }), { a: 1 });
   assert.deepEqual(desembrulhaMcp({ content: [{ type: 'text', text: 'oi' }] }), { texto: 'oi' });
   assert.deepEqual(desembrulhaMcp({ structuredContent: { z: 1 }, content: [] }), { z: 1 });

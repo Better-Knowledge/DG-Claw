@@ -37,12 +37,19 @@ function mascara(texto, credencial) {
   for (const f of formas) if (f && f.length >= 4) t = t.split(f).join('***');
   return t;
 }
-/** A mesma máscara aplicada a um objeto inteiro (o que sai do gateway rumo ao agente, como defesa em profundidade). */
-function mascaraObjeto(v, credencial) {
-  if (!credencial || v === undefined) return v;
-  const t = JSON.stringify(v);
-  const m = mascara(t, credencial);
-  return m === t ? v : JSON.parse(m);
+/**
+ * A mesma máscara aplicada a um objeto inteiro (o que sai do gateway rumo ao agente, como defesa em profundidade):
+ * percorre o objeto e troca só em folhas de texto e em chaves; números e booleanos ficam como estão (uma
+ * credencial só de dígitos nunca quebra um id ou um ano) e texto com aspas ou barra é mascarado cru.
+ */
+function mascaraObjeto(v, credencial, prof) {
+  if (!credencial || v === undefined || v === null) return v;
+  const p = prof || 0;
+  if (typeof v === 'string') return mascara(v, credencial);
+  if (p > 50) return v;
+  if (Array.isArray(v)) return v.map((x) => mascaraObjeto(x, credencial, p + 1));
+  if (typeof v === 'object') { const o = {}; for (const [k, x] of Object.entries(v)) o[mascara(k, credencial)] = mascaraObjeto(x, credencial, p + 1); return o; }
+  return v;
 }
 
 /** Só os campos de `campos` (quando a operação os declara), em cada item. */
@@ -145,7 +152,8 @@ function chamaBanco(f, op, params) {
     filho.on('error', (e) => fim(() => reject(new ErroFonte(503, `A consulta ao banco falhou ao iniciar (${e.code || e.message}).`))));
     filho.stdout.on('data', (c) => { saida += c.toString('utf8'); if (saida.length > MAX_RESPOSTA * 2) { mata('SIGKILL'); fim(() => reject(new ErroFonte(502, 'A resposta do banco passou do teto.'))); } });
     filho.stderr.on('data', (c) => { if (erros.length < 4000) erros += c.toString('utf8'); });
-    filho.on('exit', (codigo) => fim(() => {
+    // `close` só dispara depois de stdout e stderr fecharem: a saída está inteira. (`exit` pode vir antes do último pedaço.)
+    filho.on('close', (codigo) => fim(() => {
       let m = null;
       try { m = JSON.parse(saida); } catch (_) { m = null; }
       if (m && m.erro) reject(new ErroFonte(m.erro.status, m.erro.mensagem));
