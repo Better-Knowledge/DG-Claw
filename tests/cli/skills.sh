@@ -79,11 +79,18 @@ criar_agente ana --nome "Ana"
 afirma "o container nasce com a VISTA do agente montada so leitura, nao o catalogo inteiro" grep -q -- "$SK/.vistas/ana:/run/dgclaw/skills:ro" "$STUB_LOG"
 afirma "a vista tem so as skills da ana (global + a propria), copiadas" bash -c "[ -f '$SK/.vistas/ana/fechamento-mensal/SKILL.md' ] && [ -f '$SK/.vistas/ana/so-da-ana/SKILL.md' ] && [ ! -e '$SK/.vistas/ana/conciliacao' ]"
 afirma "a vista e de root, 755/644, e a pasta .vistas e 700" bash -c "[ \"\$(stat -c '%a %u' '$SK/.vistas/ana')\" = '755 0' ] && [ \"\$(stat -c %a '$SK/.vistas/ana/so-da-ana/SKILL.md')\" = 644 ] && [ \"\$(stat -c %a '$SK/.vistas')\" = 700 ]"
+INODE_VISTA="$(stat -c %i "$SK/.vistas/ana")"
 afirma "a criacao ja liga as skills compartilhadas" grep -q 'skills compartilhadas:' "$STUB_LOG.stdin"
 afirma "a lista do agente foi para dentro (so nomes)" grep -q 'PERMITIDAS=" fechamento-mensal so-da-ana"' "$STUB_LOG.stdin"
 afirma "o script nao troca link que aponta para a imagem" grep -q 'ja e uma skill da imagem' "$STUB_LOG.stdin"
 : >"$STUB_LOG.stdin"
 afirma "skill aplicar ana" dgclaw skill aplicar ana
+# Um bind mount e do inode: se a vista fosse apagada e recriada, o container ligado ficaria montado numa pasta
+# orfa e vazia. A vista tem de manter o inode entre o criar, o aplicar e o reparar.
+igual "a vista mantem o inode depois do skill aplicar (o container ligado continua enxergando)" "$INODE_VISTA" "$(stat -c %i "$SK/.vistas/ana")"
+afirma "agente reparar refaz a vista" dgclaw agente reparar ana
+igual "a vista mantem o inode depois do reparar" "$INODE_VISTA" "$(stat -c %i "$SK/.vistas/ana")"
+nega "a pasta temporaria da vista nao sobra" bash -c "ls -a '$SK/.vistas' | grep -q '^\\.ana\\.'"
 afirma "mandou o script de links por STDIN" grep -q 'ln -sfn "/run/dgclaw/skills/$nome"' "$STUB_LOG.stdin"
 afirma "remove link antigo que nao esta mais na lista" grep -q 'rm -f "$alvo"' "$STUB_LOG.stdin"
 afirma "skill aplicar sem slug passa por todos os agentes" dgclaw skill aplicar
@@ -91,6 +98,14 @@ afirma "skill aplicar sem slug passa por todos os agentes" dgclaw skill aplicar
 printf '{"versao": 1, "pessoas": {"marta": {}}, "papeis": {"nada": {}}, "agentes": {"ana": {"pessoa": "marta", "papel": "nada"}}}\n' >"$ETC/papeis.json"
 afirma "skill aplicar depois de tirar o papel" dgclaw skill aplicar ana
 afirma "a vista ficou so com a propria skill" bash -c "[ -f '$SK/.vistas/ana/so-da-ana/SKILL.md' ] && [ ! -e '$SK/.vistas/ana/fechamento-mensal' ]"
+igual "e o inode continua o mesmo" "$INODE_VISTA" "$(stat -c %i "$SK/.vistas/ana")"
+# o mesmo nome em dois escopos: a mais especifica vence (a privada do agente nunca perde para a do grupo)
+cp "$TMP/papeis.ok" "$ETC/papeis.json"
+mk_skill "$TMP/so-da-ana" so-da-ana; printf 'VERSAO DO GRUPO\n' >>"$TMP/so-da-ana/SKILL.md"
+afirma "publicar no grupo uma skill com o nome da privada da ana (avisa)" dgclaw skill publicar "$TMP/so-da-ana" --escopo grupo:financeiro
+afirma "skill aplicar ana (de novo)" dgclaw skill aplicar ana
+nega "na vista da ana, a privada dela venceu a do grupo" grep -q 'VERSAO DO GRUPO' "$SK/.vistas/ana/so-da-ana/SKILL.md"
+afirma "remover a de grupo de mesmo nome" dgclaw skill remover so-da-ana --escopo grupo:financeiro
 nega "slug invalido recusado" dgclaw skill aplicar "a;b"
 
 echo "remover"

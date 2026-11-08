@@ -2,8 +2,8 @@
 // Fonte "skills": o agente PROPÕE uma skill para o grupo da pessoa dele (ação propor_skill); uma pessoa aprova
 // no painel e só então o Web grava em <skillsDir>/grupos/<grupo>/<nome>/SKILL.md (root, 755/644), que os
 // agentes do grupo recebem no próximo `dgclaw skill aplicar` ou `agente reparar`. Nunca grava no escopo global
-// (só o dono publica ali, pela CLI). Listar mostra ao agente o catálogo compartilhado; o que ele de fato tem
-// está em ~/.claude/skills. Contrato em web/docs/SKILLS-POR-ESCOPO.md.
+// (só o dono publica ali, pela CLI). A fonte é só ação: o que o agente tem está em ~/.claude/skills, e o
+// catálogo dos outros escopos não é dele. Contrato em web/docs/SKILLS-POR-ESCOPO.md.
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -17,13 +17,23 @@ const RAIZ_APP = path.join(__dirname, '..', '..', '..');
 /** Os mesmos padrões de segredo que o dgclaw skill publicar usa (lib/segredos.regex): uma lista só. */
 function carregaSegredos(arquivo) {
   const linhas = fs.readFileSync(arquivo, 'utf8').split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
-  // [[:space:]] é POSIX; em JS vira \s. O resto dos padrões é ERE que o JS entende.
+  // [[:space:]] é POSIX; em JS vira \s. O resto dos padrões é ERE que o JS entende. Outra classe POSIX ([[:alnum:]]
+  // etc.) viraria em silêncio uma classe errada em JS: é recusada para a lista continuar igual nos dois lados.
+  for (const l of linhas) {
+    const resto = l.replace(/\[\[:space:\]\]/g, '');
+    if (/\[\[:/.test(resto)) throw new Error(`lib/segredos.regex: a linha "${l}" usa uma classe POSIX que o Web não traduz; só [[:space:]] é aceita.`);
+  }
   return new RegExp(linhas.map((l) => '(?:' + l.replace(/\[\[:space:\]\]/g, '\\s') + ')').join('|'), 'i');
 }
 const RX_SEGREDO = carregaSegredos(path.join(RAIZ_APP, 'lib', 'segredos.regex'));
-/** Nomes das skills da imagem e do Admin (pastas de skills/): uma compartilhada com esse nome tomaria o lugar da nativa. */
-function nomesReservados() {
-  try { return new Set(fs.readdirSync(path.join(RAIZ_APP, 'skills')).concat(['dgclaw'])); } catch (_) { return new Set(['dgclaw']); }
+/** As skills que o dgclaw liga em todo agente: lista fixa (a mesma de lib/skills.sh), unida ao que a pasta skills/ tem. */
+const RESERVADAS_FIXAS = ['dgclaw', 'agenda', 'lembretes', 'aprender', 'avisos', 'memory', 'foco', 'avatar', 'report', 'slide-animado', 'site-animado', 'video-animado', 'groq-audio', 'gemini-gratuito', 'visuais-na-conversa'];
+/**
+ * Nomes das skills da imagem e do Admin (pastas de skills/ mais a lista fixa): uma compartilhada com esse nome tomaria
+ * o lugar da nativa. `ok: false` quando a pasta skills/ não existe (cópia do app incompleta): propor fecha, não abre.
+ */
+function nomesReservados(raiz = RAIZ_APP) {
+  try { return { ok: true, nomes: new Set(fs.readdirSync(path.join(raiz, 'skills')).concat(RESERVADAS_FIXAS)) }; } catch (_) { return { ok: false, nomes: new Set(RESERVADAS_FIXAS) }; }
 }
 
 function fonteSkills({ dir, papeis, log, catalogo }) {
@@ -37,25 +47,6 @@ function fonteSkills({ dir, papeis, log, catalogo }) {
     try { outros = fs.readdirSync(pasta).some((n) => n !== 'SKILL.md' && !n.startsWith('.')); } catch (_) { outros = false; }
     return { outros, bytes: st.size, modificado_em: new Date(st.mtimeMs).toISOString() };
   }
-  function lista() {
-    const saida = [];
-    const le = (escopo, pasta) => {
-      let nomes = [];
-      try { nomes = fs.readdirSync(pasta, { withFileTypes: true }); } catch (_) { return; }
-      for (const d of nomes) {
-        if (!d.isDirectory() || !RX_NOME.test(d.name)) continue;
-        let st;
-        try { st = fs.statSync(path.join(pasta, d.name, 'SKILL.md')); } catch (_) { continue; }
-        saida.push({ nome: d.name, escopo, tamanho: st.size, modificado_em: new Date(st.mtimeMs).toISOString() });
-      }
-    };
-    le('global', path.join(dir, 'globais'));
-    let grupos = [];
-    try { grupos = fs.readdirSync(path.join(dir, 'grupos'), { withFileTypes: true }).filter((d) => d.isDirectory() && RX_GRUPO.test(d.name)).map((d) => d.name); } catch (_) { grupos = []; }
-    for (const g of grupos.sort()) le(`grupo:${g}`, path.join(dir, 'grupos', g));
-    return saida;
-  }
-
   return {
     nome: 'skills', catalogo,
     campos: [],
@@ -68,7 +59,8 @@ function fonteSkills({ dir, papeis, log, catalogo }) {
         validar(p, contexto) {
           soChaves(p || {}, ['nome', 'grupo', 'conteudo', 'substituir'], 'propor em skills');
           if (typeof p.nome !== 'string' || !RX_NOME.test(p.nome)) throw new ErroFonte(400, '"nome" é obrigatório: minúsculas, números e hífen, começando por letra, até 40 (ex.: fechamento-mensal).');
-          if (reservados.has(p.nome)) throw new ErroFonte(400, `"${p.nome}" é o nome de uma skill da imagem do DG Claw; uma skill compartilhada com esse nome tomaria o lugar dela. Escolha outro nome (ex.: ${p.nome}-da-empresa).`);
+          if (!reservados.ok) throw new ErroFonte(503, 'A cópia do DG Claw no servidor está sem a pasta skills/; não dá para conferir se o nome é de uma skill da imagem. O dono precisa rodar "dgclaw atualizar".');
+          if (reservados.nomes.has(p.nome)) throw new ErroFonte(400, `"${p.nome}" é o nome de uma skill da imagem do DG Claw; uma skill compartilhada com esse nome tomaria o lugar dela. Escolha outro nome (ex.: ${p.nome}-da-empresa).`);
           if (p.substituir !== undefined && typeof p.substituir !== 'boolean') throw new ErroFonte(400, '"substituir" precisa ser true ou false.');
           if (typeof p.grupo !== 'string' || !RX_GRUPO.test(p.grupo)) throw new ErroFonte(400, '"grupo" é obrigatório: o nome de um grupo de que a sua pessoa faz parte.');
           if (typeof p.conteudo !== 'string' || !p.conteudo.trim()) throw new ErroFonte(400, '"conteudo" é obrigatório: o SKILL.md inteiro, com o frontmatter (name, description).');
@@ -84,6 +76,9 @@ function fonteSkills({ dir, papeis, log, catalogo }) {
             const pessoa = contexto.politica.pessoas[contexto.pessoa];
             if (!pessoa || !pessoa.grupos.includes(p.grupo)) throw new ErroFonte(403, `A pessoa ${contexto.pessoa} não faz parte do grupo "${p.grupo}"; só dá para propor skill para um grupo seu.`);
           }
+          // Uma skill de grupo com o nome de uma global tomaria o lugar dela para o grupo inteiro (a mais específica vence).
+          let global = null; try { global = fs.statSync(path.join(dir, 'globais', p.nome, 'SKILL.md')); } catch (_) { global = null; }
+          if (global) throw new ErroFonte(409, `Já existe a skill global "${p.nome}" (publicada pelo dono); uma skill de grupo com o mesmo nome tomaria o lugar dela para o grupo. Escolha outro nome.`);
           const existe = existeSkill(p.grupo, p.nome);
           if (existe && !p.substituir) throw new ErroFonte(409, `Já existe a skill "${p.nome}" no grupo ${p.grupo}. Para trocar o texto, proponha de novo com "substituir": true; a pessoa vai ver que é uma substituição.`);
           if (existe && existe.outros) throw new ErroFonte(409, `A skill "${p.nome}" do grupo ${p.grupo} foi publicada pelo dono com mais arquivos além do SKILL.md; um agente não a substitui. Peça ao dono.`);
@@ -91,7 +86,8 @@ function fonteSkills({ dir, papeis, log, catalogo }) {
         },
         executar(p, contexto) {
           // Reconfere na hora da aprovação: a pessoa ainda está no grupo? (ela pode ter saído entre pedir e aprovar)
-          if (papeis && contexto && contexto.agente) {
+          // Pedido feito pelo dono pela sessão do painel não tem agente na política: o dono publica onde quiser.
+          if (papeis && contexto && contexto.agente && !contexto.dono) {
             const e = papeis.estado();
             const ag = e.ok ? e.politica.agentes[contexto.agente] : null;
             const pessoa = ag ? e.politica.pessoas[ag.pessoa] : null;

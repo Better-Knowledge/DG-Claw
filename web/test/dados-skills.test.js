@@ -139,13 +139,39 @@ test('rota: propor skill vira aprovação; o dono aprova e o arquivo nasce no gr
     assert.equal(e2.status, 202, e2.texto); assert.match(e2.json.pedido.descricao, /ATENÇÃO: .*SUBSTITUIR a skill "relatorio-semanal"/);
     assert.equal(fs.readFileSync(path.join(c.skillsDir, 'grupos', 'financeiro', 'relatorio-semanal', 'SKILL.md'), 'utf8'), SKILL('relatorio-semanal'));
     assert.ok(!JSON.stringify(dados.acessos.ultimas(50)).includes('passo um'), 'o conteúdo da skill não vai para o log');
+    // o dono, pela sessão do painel, propõe e aprova: ele não tem agente na política, e a reconferência do grupo não o barra
+    const d1 = await pedir('POST', '/api/v1/dados/fontes/skills/propor', { nome: 'do-dono', grupo: 'projeto-x', conteudo: SKILL('do-dono') });
+    assert.equal(d1.status, 202, d1.texto);
+    const hd = (await pedir('GET', '/api/v1/dados/aprovacoes?estado=pendente')).json.aprovacoes.find((x) => x.id === d1.json.pedido.id).hash;
+    const d2 = await pedir('POST', `/api/v1/dados/aprovacoes/${d1.json.pedido.id}/aprovar`, { hash: hd });
+    assert.equal(d2.status, 200, d2.texto); assert.equal(d2.json.pedido.estado, 'executada', JSON.stringify(d2.json.pedido));
+    assert.ok(fs.existsSync(path.join(c.skillsDir, 'grupos', 'projeto-x', 'do-dono', 'SKILL.md')));
+    // nome de skill global: a de grupo tomaria o lugar dela para o grupo inteiro; recusado
+    fs.mkdirSync(path.join(c.skillsDir, 'globais', 'fechamento'), { recursive: true });
+    fs.writeFileSync(path.join(c.skillsDir, 'globais', 'fechamento', 'SKILL.md'), SKILL('fechamento'));
+    const g = await pedir('POST', '/api/v1/dados/fontes/skills/propor', { nome: 'fechamento', grupo: 'financeiro', conteudo: SKILL('fechamento') }, CAIXA('ana'));
+    assert.equal(g.status, 409, g.texto); assert.match(g.json.erro || g.texto, /global/);
   } finally { srv.close(); c.fim(); }
 });
 
-test('os padrões de segredo são os mesmos para a CLI e para o Web (lib/segredos.regex)', () => {
-  const { RX_SEGREDO, carregaSegredos } = require('../lib/dados-fontes/skills');
-  const rx = carregaSegredos(path.join(__dirname, '..', '..', 'lib', 'segredos.regex'));
-  assert.equal(rx.source, RX_SEGREDO.source);
-  for (const s of ['GROQ_API_KEY=gsk_WvKabcdefghijklmnopqrstuv', 'Password: Abcdefghijklmnop', 'TELEGRAM_TOKEN=1234567890:AAHabcdefghijklmnopqrstuvwxyz0123456', 'AIzaSyA1234567890abcdefghijklmnopqrstuvwx', 'jwt eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIn0', 'sk-abcdefghijklmnopqrst']) assert.ok(rx.test(s), s);
-  for (const s of ['a chave está no cofre, nome OPENAI_API_KEY', 'token: curto', 'senha: a sua']) assert.ok(!rx.test(s), s);
+test('os padrões de segredo são os mesmos para a CLI (grep -Eif) e para o Web (lib/segredos.regex)', () => {
+  const { spawnSync } = require('node:child_process');
+  const { RX_SEGREDO, carregaSegredos, nomesReservados } = require('../lib/dados-fontes/skills');
+  const arquivo = path.join(__dirname, '..', '..', 'lib', 'segredos.regex');
+  assert.equal(carregaSegredos(arquivo).source, RX_SEGREDO.source);
+  const grep = (s) => spawnSync('grep', ['-Eiq', '-f', arquivo], { input: s + '\n' }).status === 0;
+  const positivos = ['GROQ_API_KEY=gsk_WvKabcdefghijklmnopqrstuv', 'Password: Abcdefghijklmnop', 'TELEGRAM_TOKEN=1234567890:AAHabcdefghijklmnopqrstuvwxyz0123456', 'AIzaSyA1234567890abcdefghijklmnopqrstuvwx', 'jwt eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIn0', 'sk-abcdefghijklmnopqrst', 'API-KEY = "abcdefghijkl.mnop"'];
+  const negativos = ['a chave está no cofre, nome OPENAI_API_KEY', 'token: curto', 'senha: a sua', 'use GROQ_API_KEY do cofre'];
+  for (const s of positivos) { assert.ok(RX_SEGREDO.test(s), 'web: ' + s); assert.ok(grep(s), 'cli: ' + s); }
+  for (const s of negativos) { assert.ok(!RX_SEGREDO.test(s), 'web: ' + s); assert.ok(!grep(s), 'cli: ' + s); }
+  // só [[:space:]] é traduzida: outra classe POSIX é recusada, em vez de virar uma classe errada em silêncio
+  const base = pastaTemp('segredos');
+  try {
+    fs.writeFileSync(path.join(base, 'r'), 'x[[:alnum:]]{3}\n');
+    assert.throws(() => carregaSegredos(path.join(base, 'r')), /classe POSIX/);
+    // nomes reservados: lista fixa mesmo sem a pasta skills/, e ok:false para o propor fechar
+    const r = nomesReservados(base);
+    assert.equal(r.ok, false); assert.ok(r.nomes.has('memory') && r.nomes.has('dgclaw'));
+    assert.equal(nomesReservados().ok, true); assert.ok(nomesReservados().nomes.has('aprender'));
+  } finally { fs.rmSync(base, { recursive: true, force: true }); }
 });

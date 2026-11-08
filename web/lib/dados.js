@@ -226,7 +226,7 @@ function criarDados({ dir, papeis, bases, basesDir, ferramentas, cofreSistemas, 
       return r;
     }
     try {
-      let resultado = await def.executar(p.params, { agente: p.agente, aprovado_por: por, aprovacao: p.id });
+      let resultado = await def.executar(p.params, { agente: p.agente, dono: ehDoDono(p), aprovado_por: por, aprovacao: p.id });
       // O que fica guardado no arquivo de aprovações tem teto: um resultado grande de ferramenta vira um resumo.
       if (Buffer.byteLength(JSON.stringify(resultado === undefined ? null : resultado)) > MAX_RESULTADO_GUARDADO) {
         const itens = resultado && Array.isArray(resultado.itens) ? resultado.itens.length : undefined;

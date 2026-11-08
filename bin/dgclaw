@@ -1335,7 +1335,9 @@ agente_acao() {
             fi
             rodar_firewall
             ok "agente $slug iniciado"
-            if [ "$ENSAIO" != 1 ] && esperar_systemd "$c" 2>/dev/null; then
+            # Refaz os links das skills compartilhadas (a politica pode ter mudado enquanto estava parado). So o
+            # estado e conferido: esperar_systemd sairia com erro se o container caiu, e o iniciar ja terminou.
+            if [ "$ENSAIO" != 1 ] && [ "$(estado_container "$slug")" = running ]; then
                 ligar_skills "$slug" >/dev/null 2>&1 || aviso "nao consegui refazer as skills compartilhadas do agente $slug; rode: dgclaw skill aplicar $slug"
             fi
             ;;
@@ -1764,6 +1766,10 @@ agente_remover() {
     else
         info "a casa $casa ja nao estava no lugar"
         criar_pasta 700 0:0 "$destino"
+    fi
+    # A vista de skills compartilhadas do agente (copias de root) nao tem nada dele; some junto.
+    if [ -d "$DG_SKILLS_DIR/.vistas/$slug" ] || [ "$ENSAIO" = 1 ]; then
+        executar rm -rf "$DG_SKILLS_DIR/.vistas/$slug"
     fi
     local seg
     for seg in "$DG_ETC/runner/$slug.token" "$DG_ETC/proxy/$slug.segredo"; do

@@ -14,6 +14,11 @@ Cada agente recebe uma **vista** própria do catálogo (`/var/lib/dgclaw/skills/
 só das skills que a política libera para ele), montada **só leitura** em `/run/dgclaw/skills` dentro do
 container; o que o agente vê em `~/.claude/skills` são links para elas. O agente não enxerga as skills dos
 outros escopos nem altera o catálogo: ele **propõe** uma skill para o grupo dele, e uma pessoa aprova no painel.
+Quando o mesmo nome existe em mais de um escopo que o agente recebe, a **mais específica vence** (agente > grupo >
+global): a skill privada de um agente nunca é trocada por uma de grupo de mesmo nome. Por isso a proposta de um
+agente recusa o nome de uma skill global, e o `publicar` avisa quando o nome já existe em outro escopo.
+A pasta da vista é sempre a mesma (só o conteúdo dela é trocado): o container montado nela enxerga a mudança
+na hora, mesmo ligado.
 
 ## Para o dono
 

@@ -20,10 +20,16 @@ SKILLS_APP="${APP_DIR:-${SCRIPT_DIR:-/opt/dgclaw/app}}"
 # Os padroes de segredo vivem num arquivo so, lido tambem pelo Web (web/lib/dados-fontes/skills.js).
 SKILLS_SEGREDOS_REGEX="${DGCLAW_SEGREDOS_REGEX:-$SKILLS_APP/lib/segredos.regex}"
 
+# As skills que vida_script liga em todo agente (bin/dgclaw): lista fixa, para o nome continuar reservado mesmo
+# se a pasta skills/ da copia do app faltar. A mesma lista esta em web/lib/dados-fontes/skills.js.
+SKILLS_RESERVADAS_FIXAS=" dgclaw agenda lembretes aprender avisos memory foco avatar report slide-animado site-animado video-animado groq-audio gemini-gratuito visuais-na-conversa "
+
 # skills_nome_reservado <nome>: 0 se o nome e de uma skill da imagem ou do Admin (as pastas de skills/ do
-# DG Claw): uma skill compartilhada com esse nome tomaria o lugar da nativa em todo agente.
+# DG Claw, mais a lista fixa acima): uma skill compartilhada com esse nome tomaria o lugar da nativa em todo
+# agente. Sem a pasta skills/ na copia do app, a copia esta incompleta e o publicar falha (skills_publicar).
 skills_nome_reservado() {
-    [ -d "$SKILLS_APP/skills/$1" ] || [ "$1" = dgclaw ]
+    case "$SKILLS_RESERVADAS_FIXAS" in *" $1 "*) return 0 ;; esac
+    [ -d "$SKILLS_APP/skills/$1" ]
 }
 
 skills_garantir_pastas() {
@@ -73,10 +79,20 @@ skills_conferir_pasta() {
 skills_publicar() {
     local origem="$1" escopo="$2" nome="${3:-$(basename "$1")}" destino pasta tmp
     [[ "$nome" =~ $RX_NOME_SKILL ]] || falha "o nome '$nome' nao serve: use de 1 a 40 caracteres entre letras minusculas, numeros e hifen, comecando por letra." "exemplo: fechamento-mensal"
+    [ -d "$SKILLS_APP/skills" ] || falha "nao achei a pasta skills/ da copia do DG Claw em $SKILLS_APP; sem ela nao da para saber quais nomes sao das skills da imagem." "a copia do DG Claw esta incompleta; reinstale ou rode: dgclaw atualizar"
     skills_nome_reservado "$nome" && falha "o nome '$nome' e de uma skill da imagem do DG Claw (ou do Admin); uma skill compartilhada com esse nome tomaria o lugar dela em todo agente." "escolha outro nome (ex.: $nome-da-empresa)"
     pasta="$(skills_escopo_pasta "$escopo")"
     [ -d "$origem" ] || falha "a pasta '$origem' nao existe." "aponte a pasta da skill (a que tem o SKILL.md)"
     destino="$pasta/$nome"
+    # A origem pode ser enorme (uma pasta que o agente escreve); pre-checagem barata antes de copiar.
+    # A conferencia de verdade e feita na copia (skills_conferir_pasta).
+    local pre; pre="$(du -sb "$origem" 2>/dev/null | cut -f1)"
+    [ -z "$pre" ] || [ "$pre" -le "$SKILL_MAX_BYTES" ] || falha "a pasta '$origem' tem $pre bytes; o teto de uma skill compartilhada e $SKILL_MAX_BYTES (2 MB)." "tire o que nao e roteiro"
+    # O mesmo nome em outro escopo confunde quem recebe as duas (na vista, a mais especifica vence).
+    local outra
+    for outra in "$DG_SKILLS_DIR"/globais/"$nome" "$DG_SKILLS_DIR"/grupos/*/"$nome" "$DG_SKILLS_DIR"/agentes/*/"$nome"; do
+        [ -d "$outra" ] && [ "$outra" != "$destino" ] && aviso "ja existe uma skill '$nome' em ${outra#"$DG_SKILLS_DIR/"}; para quem recebe as duas, a mais especifica (agente > grupo > global) vence."
+    done
     if [ "$ENSAIO" = 1 ]; then skills_conferir_pasta "$origem" "$nome"; info "[ensaio] publicaria a skill $nome em ${destino#"$R"} (755/644, root)"; return 0; fi
     skills_garantir_pastas
     mkdir -p "$pasta" && chmod 755 "$pasta"
@@ -163,6 +179,11 @@ skills_permitidas() {
 # skills_montar_vista <slug>: monta /var/lib/dgclaw/skills/.vistas/<slug>/<nome> com copias das skills que a
 # politica libera para o agente. E ESSA pasta (e so ela) que o container monta em /run/dgclaw/skills: o agente
 # nao enxerga as skills dos outros escopos. Refeita na criacao, no reparar, no iniciar e no skill aplicar.
+#
+# ATENCAO: a pasta da vista NUNCA e apagada e recriada. Um bind mount do podman e do inode, nao do caminho: se o
+# host fizesse rm -rf + mv, o container ligado continuaria montado no inode antigo (vazio e orfao) e nunca veria
+# a vista nova. Por isso a pasta e criada uma vez e so o CONTEUDO dela e trocado; com o mesmo inode, o container
+# enxerga a mudanca na hora, mesmo montado so leitura. Nao "simplifique" de volta para rm -rf + mv.
 skills_montar_vista() {
     local slug="$1" vista rel nome tmp
     [[ "$slug" =~ ^[a-z0-9][a-z0-9-]{1,30}$ ]] || return 1
@@ -170,20 +191,26 @@ skills_montar_vista() {
     vista="$DG_SKILLS_DIR/.vistas/$slug"
     if [ "$ENSAIO" = 1 ]; then info "[ensaio] montaria a vista de skills do agente $slug em ${vista#"$R"} com: $(skills_permitidas "$slug" | tr '\n' ' ')"; return 0; fi
     mkdir -p "$DG_SKILLS_DIR/.vistas" && chmod 700 "$DG_SKILLS_DIR/.vistas"
+    if [ -L "$vista" ] || { [ -e "$vista" ] && [ ! -d "$vista" ]; }; then rm -f "$vista"; fi
+    mkdir -p "$vista" && chmod 755 "$vista" && chown 0:0 "$vista"
     tmp="$(mktemp -d "$DG_SKILLS_DIR/.vistas/.$slug.XXXXXX")"
+    # skills_permitidas lista globais, depois grupos, depois as do proprio agente: com o mesmo nome em escopos
+    # diferentes, a ultima (mais especifica) toma o lugar da anterior. A privada do agente nunca perde.
     while IFS= read -r rel; do
         [ -n "$rel" ] || continue
         [[ "$rel" =~ ^(globais|grupos/[a-z][a-z0-9_-]{0,39}|agentes/[a-z0-9][a-z0-9-]{1,30})/[a-z][a-z0-9-]{0,39}$ ]] || continue
         nome="${rel##*/}"
         [ -f "$DG_SKILLS_DIR/$rel/SKILL.md" ] || continue
-        [ -e "$tmp/$nome" ] && continue   # duas skills com o mesmo nome em escopos diferentes: a primeira (global) vence
+        rm -rf "$tmp/$nome"
         cp -R --no-dereference "$DG_SKILLS_DIR/$rel" "$tmp/$nome"
     done < <(skills_permitidas "$slug")
     find "$tmp" -type d -exec chmod 755 {} +
     find "$tmp" -type f -exec chmod 644 {} +
     chown -R 0:0 "$tmp"
-    rm -rf "$vista"
-    mv "$tmp" "$vista"
+    # Troca so o conteudo, mantendo o inode da vista (veja o aviso acima).
+    find "$vista" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+    find "$tmp" -mindepth 1 -maxdepth 1 -exec mv -t "$vista" {} +
+    rmdir "$tmp"
 }
 
 # skills_vista_nomes <slug>: os nomes das skills na vista montada, um por linha.
