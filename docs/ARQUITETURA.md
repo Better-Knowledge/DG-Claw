@@ -81,7 +81,9 @@ O contrato está em [Primeiro agente pelo Admin](../web/docs/PRIMEIRO-AGENTE.md)
 O registro `/etc/dgclaw/agentes.json` informa ao Web quais agentes existem e onde ficam seus
 serviços. Tokens e senhas não pertencem a esse registro. O arquivo `/etc/dgclaw/papeis.json`
 diz o que cada agente alcança nas fontes de dados, por pessoa e por papel; o Web decide por ele
-em `/api/v1/dados` e os agentes não o alcançam (`web/docs/DADOS-POR-PAPEL.md`). Os pedidos do primeiro agente ficam
+em `/api/v1/dados` e os agentes não o alcançam (`web/docs/DADOS-POR-PAPEL.md`). O catálogo
+`/etc/dgclaw/bases.json` e as pastas `/var/lib/dgclaw/bases/<nome>` são as bases de conhecimento, por
+escopo (`web/docs/BASES-DE-CONHECIMENTO.md`). Os pedidos do primeiro agente ficam
 na pasta privada de dados do Web, com permissão restrita, e não expõem logs pela API.
 
 ## Identidade, memória e conexões

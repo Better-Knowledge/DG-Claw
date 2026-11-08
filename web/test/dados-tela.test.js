@@ -58,5 +58,11 @@ test('histórico, log e papéis viram HTML seguro', () => {
   const ok = T.htmlPapeis({ valido: true, origem: 'arquivo', hash: 'abc', pessoas: 1, papeis: 2, agentes: ['ana'], politica: { agentes: { ana: { pessoa: 'marta', papel: 'recepcao' } } } });
   assert.ok(ok.includes('<code>ana</code> trabalha para <code>marta</code>') && ok.includes('Hash abc'));
   assert.match(T.htmlPapeis({ valido: true, origem: 'arquivo', pessoas: 0, papeis: 1, agentes: [], politica: { agentes: {} } }), /Nenhum agente ligado/);
-  for (const k of ['pendentes', 'papeis', 'log']) { const p = T.PASSOS[k]; assert.ok(p.alvo && p.titulo && p.oque && p.como && p.porque, k); }
+  for (const k of ['pendentes', 'papeis', 'bases', 'log']) { const p = T.PASSOS[k]; assert.ok(p.alvo && p.titulo && p.oque && p.como && p.porque, k); }
+  assert.match(T.htmlBases({ valido: false, erro: '<x>' }), /dp-erro.*&lt;x&gt;/);
+  assert.match(T.htmlBases({ valido: true, bases: {} }), /Nenhuma base cadastrada/);
+  const hb = T.htmlBases({ valido: true, bases: { 'manual-rh': { nome: 'Manual <RH>', escopo: 'empresa', classificacao: 'interno', dono: 'rh' }, 'c-x': { nome: 'c-x', escopo: 'grupo', grupo: 'projeto-x', classificacao: 'sensivel', dono: 'nao-informado' } } });
+  assert.ok(hb.includes('<code>manual-rh</code> Manual &lt;RH&gt; · da empresa · interno · dono rh'));
+  assert.ok(hb.includes('<code>c-x</code>  · do grupo projeto-x · sensivel</p>'));
+  assert.ok(fs.readFileSync(path.join(__dirname, '../public/dados.html'), 'utf8').includes('id="secBases"'));
 });

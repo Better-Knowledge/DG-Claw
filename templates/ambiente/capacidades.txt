@@ -16,3 +16,4 @@ web/docs/USO-DA-ASSINATURA.md
 docs/COFRE-NA-CONVERSA.md
 web/docs/CONECTAR-CONTA.md
 web/docs/DADOS-POR-PAPEL.md
+web/docs/BASES-DE-CONHECIMENTO.md

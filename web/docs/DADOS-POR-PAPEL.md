@@ -68,7 +68,9 @@ Todas locais e **fictícias**; nenhum sistema real entra por aqui ainda. Os dado
 | `email` | (só ação) | ação `enviar` = `enviar_email` | grava em `email-enviados.jsonl`; **não envia** |
 
 Cada fonte declara um **catálogo** (dono, classificação, finalidade, retenção em dias), visível em
-`GET /api/v1/dados/fontes`. Ele é informativo nesta versão e é a base do catálogo de bases de conhecimento.
+`GET /api/v1/dados/fontes`. Além delas, cada **base de conhecimento** cadastrada com `dgclaw base criar`
+aparece como a fonte `base-<nome>`, com escopo (privada, grupo, empresa, pública) e busca dentro do texto:
+veja [BASES-DE-CONHECIMENTO.md](BASES-DE-CONHECIMENTO.md).
 
 ## Rotas
 
@@ -82,6 +84,7 @@ Cada fonte declara um **catálogo** (dono, classificação, finalidade, retenç�
 | `POST /api/v1/dados/aprovacoes/<id>/aprovar` | só dono, pelo navegador | corpo `{"hash": "..."}`: o hash que a tela mostrou |
 | `POST /api/v1/dados/aprovacoes/<id>/recusar` | só dono | corpo `{"motivo": "..."}` opcional |
 | `GET /api/v1/dados/papeis` | só dono | se o arquivo está válido, o hash curto e o resumo |
+| `GET /api/v1/dados/bases` | só dono | o catálogo de bases de conhecimento e se está válido |
 | `GET /api/v1/dados/log?limit=100` | só dono | as últimas linhas do log de acesso |
 
 Pela caixa (`dgclaw-api`) só respondem `fontes`, `pedidos` e `docs.md`. As rotas do dono recusam

@@ -132,6 +132,11 @@ os dois; o que não está escrito é negado), confira que continua JSON válido 
 Nunca ponha um agente com mais acesso do que a pessoa dele tem. As ações (enviar e-mail) sempre passam
 pela aprovação do dono na tela Dados do painel. `/opt/dgclaw/app/web/docs/DADOS-POR-PAPEL.md`.
 
+As bases de conhecimento (pastas de texto com escopo privada, grupo, empresa ou pública) você cadastra com
+`sudo dgclaw base criar <nome> --escopo ...` e remove com `sudo dgclaw base remover <nome>`; os grupos e as
+pessoas de cada grupo ficam no mesmo `papeis.json`, e cada papel diz quais bases lê no bloco `"bases"`. Os
+arquivos entram em `/var/lib/dgclaw/bases/<nome>/`. `/opt/dgclaw/app/web/docs/BASES-DE-CONHECIMENTO.md`.
+
 ### Aviso de versão nova
 
 De tempos em tempos a plataforma confere se saiu versão nova do DG Claw e, quando saiu, manda a você um

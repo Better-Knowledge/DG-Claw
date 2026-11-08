@@ -77,6 +77,19 @@
       (ag.length ? linhas : '<p class="dp-papel">Nenhum agente ligado ainda: acrescente-o em "agentes" no arquivo.</p>');
   }
 
+  const ROTULO_ESCOPO = { privada: 'privada', grupo: 'do grupo', empresa: 'da empresa', publica: 'pública' };
+
+  function htmlBases(r) {
+    if (!r.valido) return '<p class="dp-erro">' + esc(r.erro || 'inválido') + '</p>';
+    const nomes = Object.keys(r.bases || {}).sort();
+    if (!nomes.length) return '<p class="dp-papel">Nenhuma base cadastrada. No servidor: <code>sudo dgclaw base criar manual-rh --escopo empresa</code>.</p>';
+    return nomes.map(n => {
+      const b = r.bases[n];
+      const quem = b.escopo === 'grupo' ? ' ' + esc(b.grupo) : b.escopo === 'privada' ? ' de ' + esc(b.pessoa) : '';
+      return '<p class="dp-papel"><code>' + esc(n) + '</code> ' + esc(b.nome && b.nome !== n ? b.nome : '') + ' · ' + esc(ROTULO_ESCOPO[b.escopo] || b.escopo) + quem + ' · ' + esc(b.classificacao) + (b.dono && b.dono !== 'nao-informado' ? ' · dono ' + esc(b.dono) : '') + '</p>';
+    }).join('');
+  }
+
   const PASSOS = {
     pendentes: {
       alvo: '#secPendentes', titulo: 'Ações aguardando sua aprovação',
@@ -90,6 +103,12 @@
       como: 'O arquivo fica fora do alcance dos agentes. O que não está escrito é negado; um agente só alcança uma fonte se a pessoa dele E o papel dele liberam. Para mudar, edite o arquivo ou peça ao Admin.',
       porque: 'Para você conferir, numa olhada, o que cada agente alcança e se o arquivo está válido.',
     },
+    bases: {
+      alvo: '#secBases', titulo: 'Bases de conhecimento',
+      oque: 'As pastas de texto que os agentes consultam, com o escopo de cada uma: privada, do grupo, da empresa ou pública.',
+      como: 'Você cadastra no servidor com "dgclaw base criar" e põe os arquivos em /var/lib/dgclaw/bases/<nome>. Cada papel diz quais bases lê; a pessoa só alcança o que o escopo dela permite. Escrever numa base passa pela sua aprovação, aqui em cima.',
+      porque: 'Para você ver de relance o que existe e quem alcança, sem abrir arquivo nenhum.',
+    },
     log: {
       alvo: '#secLog', titulo: 'Últimos acessos',
       oque: 'Quem leu o quê, quando e com qual decisão. Sem o conteúdo dos dados.',
@@ -98,7 +117,7 @@
     },
   };
 
-  if (!raiz.document) return { fmt, prazo, paresDe, htmlPedido, htmlHistorico, htmlLog, htmlPapeis, ROTULO_ESTADO, PASSOS };
+  if (!raiz.document) return { fmt, prazo, paresDe, htmlPedido, htmlHistorico, htmlLog, htmlPapeis, htmlBases, ROTULO_ESTADO, PASSOS };
 
   /* ── Parte com DOM ─────────────────────────────────────────────────────── */
   const $ = id => document.getElementById(id);
@@ -149,6 +168,13 @@
     $('papeis').innerHTML = htmlPapeis(r.json);
   }
 
+  async function carregaBases() {
+    const r = await chamar('GET', '/api/v1/dados/bases');
+    if (!r.ok) { $('basesEstado').textContent = r.erro; return; }
+    $('basesEstado').textContent = r.json.valido ? (Object.keys(r.json.bases || {}).length + ' base(s) no catálogo.') : 'Catálogo inválido: nenhuma base é alcançada até corrigir.';
+    $('bases').innerHTML = htmlBases(r.json);
+  }
+
   async function carregaLog() {
     const r = await chamar('GET', '/api/v1/dados/log?limit=50');
     if (!r.ok) return;
@@ -180,11 +206,11 @@
       if (raiz.DGTour && p) raiz.DGTour.inicia({ passos: [p] });
     }));
     raiz.DGDadosTutorial = () => { if (raiz.DGTour) raiz.DGTour.inicia({ passos: Object.values(PASSOS) }); };
-    Promise.all([carregaPendentes(), carregaPapeis(), carregaLog()]);
+    Promise.all([carregaPendentes(), carregaPapeis(), carregaBases(), carregaLog()]);
     setInterval(() => { if (!document.hidden) carregaPendentes(); }, POLL_MS);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', inicia);
   else inicia();
 
-  return { fmt, prazo, paresDe, htmlPedido, htmlHistorico, htmlLog, htmlPapeis, ROTULO_ESTADO, PASSOS };
+  return { fmt, prazo, paresDe, htmlPedido, htmlHistorico, htmlLog, htmlPapeis, htmlBases, ROTULO_ESTADO, PASSOS };
 });

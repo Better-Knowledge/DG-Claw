@@ -41,6 +41,22 @@ da atualização lista os agentes que ainda precisam disso. Servidor arm64 preci
 
 **Anexos na casa do agente.** Os arquivos enviados pela conversa agora são gravados pelo dono do agente, e não mais pelo root do servidor, para que uma pasta trocada por um atalho dentro da casa do agente não leve o arquivo para fora dela. Em instalações antigas, a pasta `uploads/` que o root tinha criado passa sozinha para o dono do agente no primeiro anexo; as pastas de dias antigos ficam como estão. Nada precisa ser feito para atualizar.
 
+**Bases de conhecimento por escopo.** Você cadastra pastas de texto como bases (`sudo dgclaw base criar manual-rh
+--escopo empresa`), e cada base tem um escopo: privada de uma pessoa, de um grupo (departamento, projeto ou
+equipe), da empresa inteira ou pública. Os grupos e as pessoas de cada grupo ficam no arquivo de papéis, e cada
+papel diz quais bases lê. O agente busca dentro dos textos e recebe trechos; para guardar um procedimento ou uma
+decisão numa base ele só propõe o arquivo, e você lê e aprova na tela Dados. Pessoa marcada como desligada deixa
+de alcançar tudo, e os pedidos pendentes dos agentes dela caem. A busca é por termo nesta versão; a busca pelo
+sentido e a porta para agentes de fora (bases públicas) vêm nas próximas. Detalhes e limites em
+`web/docs/BASES-DE-CONHECIMENTO.md`.
+
+### Como atualizar (bases de conhecimento)
+
+Peça ao Admin, no chat: "atualiza o DG Claw". A atualização cria o catálogo `/etc/dgclaw/bases.json` vazio e a
+pasta `/var/lib/dgclaw/bases`; nenhum agente passa a ver nada até você cadastrar uma base e dizer, no papel dele,
+que ele a lê. Se o catálogo já existir, ele não é tocado. As instruções dos agentes ganharam o trecho sobre as
+bases; ele entra sozinho na identidade de cada um ao atualizar, sem apagar o que você personalizou.
+
 **Dados por papel: o agente pede, o software decide.** Os agentes de trabalho passam a alcançar fontes de dados
 (agenda, clientes, documentos numa pasta) e ações (enviar e-mail) por uma rota nova da caixa, e o que cada um
 alcança vem de um arquivo de papéis, `/etc/dgclaw/papeis.json`, que fica fora do alcance dos agentes. Cada agente

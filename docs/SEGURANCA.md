@@ -194,6 +194,10 @@ atende outra pessoa usa a credencial dela.
   ou pedido já usado é recusado, e revogar a pessoa ou o agente derruba os pendentes.
 - Uma linha de log por pedido, sem parâmetros nem conteúdo. Contrato e limites em
   `web/docs/DADOS-POR-PAPEL.md`.
+- Bases de conhecimento (`web/docs/BASES-DE-CONHECIMENTO.md`): pastas de root em `/var/lib/dgclaw/bases`,
+  com escopo (privada, grupo, empresa, pública) cruzado com a pessoa e o papel do agente; a escrita só
+  acontece depois da aprovação de uma pessoa, num temporário `O_EXCL | O_NOFOLLOW` renomeado para dentro
+  da base. Pessoa desligada no arquivo de papéis não alcança nada.
 - **O que fica fora:** o que o agente alcança por outro caminho (arquivo montado, rede, canal) e o
   que ele já recebeu e anotou na própria casa; a revogação fecha a porta, não apaga o que passou.
 
