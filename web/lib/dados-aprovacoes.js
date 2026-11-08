@@ -41,6 +41,7 @@ function criarAprovacoes({ dir, log, agora, prazoMs }) {
   const arquivo = path.join(dir, 'aprovacoes.json');
   let itens = null;        // Map id -> pedido
   let assinatura = null;
+  let avisouVencimento = false;   // o aviso de "venceram mas não gravei" sai uma vez por falha, não a cada leitura
 
   function assinaturaDoArquivo() {
     try { const st = fs.statSync(arquivo); return `${st.mtimeMs}:${st.size}`; } catch (_) { return 'ausente'; }
@@ -91,10 +92,11 @@ function criarAprovacoes({ dir, log, agora, prazoMs }) {
     if (!alvos.length) return;
     const antes = alvos.map((p) => ({ p, decidido_em: p.decidido_em }));
     for (const p of alvos) { p.estado = 'expirada'; p.decidido_em = new Date(t).toISOString(); }
-    try { salva(); } catch (e) {
+    try { salva(); avisouVencimento = false; } catch (e) {
       // Memória e disco não podem divergir: desfaz. Os pedidos continuam vencidos pelo prazo, então aprovar já falha.
       for (const a of antes) { a.p.estado = 'pendente'; a.p.decidido_em = a.decidido_em; }
-      log('aviso', `Aprovações de dados: ${alvos.length} pedido(s) venceram mas não consegui gravar (${e.message}); tento de novo na próxima leitura.`);
+      if (!avisouVencimento) log('aviso', `Aprovações de dados: ${alvos.length} pedido(s) venceram mas não consegui gravar (${e.message}); tento de novo a cada leitura e aviso de novo quando gravar.`);
+      avisouVencimento = true;
     }
   }
 

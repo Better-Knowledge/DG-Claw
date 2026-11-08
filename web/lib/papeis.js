@@ -137,6 +137,7 @@ function validaPapeis(bruto) {
       const onde = `agentes.${String(slug).slice(0, 40)}`;
       if (!RX_SLUG.test(slug)) { erros.push(`agentes: o slug "${String(slug).slice(0, 40)}" não vale (minúsculas, números e hífen, até 32 caracteres).`); continue; }
       if (slug === 'admin') { erros.push('agentes: o Admin não entra nos papéis de dados; ele não usa a caixa.'); continue; }
+      if (slug === 'dono') { erros.push('agentes: "dono" é reservado (é como a rota registra os pedidos da própria pessoa); nenhum agente pode ter esse slug.'); continue; }
       if (!ehObjeto(a)) { erros.push(`${onde} precisa ser um objeto { "pessoa", "papel" }.`); continue; }
       soChaves(a, CAMPOS_AGENTE, onde, erros);
       if (typeof a.pessoa !== 'string' || !RX_NOME.test(a.pessoa)) erros.push(`${onde}.pessoa é obrigatório e precisa ser o nome de uma pessoa do bloco "pessoas".`);
