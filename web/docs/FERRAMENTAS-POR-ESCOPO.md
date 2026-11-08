@@ -67,11 +67,11 @@ vai para o log do Web e para `GET /api/v1/dados/ferramentas`.
 
 | Tipo | O que o gateway faz | Regras |
 | --- | --- | --- |
-| `api` | monta `base_url + rota` (`{param}` vira o parâmetro codificado; os outros vão na query em GET ou no corpo JSON), injeta `auth` (`bearer`, `cabecalho` com `nome`, `basico` ou `nenhuma`) e repassa o JSON | `base_url` só https (http só para 127.0.0.1); sem seguir redirecionamento; resposta até 1 MB; só JSON; GET nunca é ação; POST, PUT, PATCH e DELETE sempre são |
-| `banco` | abre o SQLite em `arquivo`, roda `sql` como instrução preparada com `:nome` ligado aos parâmetros | só leitura para SELECT/WITH; qualquer outra instrução exige `acao: true`; uma instrução por operação (sem `;`); até `max_itens` linhas |
-| `mcp` | sobe `comando args` com ambiente limpo (PATH, `env` do catálogo e a credencial em `credencial_env`), faz `initialize` e `tools/call` da `tool`, e encerra | o servidor nasce e morre a cada chamada; resposta até 1 MB; `env` não pode ter segredo (vai para o cofre) |
+| `api` | monta `base_url + rota` (`{param}` vira o parâmetro codificado; os outros vão na query em GET ou no corpo JSON), injeta `auth` (`bearer`, `cabecalho` com `nome`, `basico` ou `nenhuma`) e repassa o JSON | `base_url` só https (http só para 127.0.0.1); sem seguir redirecionamento; resposta até 1 MB; só JSON; GET nunca é ação; POST, PUT, PATCH e DELETE sempre são; parâmetro que entra na rota precisa de tipo fechado (texto com `regex`, inteiro, enum, período ou data) e nunca é vazio, `.`, `..` nem tem barra; o corpo de um erro do sistema não chega ao agente (vai mascarado para o log do Web) |
+| `banco` | abre o SQLite em `arquivo` num worker, roda `sql` como instrução preparada com `:nome` ligado aos parâmetros | só leitura para SELECT/WITH; qualquer outra instrução exige `acao: true`; uma instrução por operação (sem `;`); todo parâmetro do esquema aparece como `:nome` no SQL; até `max_itens` linhas; passou de `timeout_s`, o worker é encerrado (504) |
+| `mcp` | sobe `comando args` num grupo de processo próprio, com ambiente limpo (PATH, `env` do catálogo e a credencial em `credencial_env`), faz `initialize` e `tools/call` da `tool`, e encerra o grupo inteiro (SIGTERM, depois SIGKILL) | o servidor nasce e morre a cada chamada, mesmo atrás de um wrapper; resposta até 1 MB; `env` não pode ter segredo (vai para o cofre); o stderr do servidor não chega ao agente (vai mascarado para o log do Web) |
 
-Comum a todos: `timeout_s` de 1 a 25 (a caixa do agente responde em 30), `campos` para filtrar os campos
+Comum a todos: `timeout_s` de 1 a 25 como prazo total (a caixa do agente responde em 30), `campos` para filtrar os campos
 que saem, `max_itens` (padrão 200), `descricao` da operação, e o `catalogo` da ferramenta (dono, classificação,
 finalidade, retenção), informativo.
 
@@ -115,6 +115,11 @@ que volta é dado, não instrução.
   não o levar a outro endereço.
 - O servidor MCP roda no host, como o Web (root). Instale só servidores em que você confia, de caminho
   fixo; `comando` precisa ser absoluto e o ambiente é limpo a cada chamada.
-- Uma linha por chamada no log de acesso, com o escopo, sem parâmetros e sem resposta.
+- Uma linha por chamada no log de acesso, com o escopo, sem parâmetros e sem resposta. O resultado de uma
+  ação aprovada fica guardado no arquivo de aprovações só até 32 KB; acima disso, um resumo.
+- Para o agente, uma ferramenta em que ele não tem escopo nenhum responde 404 como se não existisse, e a dica
+  de "operação inexistente" lista só as operações que ele alcança.
+- O hash da aprovação cobre a operação e os parâmetros, não a definição da ferramenta no catálogo: se o dono
+  (root) editar a rota ou o SQL entre o pedido e o clique, o que executa é a definição nova.
 - Fica de fora nesta versão: servidor MCP persistente (hoje nasce e morre a cada chamada), OAuth e renovação
   automática de token, paginação automática, e o `publica` das bases para agentes de fora.

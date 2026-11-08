@@ -1387,6 +1387,8 @@ agente_reparar() {
     garantir_gancho_foco "$DG_CASAS/$slug/runner/runner.json" "$slug"
     passo "Garantindo o gancho do aviso de novidades no runner.json"
     garantir_gancho_novidades "$DG_CASAS/$slug/runner/runner.json" "$slug"
+    passo "Garantindo o servidor MCP de dados e as tools dele"
+    garantir_mcp_dados "$slug"
     passo "Regravando o config.sh do agente $slug"
     regravar_config_sh "$slug" "$obj"
     passo "Regravando a identidade do agente $slug"
@@ -1473,6 +1475,8 @@ agente_recriar() {
         rm -f "$unidades"
     fi
 
+    passo "Garantindo o servidor MCP de dados e as tools dele"
+    garantir_mcp_dados "$slug"
     passo "Trocando o container do agente $slug pelo da imagem atual"
     C_RECRIANDO="$slug"; C_RECRIOU=0
     trap '_recriar_ao_sair' EXIT
@@ -2059,6 +2063,41 @@ base_main() {
         "") falha "faltou dizer o que fazer com as bases." "use: criar, listar ou remover (veja dgclaw --ajuda)." ;;
         *) falha "'base $sub' nao existe." "use: criar, listar ou remover (veja dgclaw --ajuda)." ;;
     esac
+}
+
+# garantir_mcp_dados <slug>: poe o servidor MCP "dgclaw" (dgclaw-dados-mcp) no dgchat.mcp.json e as tres
+# allowTools no runner.json de um agente que ja existia, linha a linha (jq), sem apagar o resto. Idempotente;
+# arquivo ausente ou invalido: avisa e nao mexe. Vale na proxima sessao do agente.
+garantir_mcp_dados() {
+    local slug="$1" casa="$DG_CASAS/$1" mcp rj novo ug
+    mcp="$casa/home/.plataforma/dgchat.mcp.json"; rj="$casa/runner/runner.json"
+    if [ -f "$mcp" ]; then
+        if ! jq -e '(.mcpServers | type) == "object"' "$mcp" >/dev/null 2>&1; then
+            aviso "o $mcp nao e um JSON valido com mcpServers; nao pus o MCP de dados nele (confira com: jq . $mcp)"
+        elif ! jq -e '.mcpServers.dgclaw.args[0] == "/opt/dgclaw/app/bin/dgclaw-dados-mcp"' "$mcp" >/dev/null 2>&1; then
+            if [ "$ENSAIO" = 1 ]; then info "[ensaio] poria o servidor MCP dgclaw (dados) em ${mcp#"$R"}"
+            else
+                ug="$(stat -c '%u:%g' "$mcp")"
+                novo="$(jq '.mcpServers.dgclaw = {command: "node", args: ["/opt/dgclaw/app/bin/dgclaw-dados-mcp"]}' "$mcp")" \
+                    || falha "o jq nao conseguiu acrescentar o MCP de dados em $mcp." "confira o arquivo (jq . $mcp) e rode de novo"
+                printf '%s\n' "$novo" | escrever_arquivo "$mcp" 644 "$ug"
+                ok "servidor MCP de dados (dgclaw-dados-mcp) acrescentado ao dgchat.mcp.json do agente $slug"
+            fi
+        fi
+    fi
+    if [ -f "$rj" ]; then
+        if ! jq -e '(.config | type) == "object" and ((.config.allowTools // []) | type) == "array"' "$rj" >/dev/null 2>&1; then
+            aviso "o $rj nao e um JSON valido com config.allowTools como lista; nao mexi nele (confira com: jq . $rj)"
+        elif ! jq -e '(.config.allowTools // []) | index("mcp__dgclaw__dados_chamar") != null' "$rj" >/dev/null 2>&1; then
+            if [ "$ENSAIO" = 1 ]; then info "[ensaio] poria as allowTools mcp__dgclaw__dados_* em ${rj#"$R"}"
+            else
+                novo="$(jq '(.config.allowTools // []) as $a | .config.allowTools = ($a + (["mcp__dgclaw__dados_fontes", "mcp__dgclaw__dados_chamar", "mcp__dgclaw__dados_pedido"] - $a))' "$rj")" \
+                    || falha "o jq nao conseguiu acrescentar as allowTools em $rj." "confira o arquivo (jq . $rj) e rode de novo"
+                printf '%s\n' "$novo" | escrever_arquivo "$rj" 444 0:0
+                ok "allowTools das tools de dados acrescentadas ao runner.json do agente $slug (valem quando o runner reiniciar)"
+            fi
+        fi
+    fi
 }
 
 # --- sistemas: cofre de credenciais e catalogo de ferramentas ------------------------------

@@ -79,7 +79,11 @@ function validaOperacao(tipo, nomeOp, op, onde, erros) {
     if (typeof op.rota !== 'string' || !op.rota.startsWith('/') || op.rota.length > 300 || /[\s\u0000-\u001f\u007f?#]/.test(op.rota)) erros.push(`${o}.rota precisa começar por "/", sem espaço, "?" ou "#", até 300 caracteres (use {nome} para encaixar um parâmetro).`);
     else {
       for (const m of op.rota.matchAll(/\{([^}]*)\}/g)) {
-        if (!op.params || !Object.prototype.hasOwnProperty.call(op.params, m[1])) erros.push(`${o}.rota usa {${m[1].slice(0, 40)}}, que não está em "params".`);
+        if (!op.params || !Object.prototype.hasOwnProperty.call(op.params, m[1])) { erros.push(`${o}.rota usa {${m[1].slice(0, 40)}}, que não está em "params".`); continue; }
+        // O que entra na rota muda para onde a chamada vai: texto livre não serve; só tipo fechado ou texto com regex.
+        const pr = op.params[m[1]];
+        if (ehObjeto(pr) && pr.tipo === 'texto' && (typeof pr.regex !== 'string' || !pr.regex)) erros.push(`${o}: o parâmetro {${m[1]}} entra na rota e por isso precisa de "regex" (texto livre na rota não é catálogo fechado).`);
+        if (ehObjeto(pr) && (pr.tipo === 'booleano' || pr.tipo === 'numero')) erros.push(`${o}: o parâmetro {${m[1]}} entra na rota e precisa ser texto com regex, inteiro, enum, periodo ou data.`);
       }
     }
     if (op.metodo === 'GET' && op.acao === true) erros.push(`${o}: GET não pode ser ação (acao: true); ação é escrita.`);
@@ -93,9 +97,12 @@ function validaOperacao(tipo, nomeOp, op, onde, erros) {
       const leitura = /^(select|with)\b/i.test(sql);
       if (!leitura && op.acao !== true) erros.push(`${o}.sql não é SELECT/WITH e por isso precisa de "acao": true (executa só com aprovação).`);
       if (leitura && op.acao === true) erros.push(`${o}: SELECT não pode ser ação.`);
+      const noSql = new Set();
       for (const m of sql.matchAll(/:([a-z][a-z0-9_]*)/g)) {
+        noSql.add(m[1]);
         if (!op.params || !Object.prototype.hasOwnProperty.call(op.params, m[1])) erros.push(`${o}.sql usa :${m[1]}, que não está em "params".`);
       }
+      for (const nomeP of Object.keys(ehObjeto(op.params) ? op.params : {})) if (!noSql.has(nomeP)) erros.push(`${o}: o parâmetro "${nomeP}" não aparece no sql como :${nomeP}; tire-o ou use-o.`);
     }
   }
   if (tipo === 'mcp') {

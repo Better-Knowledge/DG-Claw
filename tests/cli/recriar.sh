@@ -84,4 +84,29 @@ afirma "criou com as portas do registro" grep -q -- '--publish 127.0.0.1:[0-9]*:
 nega "nao tentou parar nem remover o que nao existe" grep -q '^podman \(stop\|rm\) ' "$STUB_LOG"
 : "$porta"
 
+
+echo "recriar e reparar entregam o MCP de dados a um agente que nasceu sem ele"
+MCP="$LIB/agentes/ana/home/.plataforma/dgchat.mcp.json"
+RJ="$LIB/agentes/ana/runner/runner.json"
+jq 'del(.mcpServers.dgclaw)' "$MCP" > "$TMP/mcp.json" && cp "$TMP/mcp.json" "$MCP"
+jq '.config.allowTools = ["mcp__dgchat__reply"]' "$RJ" > "$TMP/rj.json" && cp "$TMP/rj.json" "$RJ"
+printf '{"versao":1}\n' > "$LIB/agentes/ana/home/.plataforma/extra.json"
+echo imagem-nova-2 > "$STUB_ESTADO/imagem-id"
+recriar ana
+igual "recriar sai com 0" "0" "$?"
+afirma "o dgchat.mcp.json ganhou o servidor dgclaw" jq -e '.mcpServers.dgclaw.args[0] == "/opt/dgclaw/app/bin/dgclaw-dados-mcp" and .mcpServers.dgchat.command == "node"' "$MCP"
+afirma "o runner.json ganhou as tres allowTools sem perder a que ja tinha" jq -e '.config.allowTools == ["mcp__dgchat__reply","mcp__dgclaw__dados_fontes","mcp__dgclaw__dados_chamar","mcp__dgclaw__dados_pedido"]' "$RJ"
+afirma "runner.json continua 444 e do root" test "$(stat -c '%a %u' "$RJ")" = "444 0"
+cp "$MCP" "$TMP/mcp-antes"; cp "$RJ" "$TMP/rj-antes"
+recriar ana --forcar
+afirma "rodar de novo nao duplica nada" bash -c "cmp -s '$MCP' '$TMP/mcp-antes' && cmp -s '$RJ' '$TMP/rj-antes'"
+jq 'del(.mcpServers.dgclaw)' "$MCP" > "$TMP/mcp.json" && cp "$TMP/mcp.json" "$MCP"
+dgclaw agente reparar ana >"$TMP/rep.txt" 2>&1
+igual "reparar sai com 0" "0" "$?"
+afirma "reparar tambem poe o servidor dgclaw" jq -e '.mcpServers.dgclaw' "$MCP"
+printf '{ quebrado' > "$MCP"
+dgclaw agente reparar ana >"$TMP/rep.txt" 2>&1
+igual "mcp.json quebrado: reparar avisa e nao derruba" "0" "$?"
+afirma "o aviso cita o arquivo" grep -q 'nao e um JSON valido com mcpServers' "$TMP/rep.txt"
+igual "o arquivo quebrado nao foi sobrescrito" "{ quebrado" "$(cat "$MCP")"
 fim

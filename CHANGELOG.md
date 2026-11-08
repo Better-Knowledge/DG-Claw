@@ -54,9 +54,10 @@ tudo o que era dela sem trocar credencial. Detalhes e limites em `web/docs/FERRA
 ### Como atualizar (ferramentas por escopo)
 
 Peça ao Admin, no chat: "atualiza o DG Claw". A atualização cria o catálogo `/etc/dgclaw/ferramentas.json`
-vazio e a pasta do cofre de sistemas; nada muda para os seus agentes até você cadastrar um sistema. Os agentes
-precisam ser recriados para ganhar o servidor MCP novo nas configurações deles; a atualização faz isso sozinha
-com o `agente recriar`. Se algum agente não for recriado, rode `sudo dgclaw agente reparar <slug>`.
+vazio e a pasta do cofre de sistemas; nada muda para os seus agentes até você cadastrar um sistema. Cada agente
+que já existe ganha o servidor MCP novo e as tools dele quando passa pelo `agente recriar` (que a atualização
+roda) ou pelo `sudo dgclaw agente reparar <slug>`: os dois acrescentam só as linhas novas nos arquivos de
+configuração do agente, sem apagar o resto; valem na próxima sessão dele.
 
 **Bases de conhecimento por escopo.** Você cadastra pastas de texto como bases (`sudo dgclaw base criar manual-rh
 --escopo empresa`), e cada base tem um escopo: privada de uma pessoa, de um grupo (departamento, projeto ou
