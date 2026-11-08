@@ -117,3 +117,12 @@ test('o exemplo que o instalador grava é válido e nega tudo por padrão', () =
   assert.deepEqual(r.politica.agentes, {}, 'o exemplo não libera agente nenhum: o dono acrescenta os seus');
   assert.ok(Object.keys(r.politica.papeis).length >= 1, 'traz ao menos um papel de modelo para copiar');
 });
+
+test('validaPapeis: nomes herdados de Object.prototype (constructor) não contam como pessoa, papel ou grupo existentes', () => {
+  const { validaPapeis } = require('../lib/papeis');
+  const r = validaPapeis({ versao: 1, pessoas: { m: { grupos: ['constructor'] } }, papeis: {}, agentes: { ana: { pessoa: 'constructor', papel: 'constructor' } } });
+  assert.equal(r.ok, false);
+  assert.ok(r.erros.some((e) => /grupos cita "constructor"/.test(e)));
+  assert.ok(r.erros.some((e) => /pessoa aponta para "constructor"/.test(e)));
+  assert.ok(r.erros.some((e) => /papel aponta para "constructor"/.test(e)));
+});

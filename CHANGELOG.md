@@ -7,6 +7,12 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Não lançado]
 
+**Acessos dos agentes.** A tela nova (menu ☰, `/acessos`) mostra, agente por agente, o que ele alcança de fato nos
+dados (fontes e campos, bases, ferramentas, skills e ações com aprovação) e quem conversa com ele no painel (você e
+os colaboradores convidados). Ali você escolhe a pessoa e o papel de cada agente e monta os papéis, as pessoas e os
+grupos marcando caixas, sem editar o arquivo de papéis à mão: nada é gravado se o arquivo ficar inválido, e o que
+você escreveu no arquivo e a tela não conhece fica como está. Detalhes em `web/docs/ACESSOS.md`.
+
 **Colaboradores com vários agentes.** Uma pessoa convidada pode usar mais de um agente de trabalho, e um agente
 pode ter várias pessoas: no convite você marca os agentes que ela vai usar, e o botão **Editar agentes** (tela
 Colaboradores) muda a lista depois, sem derrubar a sessão dela. Com mais de um agente, ela troca de agente pelo menu,

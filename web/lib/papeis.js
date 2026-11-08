@@ -181,7 +181,7 @@ function validaPapeis(bruto) {
       if (p.grupos !== undefined) {
         if (!Array.isArray(p.grupos) || p.grupos.some((g) => typeof g !== 'string' || !RX_NOME.test(g))) erros.push(`${onde}.grupos precisa ser uma lista de nomes de grupos.`);
         else {
-          for (const g of p.grupos) if (ehObjeto(bg) && !bg[g]) erros.push(`${onde}.grupos cita "${g}", que não existe em "grupos".`);
+          for (const g of p.grupos) if (ehObjeto(bg) && !Object.prototype.hasOwnProperty.call(bg, g)) erros.push(`${onde}.grupos cita "${g}", que não existe em "grupos".`);
           gruposDaPessoa = [...new Set(p.grupos)];
         }
       }
@@ -214,9 +214,9 @@ function validaPapeis(bruto) {
       if (!ehObjeto(a)) { erros.push(`${onde} precisa ser um objeto { "pessoa", "papel" }.`); continue; }
       soChaves(a, CAMPOS_AGENTE, onde, erros);
       if (typeof a.pessoa !== 'string' || !RX_NOME.test(a.pessoa)) erros.push(`${onde}.pessoa é obrigatório e precisa ser o nome de uma pessoa do bloco "pessoas".`);
-      else if (ehObjeto(bp) && !bp[a.pessoa]) erros.push(`${onde}.pessoa aponta para "${a.pessoa}", que não existe em "pessoas".`);
+      else if (ehObjeto(bp) && !Object.prototype.hasOwnProperty.call(bp, a.pessoa)) erros.push(`${onde}.pessoa aponta para "${a.pessoa}", que não existe em "pessoas".`);
       if (typeof a.papel !== 'string' || !RX_NOME.test(a.papel)) erros.push(`${onde}.papel é obrigatório e precisa ser o nome de um papel do bloco "papeis".`);
-      else if (ehObjeto(bpa) && !bpa[a.papel]) erros.push(`${onde}.papel aponta para "${a.papel}", que não existe em "papeis".`);
+      else if (ehObjeto(bpa) && !Object.prototype.hasOwnProperty.call(bpa, a.papel)) erros.push(`${onde}.papel aponta para "${a.papel}", que não existe em "papeis".`);
       agentes[slug] = { pessoa: a.pessoa, papel: a.papel };
     }
   }

@@ -1,0 +1,30 @@
+/* acessos.css: a tela /acessos (o que cada agente alcança e a edição dos papéis, pessoas e grupos). Base lp- e us-. */
+.ac-agente{border:1px solid var(--lp-linha);border-radius:12px;padding:10px 12px;margin-bottom:10px;background:#fafcfa}
+.ac-agente h3{font-size:15.5px;margin:0 0 6px;overflow-wrap:anywhere}
+.ac-agente .ac-liga{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px}
+.ac-agente .ac-liga label{display:flex;flex-direction:column;gap:3px;font-size:13px;font-weight:600}
+.ac-agente select{font:inherit;font-weight:400;min-height:36px;padding:4px 8px;border:1px solid var(--lp-linha);border-radius:10px;background:#fff}
+.ac-efetivo{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:6px 12px;font-size:13.5px}
+.ac-efetivo h4{margin:0 0 2px;font-size:12.5px;color:var(--lp-fraco);font-weight:600}
+.ac-efetivo ul{margin:0;padding-left:16px}
+.ac-efetivo li{overflow-wrap:anywhere}
+.ac-efetivo .nada{color:var(--lp-fraco);font-style:italic}
+.ac-usuarios{color:var(--lp-fraco);font-size:13px;margin:6px 0 0;overflow-wrap:anywhere}
+.ac-sem{color:#7a5a00;background:#fff7e0;border:1px solid #f0d98c;border-radius:10px;padding:6px 10px;font-size:13.5px;margin:0 0 8px}
+.ac-escolha{align-items:flex-end;gap:10px;flex-wrap:wrap}
+.ac-escolha label{display:flex;flex-direction:column;gap:3px;font-size:13.5px;font-weight:600}
+.ac-escolha input,.ac-escolha select{font:inherit;font-weight:400;min-height:36px;padding:4px 8px;border:1px solid var(--lp-linha);border-radius:10px;background:#fff;min-width:160px}
+.ac-form{margin-top:12px;display:flex;flex-direction:column;gap:10px}
+.ac-form fieldset{border:1px solid var(--lp-linha);border-radius:12px;padding:8px 12px;margin:0}
+.ac-form legend{font-size:13.5px;font-weight:600;padding:0 4px}
+.ac-form .ac-grade{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:2px 14px}
+.ac-form .lp-check{min-height:32px;align-items:flex-start;padding-top:4px}
+.ac-form .lp-check small{color:var(--lp-fraco);font-weight:400}
+.ac-form .ac-campos{font:inherit;font-size:13px;padding:4px 8px;border:1px solid var(--lp-linha);border-radius:8px;margin-left:30px;width:calc(100% - 30px);max-width:360px}
+.ac-form .ac-topo{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.ac-form .ac-topo label{display:flex;flex-direction:column;gap:3px;font-size:13.5px;font-weight:600}
+.ac-form .ac-topo input,.ac-form .ac-topo select{font:inherit;font-weight:400;min-height:36px;padding:4px 8px;border:1px solid var(--lp-linha);border-radius:10px;background:#fff}
+.ac-form .ac-rodape{display:flex;gap:8px;flex-wrap:wrap}
+.ac-grupo{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--lp-linha);font-size:14px;flex-wrap:wrap}
+.ac-grupo:first-child{border-top:0}
+.ac-grupo .ac-pessoas{color:var(--lp-fraco);font-size:13px;flex:1;min-width:0;overflow-wrap:anywhere}
