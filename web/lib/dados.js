@@ -148,13 +148,15 @@ function criarDados({ dir, papeis, bases, basesDir, ferramentas, cofreSistemas, 
       d = { decisao: ehLeitura ? 'permitido' : 'aprovacao', campos: null, motivo: 'sessão do dono do painel', pessoa: 'dono', papel: 'dono' };
     }
     Object.assign(base, { pessoa: d.pessoa, papel: d.papel, acao: acaoDef ? acaoDef.acao : undefined, escopo: d.escopo });
+    // Ferramenta: o NOME da credencial que a operação usa vai para o log (nunca o valor), para a observabilidade por agente.
+    { const def = ehLeitura ? fonte.operacoes[operacao] : acaoDef; if (def && def.credencial) base.credencial = def.credencial; }
     // Ferramenta: escopo que falta para ESTA operação (mas o agente alcança outras) é 403 com o motivo; base: invisível.
     if (d.decisao === 'negado' && d.invisivel && !fonte.ferramenta) naoExiste();
     if (d.decisao === 'negado') nega(403, d.motivo);
 
     if (ehLeitura) {
       let r;
-      try { r = await fonte.operacoes[operacao](corpo); } catch (e) {
+      try { r = await fonte.operacoes[operacao](corpo, { agente: base.agente }); } catch (e) {
         if (e instanceof ErroFonte) nega(e.status, e.message, `a fonte recusou os parâmetros (${e.status})`);
         log('erro', `Dados ${nomeFonte}/${operacao} (${base.por}): falha inesperada no adaptador (${e.stack || e.message}).`);
         nega(500, `Falha inesperada ao ler "${nomeFonte}"; por segurança nada foi devolvido. Tente de novo; se repetir, avise o dono.`);
@@ -222,6 +224,7 @@ function criarDados({ dir, papeis, bases, basesDir, ferramentas, cofreSistemas, 
     const fonte = fontes.obter(p.fonte);
     const def = fonte && fonte.acoes && Object.prototype.hasOwnProperty.call(fonte.acoes, p.operacao) ? fonte.acoes[p.operacao] : null;
     const base = { agente: p.agente, por: `dono:${por}`, pessoa: p.pessoa, papel: p.papel, fonte: p.fonte, operacao: p.operacao, acao: p.acao, aprovacao: p.id };
+    if (def && def.credencial) base.credencial = def.credencial;
     if (!def || def.acao !== p.acao) {
       const r = aprovacoes.concluir(p.id, { ok: false, erro: `a fonte "${p.fonte}" já não tem a ação "${p.acao}"` });
       registra(Object.assign({}, base, { decisao: 'falhou', motivo: r.motivo, status: 500 }));

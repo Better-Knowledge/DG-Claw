@@ -17,6 +17,22 @@ inteira. Quem já tinha convidado alguém não precisa fazer nada: o convite ant
 Pelo chat, o Admin também convida, troca os agentes, reenvia e revoga (`sudo dgclaw colaborador ...`), com o mesmo
 arquivo e as mesmas regras da tela.
 
+**Uma credencial por escopo nos sistemas de fora, e a observabilidade por agente.** Quando o CRM (ou o ERP,
+ou um servidor MCP) oferece chaves com poderes diferentes, você agora cadastra uma por escopo: `crm:ler` usa
+a chave só de leitura e `crm:escrever` usa a outra, cada uma com o seu nome no cofre de sistemas
+(`"credenciais": { "crm:ler": "crm-leitura", "crm:escrever": "crm-escrita" }` no catálogo). O log de acesso
+passa a dizer qual credencial (pelo nome, nunca o valor) cada chamada usou, e a tela Observabilidade ganhou
+"Sistemas de fora, por agente": qual agente usou qual sistema com qual escopo. E, se quiser que o sistema de
+destino saiba qual agente chamou, `"cabecalho_agente"` (API) ou `"env_agente"` (MCP) mandam o nome curto do
+agente junto com a chamada. Detalhes em `web/docs/FERRAMENTAS-POR-ESCOPO.md`.
+
+### Como atualizar (credencial por escopo)
+
+Peça ao Admin, no chat: "atualiza o DG Claw". Nada muda no que você já tem: o catálogo com uma credencial por
+sistema continua valendo igual. Para separar as chaves de um sistema, guarde a segunda com
+`printf %s "$CHAVE" | sudo dgclaw sistema credencial crm-escrita` e acrescente o bloco `credenciais` à ferramenta
+no `/etc/dgclaw/ferramentas.json`; o Web relê sozinho.
+
 **Força bruta contra uma conta, vinda de muitos endereços.** Além dos limites por endereço, cada login passa a ter
 um teto de 20 senhas erradas em 15 minutos somando todos os endereços. Quando esse teto é atingido, a conta continua
 aberta para os aparelhos de onde a pessoa já entrou nos últimos 30 dias (a sua casa, o seu celular), e fica fechada

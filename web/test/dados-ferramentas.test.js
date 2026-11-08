@@ -38,9 +38,10 @@ async function crmFalso() {
     const partes = []; req.on('data', (c) => partes.push(c));
     req.on('end', () => {
       const corpo = Buffer.concat(partes).toString('utf8');
-      chamadas.push({ metodo: req.method, url: req.url, auth: req.headers.authorization || null, corpo });
+      chamadas.push({ metodo: req.method, url: req.url, auth: req.headers.authorization || null, agente: req.headers['x-dgclaw-agente'] || null, corpo });
       const j = (c, o) => { res.writeHead(c, { 'content-type': 'application/json' }); res.end(JSON.stringify(o)); };
-      if (req.headers.authorization !== 'Bearer segredo-do-crm-123') return j(401, { erro: 'sem credencial' });
+      if (!['Bearer segredo-do-crm-123', 'Bearer so-leitura-456', 'Bearer leitura-e-escrita-789'].includes(req.headers.authorization)) return j(401, { erro: 'sem credencial' });
+      if (req.headers.authorization === 'Bearer so-leitura-456' && req.method !== 'GET') return j(403, { erro: 'chave só de leitura' });
       if (req.method === 'GET' && req.url.startsWith('/api/clientes/')) return j(200, { id: req.url.split('/').pop(), nome: 'Cliente Exemplo', cpf: 'oculto?' });
       if (req.method === 'GET' && req.url.startsWith('/api/clientes')) return j(200, { items: [{ id: '1', nome: 'Um', cpf: '000' }, { id: '2', nome: 'Dois', cpf: '111' }] });
       if (req.method === 'POST' && req.url === '/api/propostas') return j(201, { id: 'p9', recebido: JSON.parse(corpo) });
@@ -134,6 +135,8 @@ async function subir() {
   const { grava, cofre } = cofreDeTeste(base);
   grava('crm', 'segredo-do-crm-123');
   grava('notas', 'token-notas-xyz');
+  grava('crm-leitura', 'so-leitura-456');
+  grava('crm-escrita', 'leitura-e-escrita-789');
   // banco
   const { DatabaseSync } = require('node:sqlite');
   const arqDb = path.join(base, 'vendas.sqlite');
@@ -150,7 +153,7 @@ async function subir() {
         if (m.params.name === 'explode') process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: m.id, error: { code: -32000, message: 'tool explodiu' } }) + '\\n');
         else if (m.params.name === 'trava') { setInterval(() => {}, 1000); return; }
         else if (m.params.name === 'morre') { process.stderr.write('ENV-DEBUG NOTAS_TOKEN=' + process.env.NOTAS_TOKEN + '\\n'); process.exit(3); }
-        else process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: m.id, result: { content: [{ type: 'text', text: JSON.stringify({ tool: m.params.name, args: m.params.arguments, token: process.env.NOTAS_TOKEN || null, token_len: (process.env.NOTAS_TOKEN || '').length, extra: process.env.EXTRA || null, home: process.env.HOME || null }) }] } }) + '\\n');
+        else process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: m.id, result: { content: [{ type: 'text', text: JSON.stringify({ tool: m.params.name, args: m.params.arguments, token: process.env.NOTAS_TOKEN || null, token_len: (process.env.NOTAS_TOKEN || '').length, extra: process.env.EXTRA || null, home: process.env.HOME || null, agente: process.env.DGCLAW_AGENTE || null }) }] } }) + '\\n');
       } });
   `);
   const ferramentas = { versao: 1, ferramentas: {
@@ -177,7 +180,13 @@ async function subir() {
       trava: { tool: 'trava', escopo: 'notas:ler' },
       morre: { tool: 'morre', escopo: 'notas:ler' },
     } },
-    notas: { tipo: 'mcp', comando: process.execPath, args: [mcp], credencial: 'notas', credencial_env: 'NOTAS_TOKEN', env: { EXTRA: 'sim' }, timeout_s: 5, operacoes: {
+    crm2: { tipo: 'api', titulo: 'CRM com duas chaves', base_url: `http://127.0.0.1:${crm.porta}/api`, auth: { tipo: 'bearer' }, timeout_s: 1, cabecalho_agente: 'X-DGClaw-Agente',
+      credenciais: { 'crm2:ler': 'crm-leitura', 'crm2:escrever': 'crm-escrita' },
+      operacoes: {
+        clientes_listar: { metodo: 'GET', rota: '/clientes', escopo: 'crm2:ler', campos: ['id', 'nome'] },
+        proposta_criar: { metodo: 'POST', rota: '/propostas', escopo: 'crm2:escrever', acao: true, params: { cliente_id: { tipo: 'texto', regex: '^[0-9]{1,6}$', obrigatorio: true }, valor: { tipo: 'numero', min: 0, obrigatorio: true } } },
+      } },
+    notas: { tipo: 'mcp', comando: process.execPath, args: [mcp], credencial: 'notas', credencial_env: 'NOTAS_TOKEN', env_agente: 'DGCLAW_AGENTE', env: { EXTRA: 'sim' }, timeout_s: 5, operacoes: {
       buscar: { tool: 'search', escopo: 'notas:ler', params: { query: { tipo: 'texto', obrigatorio: true } } },
       explode: { tool: 'explode', escopo: 'notas:ler' },
     } },
@@ -325,7 +334,7 @@ test('MCP: o servidor nasce com ambiente limpo mais a credencial na variável co
   try {
     const r = await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-notas/buscar', { query: 'reunião' }, CAIXA('ana'));
     assert.equal(r.status, 200, r.texto);
-    assert.deepEqual(r.json.item, { tool: 'search', args: { query: 'reunião' }, token: '***', token_len: 15, extra: 'sim', home: null }, 'a credencial chegou ao servidor (15 caracteres) e o eco dela sai mascarado');
+    assert.deepEqual(r.json.item, { tool: 'search', args: { query: 'reunião' }, token: '***', token_len: 15, extra: 'sim', home: null, agente: 'ana' }, 'a credencial chegou ao servidor (15 caracteres), o eco dela sai mascarado, e o servidor sabe qual agente chamou');
     assert.ok(!r.texto.includes('NOTAS_TOKEN=') );
     const x = await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-notas/explode', {}, CAIXA('ana'));
     assert.equal(x.status, 502); assert.ok(!x.json.erro.includes('tool explodiu'), 'o detalhe do erro do servidor não chega ao agente'); assert.match(s.cap.texto(), /tool explodiu/);
@@ -344,8 +353,44 @@ test('MCP: o servidor nasce com ambiente limpo mais a credencial na variável co
     assert.equal(morto.status, 502); assert.ok(!morto.texto.includes('token-notas'), morto.texto); assert.ok(!morto.texto.includes('ENV-DEBUG'));
     assert.match(s.cap.texto(), /stderr: .*ENV-DEBUG/); assert.ok(!s.cap.texto().includes('token-notas-xyz'));
     const cat = await s.pedir('GET', '/api/v1/dados/ferramentas', undefined, DONO);
-    assert.equal(cat.json.valido, true); assert.deepEqual(Object.keys(cat.json.ferramentas).sort(), ['crm', 'notas', 'vendas', 'wrapper']); assert.deepEqual(cat.json.credenciais, ['crm', 'notas']);
+    assert.equal(cat.json.valido, true); assert.deepEqual(Object.keys(cat.json.ferramentas).sort(), ['crm', 'crm2', 'notas', 'vendas', 'wrapper']); assert.deepEqual(cat.json.credenciais, ['crm', 'crm-escrita', 'crm-leitura', 'notas']);
     assert.ok(!cat.texto.includes('segredo-do-crm') && !cat.texto.includes('token-notas'));
     assert.equal((await s.pedir('GET', '/api/v1/dados/ferramentas', undefined, CAIXA('ana'))).status, 403);
+  } finally { await s.fechar(); }
+});
+
+test('credencial por escopo: ler usa a chave de leitura, escrever usa a outra; o sistema sabe qual agente chamou; o log tem o nome da credencial', async () => {
+  const s = await subir();
+  try {
+    // marta e o papel têm crm2:ler e crm2:escrever? dê os escopos pela política
+    const pol = JSON.parse(fs.readFileSync(s.arqPapeis, 'utf8'));
+    pol.pessoas.marta.ferramentas = ['crm:ler', 'crm:escrever', 'vendas:ler', 'vendas:escrever', 'notas:ler', 'crm2:ler', 'crm2:escrever'];
+    pol.papeis.vendedor.ferramentas = pol.pessoas.marta.ferramentas.slice();
+    fs.writeFileSync(s.arqPapeis, JSON.stringify(pol));
+    const r = await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-crm2/clientes_listar', {}, CAIXA('ana'));
+    assert.equal(r.status, 200, r.texto);
+    const lida = s.crm.chamadas[s.crm.chamadas.length - 1];
+    assert.equal(lida.auth, 'Bearer so-leitura-456', 'a leitura foi com a chave só de leitura');
+    assert.equal(lida.agente, 'ana', 'o CRM recebeu o slug do agente no cabeçalho combinado');
+    assert.ok(!r.texto.includes('so-leitura-456'));
+    const e = await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-crm2/proposta_criar', { cliente_id: '7', valor: 10 }, CAIXA('ana'));
+    assert.equal(e.status, 202, e.texto);
+    const hash = (await s.pedir('GET', '/api/v1/dados/aprovacoes?estado=pendente', undefined, DONO)).json.aprovacoes.find((x) => x.id === e.json.pedido.id).hash;
+    const a = await s.pedir('POST', `/api/v1/dados/aprovacoes/${e.json.pedido.id}/aprovar`, { hash }, DONO);
+    assert.equal(a.status, 200, a.texto); assert.equal(a.json.pedido.estado, 'executada', JSON.stringify(a.json.pedido));
+    const escrita = s.crm.chamadas[s.crm.chamadas.length - 1];
+    assert.equal(escrita.auth, 'Bearer leitura-e-escrita-789', 'a escrita foi com a chave de escrita');
+    assert.equal(escrita.agente, 'ana', 'na execução aprovada o agente de origem continua sendo o do pedido');
+    // observabilidade por agente: o log diz qual credencial (pelo nome) e o resumo agrupa por agente e sistema
+    const linhas = s.dados.acessos.ultimas(100);
+    assert.equal(linhas.find((l) => l.fonte === 'ferramenta-crm2' && l.operacao === 'clientes_listar').credencial, 'crm-leitura');
+    assert.equal(linhas.find((l) => l.fonte === 'ferramenta-crm2' && l.decisao === 'executada').credencial, 'crm-escrita');
+    assert.ok(!JSON.stringify(linhas).includes('so-leitura-456') && !JSON.stringify(linhas).includes('leitura-e-escrita-789'));
+    const resumo = s.dados.acessos.resumo('2026-11-01');
+    assert.equal(resumo.por_agente_sistema['ana › crm2 (crm2:ler)'], 1);
+    assert.ok(resumo.por_agente_sistema['ana › crm2 (crm2:escrever)'] >= 1);
+    // o CRM sem cabeçalho combinado não recebe o slug
+    await s.pedir('POST', '/api/v1/dados/fontes/ferramenta-crm/clientes_listar', {}, CAIXA('ana'));
+    assert.equal(s.crm.chamadas[s.crm.chamadas.length - 1].agente, null);
   } finally { await s.fechar(); }
 });

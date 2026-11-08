@@ -52,7 +52,7 @@
   const PASSOS = {
     resumo: {
       alvo: '#secResumo', titulo: 'Uso dos dados',
-      oque: 'Quantos pedidos os agentes fizeram às fontes, bases e ferramentas, e quantos foram permitidos, negados ou viraram aprovação.',
+      oque: 'Quantos pedidos os agentes fizeram às fontes, bases e ferramentas, e quantos foram permitidos, negados ou viraram aprovação. "Sistemas de fora, por agente" diz qual agente usou qual sistema (CRM, ERP...) e com qual escopo.',
       como: 'Cada pedido à rota de dados vira uma linha de log, sem o conteúdo. Aqui elas são contadas por decisão, agente, fonte e pessoa.',
       porque: 'Para você ver, numa olhada, quem está usando o quê e se algum agente bate em porta fechada.',
     },
@@ -94,6 +94,7 @@
     $('porAgente').innerHTML = htmlBarras(r.json.por_agente);
     $('porFonte').innerHTML = htmlBarras(r.json.por_fonte);
     $('porPessoa').innerHTML = htmlBarras(r.json.por_pessoa);
+    $('porAgenteSistema').innerHTML = htmlBarras(r.json.por_agente_sistema);
   }
 
   async function carregaLinhas() {

@@ -26,6 +26,8 @@ test('resumo, barras e linhas viram HTML seguro; a query leva só o que foi pree
   const barras = T.htmlBarras({ 'ana<x>': 5, bia: 1 });
   assert.ok(barras.includes('ana&lt;x&gt;') && barras.indexOf('ana&lt;x&gt;') < barras.indexOf('bia'), 'maior primeiro, escapado');
   assert.match(T.htmlBarras({}), /nada/);
+  assert.ok(fs.readFileSync(path.join(__dirname, '../public/observabilidade.html'), 'utf8').includes('id="porAgenteSistema"'), 'a coluna de sistemas por agente');
+  assert.ok(fs.readFileSync(path.join(__dirname, '../public/observabilidade.js'), 'utf8').includes('por_agente_sistema'));
   const linhas = T.htmlLinhas([{ quando: '2026-11-08T12:00:00.000Z', agente: 'ana', pessoa: 'marta', papel: 'recepcao', fonte: 'folha', operacao: 'listar', decisao: 'negado', status: 403, motivo: 'o papel <recepcao> nega' }]);
   assert.ok(linhas.includes('&lt;recepcao&gt;') && linhas.includes('class="negado"') && linhas.includes('marta · recepcao'));
   assert.match(T.htmlLinhas([]), /Nenhum acesso/);

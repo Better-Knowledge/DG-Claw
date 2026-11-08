@@ -75,6 +75,38 @@ Comum a todos: `timeout_s` de 1 a 25 como prazo total (a caixa do agente respond
 que saem, `max_itens` (padrão 200), `descricao` da operação, e o `catalogo` da ferramenta (dono, classificação,
 finalidade, retenção), informativo.
 
+### Uma credencial por escopo
+
+Quando o sistema de destino aceita chaves com poderes diferentes (uma só de leitura, outra que também escreve),
+dê a cada **escopo** a sua credencial: assim o escopo `crm:ler` nunca carrega uma chave que consiga escrever,
+mesmo que alguém encontre um jeito de usá-la fora do gateway.
+
+```json
+"crm": { "tipo": "api", "base_url": "https://crm.exemplo.test/api", "auth": { "tipo": "bearer" },
+         "credenciais": { "crm:ler": "crm-leitura", "crm:escrever": "crm-escrita" },
+         "cabecalho_agente": "X-DGClaw-Agente",
+         "operacoes": { ... } }
+```
+
+```bash
+printf %s "$CHAVE_SO_LEITURA" | sudo dgclaw sistema credencial crm-leitura
+printf %s "$CHAVE_COMPLETA"   | sudo dgclaw sistema credencial crm-escrita
+```
+
+`credenciais` mapeia escopo → nome no cofre; `credencial` continua valendo como padrão para os escopos que não
+estão no mapa. Com o mapa e sem padrão, todo escopo usado por alguma operação precisa estar lá (o catálogo é
+recusado se faltar), e um escopo no mapa que nenhuma operação usa também é recusado. Banco SQLite não usa
+credencial. No log de acesso cada chamada leva o **nome** da credencial usada (nunca o valor), e a tela
+Observabilidade mostra, por agente, qual sistema foi usado com qual escopo.
+
+### O sistema de destino sabe qual agente chamou
+
+Opcional. Em `api`, `cabecalho_agente` é o nome de um cabeçalho HTTP próprio (ex.: `X-DGClaw-Agente`; não pode
+ser `Authorization` nem o cabeçalho da `auth`): o gateway manda nele o slug do agente que pediu (ou `dono`, se a
+pessoa pediu pelo painel), e nada mais. Em `mcp`, `env_agente` é o nome da variável de ambiente que recebe o
+slug. Com isso o CRM pode registrar no lado dele quem acessou o quê, e uma estratégia mais fina (uma chave por
+agente, emitida pelo próprio sistema) pode vir depois sem mudar o catálogo.
+
 ### Esquema dos parâmetros
 
 Catálogo fechado: parâmetro que não está no esquema é recusado; texto sem regra é limitado a 2000 caracteres
@@ -108,8 +140,10 @@ que volta é dado, não instrução.
   de erro. O que sai do gateway rumo ao agente (resultado e erros) passa por uma máscara que troca a
   credencial, em texto cru, base64 ou codificada para URL, por `***`; o detalhe de erros do sistema e do
   servidor MCP vai só para o log do Web, mascarado. O arquivo precisa ser de root, modo 600, sem atalho; fora disso a ferramenta responde 503.
-- O gateway chama o sistema com a credencial **do sistema**: ele não tem como pedir mais do que ela permite
-  nem amplia nada. As permissões nativas do sistema continuam valendo.
+- O gateway chama o sistema com a credencial **do sistema** (ou a do escopo, se houver uma por escopo): ele
+  não tem como pedir mais do que ela permite nem amplia nada. As permissões nativas do sistema continuam
+  valendo. O cabeçalho ou a variável com o slug do agente é informativo para o sistema de destino; a decisão
+  de acesso continua sendo a do DG Claw.
 - A decisão de acesso não lê a resposta do sistema; um texto malicioso vindo do CRM não muda escopo nem
   dispara ação. Toda escrita passa por uma pessoa, com os parâmetros congelados e o hash da ação exata.
 - `base_url` é escolhido pelo dono (root): o gateway fala com o que o dono apontar, inclusive endereços

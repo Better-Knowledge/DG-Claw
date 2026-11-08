@@ -39,6 +39,19 @@ test('validaFerramentas aceita o exemplo e normaliza', () => {
   assert.equal(r.ferramentas.notion.catalogo.classificacao, 'interno');
 });
 
+test('credenciais por escopo: a do escopo vence a padrão; cabecalho_agente e env_agente normalizados', () => {
+  const r = validaFerramentas({ versao: 1, ferramentas: {
+    crm: { tipo: 'api', base_url: 'https://a.test', auth: { tipo: 'bearer' }, credencial: 'crm-leitura', credenciais: { 'crm:escrever': 'crm-escrita' }, cabecalho_agente: 'X-DGClaw-Agente',
+      operacoes: { listar: { metodo: 'GET', rota: '/c', escopo: 'crm:ler' }, criar: { metodo: 'POST', rota: '/c', escopo: 'crm:escrever', acao: true } } },
+    so: { tipo: 'api', base_url: 'https://b.test', auth: { tipo: 'bearer' }, credenciais: { 'so:ler': 'so-leitura' }, operacoes: { listar: { metodo: 'GET', rota: '/c', escopo: 'so:ler' } } },
+    m: { tipo: 'mcp', comando: '/usr/bin/node', credencial: 'n', credencial_env: 'TOKEN', env_agente: 'DGCLAW_AGENTE', operacoes: { a: { tool: 't', escopo: 'm:ler' } } },
+  } });
+  assert.equal(r.ok, true, JSON.stringify(r.erros));
+  assert.deepEqual(r.ferramentas.crm.credenciais, { 'crm:escrever': 'crm-escrita' }); assert.equal(r.ferramentas.crm.credencial, 'crm-leitura'); assert.equal(r.ferramentas.crm.cabecalho_agente, 'X-DGClaw-Agente');
+  assert.equal(r.ferramentas.so.credencial, null); assert.deepEqual(r.ferramentas.so.credenciais, { 'so:ler': 'so-leitura' });
+  assert.equal(r.ferramentas.m.env_agente, 'DGCLAW_AGENTE'); assert.equal(r.ferramentas.m.cabecalho_agente, undefined);
+});
+
 test('validaFerramentas recusa o que abriria uma brecha ou quebraria a chamada', () => {
   const api = (extra, ops) => ({ versao: 1, ferramentas: { x: Object.assign({ tipo: 'api', base_url: 'https://a.test', operacoes: ops || {} }, extra) } });
   const casos = [
@@ -76,6 +89,20 @@ test('validaFerramentas recusa o que abriria uma brecha ou quebraria a chamada',
     [{ versao: 1, ferramentas: { m: { tipo: 'mcp', comando: '/usr/bin/node', env: { API_TOKEN: 'x' }, operacoes: {} } } }, /parece ter um segredo/],
     [{ versao: 1, ferramentas: { m: { tipo: 'mcp', comando: '/usr/bin/node', credencial: 'n', credencial_env: 'T', env: { T: 'x' }, operacoes: {} } } }, /não pode definir T/],
     [{ versao: 1, ferramentas: { m: { tipo: 'mcp', comando: '/usr/bin/node', operacoes: { a: { escopo: 'm:ler' } } } } }, /tool é obrigatório/],
+    // credencial por escopo
+    [api({ auth: { tipo: 'bearer' }, credenciais: { 'crm:ler': 'crm-leitura' } }, { a: { metodo: 'GET', rota: '/x', escopo: 'crm:ler' }, b: { metodo: 'POST', rota: '/x', escopo: 'crm:escrever', acao: true } }), /escopo "crm:escrever" não tem credencial/],
+    [api({ auth: { tipo: 'bearer' }, credenciais: { 'crm:ler': 'crm-leitura', 'crm:apagar': 'x' } }, { a: { metodo: 'GET', rota: '/x', escopo: 'crm:ler' } }), /cita o escopo "crm:apagar", que nenhuma operação usa/],
+    [api({ auth: { tipo: 'bearer' }, credenciais: { 'crm:ler': 'SK_LIVE_abc' } }, { a: { metodo: 'GET', rota: '/x', escopo: 'crm:ler' } }), /NOME de uma credencial do cofre/],
+    [api({ auth: { tipo: 'bearer' }, credenciais: { crm: 'c' } }, { a: { metodo: 'GET', rota: '/x', escopo: 'crm:ler' } }), /escopo "crm" não vale/],
+    [api({ credenciais: { 'crm:ler': 'c' } }, { a: { metodo: 'GET', rota: '/x', escopo: 'crm:ler' } }), /auth "nenhuma" com "credencial"/],
+    [{ versao: 1, ferramentas: { b: { tipo: 'banco', arquivo: '/x.sqlite', credenciais: { 'b:ler': 'c' }, operacoes: { a: { sql: 'SELECT 1', escopo: 'b:ler' } } } } }, /banco SQLite não usa "credenciais"/],
+    [{ versao: 1, ferramentas: { m: { tipo: 'mcp', comando: '/usr/bin/node', credenciais: { 'm:ler': 'n' }, operacoes: { a: { tool: 't', escopo: 'm:ler' } } } } }, /em qual variável ela vai/],
+    // o cabeçalho e a variável com o slug do agente
+    [api({ auth: { tipo: 'bearer' }, credencial: 'c', cabecalho_agente: 'Authorization' }), /cabecalho_agente precisa ser o nome de um cabeçalho HTTP próprio/],
+    [api({ auth: { tipo: 'cabecalho', nome: 'X-Api-Key' }, credencial: 'c', cabecalho_agente: 'x-api-key' }), /cabecalho_agente precisa ser/],
+    [api({ auth: { tipo: 'bearer' }, credencial: 'c', cabecalho_agente: 'X Agente' }), /cabecalho_agente precisa ser/],
+    [{ versao: 1, ferramentas: { m: { tipo: 'mcp', comando: '/usr/bin/node', credencial: 'n', credencial_env: 'T', env_agente: 'T', operacoes: {} } } }, /env_agente precisa ser/],
+    [{ versao: 1, ferramentas: { m: { tipo: 'mcp', comando: '/usr/bin/node', env_agente: 'minuscula', operacoes: {} } } }, /env_agente precisa ser/],
   ];
   for (const [entrada, rx] of casos) {
     const r = validaFerramentas(entrada);

@@ -149,8 +149,10 @@ Os sistemas de fora (CRM, ERP, servidor MCP, banco) entram pelo gateway: a crede
 para o cofre de sistemas com `printf %s "$CHAVE" | sudo dgclaw sistema credencial <nome>` (o valor sempre
 pelo STDIN, nunca na linha de comando nem no chat), o catálogo de operações fica em
 `/etc/dgclaw/ferramentas.json` e os escopos (`crm:ler`, `crm:escrever`) entram no bloco `"ferramentas"` das
-pessoas e dos papéis. Nunca cole uma credencial no `ferramentas.json` nem no `papeis.json`.
-`/opt/dgclaw/app/web/docs/FERRAMENTAS-POR-ESCOPO.md`.
+pessoas e dos papéis. Quando o sistema oferece chaves com poderes diferentes, cadastre uma por escopo
+(`"credenciais": { "crm:ler": "crm-leitura", "crm:escrever": "crm-escrita" }`), cada uma com o seu nome no
+cofre; `"cabecalho_agente"` faz o sistema saber qual agente chamou. Nunca cole uma credencial no
+`ferramentas.json` nem no `papeis.json`. `/opt/dgclaw/app/web/docs/FERRAMENTAS-POR-ESCOPO.md`.
 
 As skills compartilhadas ficam em `/var/lib/dgclaw/skills` (globais, por grupo, por agente) e entram com
 `sudo dgclaw skill publicar <pasta> --escopo global|grupo:<g>|agente:<slug>`; cada papel diz quais recebe no

@@ -76,12 +76,19 @@ test('filtrar, resumo e csv: por agente, pessoa, fonte, decisão e período; csv
     const r = l.resumo('2026-11-01');
     assert.equal(r.linhas, 3); assert.deepEqual(r.por_decisao, { permitido: 2, negado: 1 }); assert.deepEqual(r.por_agente, { ana: 2, bia: 1 }); assert.deepEqual(r.por_pessoa, { marta: 2, caio: 1 });
     assert.equal(l.resumo('2026-11-07').linhas, 2);
+
     const csv = l.csv(l.filtrar({}));
     const linhas = csv.split('\r\n').filter(Boolean);
     assert.equal(linhas.length, 4);
-    assert.equal(linhas[0], 'quando,agente,pessoa,papel,fonte,escopo,operacao,acao,decisao,motivo,status,itens,bytes,aprovacao,por');
+    assert.equal(linhas[0], 'quando,agente,pessoa,papel,fonte,escopo,operacao,acao,decisao,motivo,status,itens,bytes,aprovacao,por,credencial');
     assert.ok(linhas[1].includes('"a pessoa ""caio"", com vírgula, nega"'), linhas[1]);
-    assert.ok(csv.includes('2026-11-08T12:00:00.000Z,ana,marta,r,clientes,,listar,,permitido,ok,200,2,100,,'));
+    assert.ok(csv.includes('2026-11-08T12:00:00.000Z,ana,marta,r,clientes,,listar,,permitido,ok,200,2,100,,,'));
+    // sistemas de fora por agente: só linhas de ferramenta, com o escopo; a credencial é só o nome
+    l.registrar({ agente: 'ana', pessoa: 'marta', papel: 'r', fonte: 'ferramenta-crm', escopo: 'crm:ler', operacao: 'clientes_listar', decisao: 'permitido', motivo: 'ok', status: 200, credencial: 'crm-leitura' });
+    l.registrar({ agente: 'ana', pessoa: 'marta', papel: 'r', fonte: 'ferramenta-crm', escopo: 'crm:ler', operacao: 'cliente_ler', decisao: 'permitido', motivo: 'ok', status: 200, credencial: 'crm-leitura' });
+    l.registrar({ agente: 'bia', pessoa: 'caio', papel: 'a', fonte: 'ferramenta-crm', escopo: 'crm:escrever', operacao: 'proposta_criar', decisao: 'aprovacao', motivo: 'ok', status: 202, credencial: 'crm-escrita' });
+    assert.deepEqual(l.resumo('2026-11-01').por_agente_sistema, { 'ana › crm (crm:ler)': 2, 'bia › crm (crm:escrever)': 1 });
+    assert.equal(l.filtrar({ agente: 'bia', fonte: 'ferramenta-crm' })[0].credencial, 'crm-escrita');
     // célula que uma planilha leria como fórmula ganha apóstrofo; número negativo (itens) fica número
     const perigoso = l.csv([{ quando: '2026-11-08T12:00:00.000Z', agente: 'ana', motivo: '=HYPERLINK("http://x")', fonte: '+a', operacao: '@b', papel: '-c', itens: -1 }]);
     assert.ok(perigoso.includes('"\'=HYPERLINK(""http://x"")"'), perigoso);

@@ -210,9 +210,10 @@ atende outra pessoa usa a credencial dela.
   com escopo (privada, grupo, empresa, pública) cruzado com a pessoa e o papel do agente; a escrita só
   acontece depois da aprovação de uma pessoa, num temporário `O_EXCL | O_NOFOLLOW` renomeado para dentro
   da base. Pessoa desligada no arquivo de papéis não alcança nada.
-- Ferramentas (`web/docs/FERRAMENTAS-POR-ESCOPO.md`): uma credencial por sistema em
-  `/etc/dgclaw/cofre-sistemas` (root, 600), lida pelo Web na hora da chamada e nunca entregue ao
-  container, à resposta ou ao log; catálogo fechado de operações com esquema de parâmetros; escopo
+- Ferramentas (`web/docs/FERRAMENTAS-POR-ESCOPO.md`): uma credencial por sistema (ou por escopo do
+  sistema, para o escopo de leitura nunca carregar uma chave que escreve) em `/etc/dgclaw/cofre-sistemas`
+  (root, 600), lida pelo Web na hora da chamada e nunca entregue ao container, à resposta ou ao log (o log
+  leva só o nome dela); catálogo fechado de operações com esquema de parâmetros; escopo
   exigido na pessoa e no papel; escrita só com aprovação humana. O gateway não segue redirecionamento,
   limita a resposta a 1 MB e sobe servidores MCP com ambiente limpo.
 - Skills compartilhadas (`web/docs/SKILLS-POR-ESCOPO.md`): catálogo de root em `/var/lib/dgclaw/skills`;
