@@ -46,6 +46,29 @@ afirma "a base entrou no catalogo no escopo do grupo dela" jq -e '.bases["entreg
 nega "pessoa inexistente recusada" dgclaw pessoa desligar fantasma --sim
 nega "nome invalido recusado" dgclaw pessoa desligar "Marta;rm" --sim
 
+echo "desligar de novo nao reabre uma base que o dono estreitou"
+jq '.bases["entrega-marta"].escopo = "privada" | .bases["entrega-marta"].pessoa = "marta" | del(.bases["entrega-marta"].grupo)' "$ETC/bases.json" >"$TMP/b.json" && cp "$TMP/b.json" "$ETC/bases.json"
+printf '%s\n' '- nova regra' >>"$H/MEMORY.md"
+afirma "desligar marta de novo" dgclaw pessoa desligar marta --sim
+afirma "o catalogo ficou como o dono deixou (privada)" jq -e '.bases["entrega-marta"].escopo == "privada" and .bases["entrega-marta"].pessoa == "marta" and (.bases["entrega-marta"].grupo == null)' "$ETC/bases.json"
+afirma "mas os arquivos foram copiados de novo" grep -q 'nova regra' "$E/ana/MEMORY.md"
+
+echo "nome longo: a base nao cabe no catalogo, e nada muda"
+LONGA="pessoa-com-nome-muito-comprido-demais-x"
+jq --arg n "$LONGA" '.pessoas[$n] = {"grupos": ["financeiro"]} | .agentes.zoe = {"pessoa": $n, "papel": "analista"}' "$PAP" >"$TMP/p.json" && cp "$TMP/p.json" "$PAP"
+mkdir -p "$LIB/agentes/zoe/home"; printf 'z\n' >"$LIB/agentes/zoe/home/MEMORY.md"
+: >"$STUB_LOG"
+nega "entrega-<nome longo> passa de 40 e e recusado ANTES de mudar algo" dgclaw pessoa desligar "$LONGA" --sim
+igual "a pessoa continua ativa" "ativa" "$(jq -r --arg n "$LONGA" '.pessoas[$n].estado // "ativa"' "$PAP")"
+nega "nenhum agente foi parado" grep -q '^podman stop' "$STUB_LOG"
+afirma "com --base cabe" dgclaw pessoa desligar "$LONGA" --sim --base entrega-zoe
+afirma "base entrega-zoe no catalogo" jq -e '.bases["entrega-zoe"].escopo == "grupo"' "$ETC/bases.json"
+afirma "o catalogo continua valido para o Web" node -e '
+  const { validaBases } = require(process.argv[1]); const fs = require("node:fs");
+  process.exit(validaBases(JSON.parse(fs.readFileSync(process.argv[2], "utf8"))).ok ? 0 : 1);' "$REPO/web/lib/bases.js" "$ETC/bases.json"
+nega "--base invalido recusado" dgclaw pessoa desligar caio --sim --base "Maiuscula"
+nega "--base sem nome recusado" dgclaw pessoa desligar caio --sim --base
+
 echo "desligar quem nao tem grupo: base da empresa"
 : >"$STUB_LOG"
 mkdir -p "$LIB/agentes/bia/home"; printf 'x\n' >"$LIB/agentes/bia/home/MEMORY.md"
@@ -58,7 +81,9 @@ igual "estado ativa" "ativa" "$(jq -r .pessoas.marta.estado "$PAP")"
 nega "religar inexistente" dgclaw pessoa religar fantasma
 
 echo "ensaio e papeis invalido"
-afirma "ensaio nao grava" dgclaw --ensaio pessoa desligar marta --sim
+dgclaw --ensaio pessoa desligar marta --sim >"$TMP/ens.txt" 2>&1
+afirma "ensaio nao grava" test $? -eq 0
+afirma "o ensaio mostra o passo da entrega" grep -q 'copiaria a memoria' "$TMP/ens.txt"
 igual "ensaio: continua ativa" "ativa" "$(jq -r .pessoas.marta.estado "$PAP")"
 cp "$PAP" "$TMP/pap.ok"; printf '{ quebrado' >"$PAP"
 nega "papeis.json quebrado: desligar recusa" dgclaw pessoa desligar marta --sim

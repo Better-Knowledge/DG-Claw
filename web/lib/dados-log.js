@@ -122,7 +122,14 @@ function criarDadosLog({ dir, log, agora, retencaoDias }) {
   /** CSV das linhas (cabeçalho fixo), para planilha. Sem conteúdo porque o log não o tem. */
   function csv(linhas) {
     const cols = ['quando', ...CAMPOS];
-    const cel = (v) => { if (v === undefined || v === null) return ''; const t = String(v); return /[",\n\r;]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+    // Célula que começa com = + - @ ou tabulação vira fórmula numa planilha (CSV injection): ganha um apóstrofo na
+    // frente, como as planilhas fazem para "texto literal". Número fica número.
+    const cel = (v) => {
+      if (v === undefined || v === null) return '';
+      let t = String(v);
+      if (typeof v !== 'number' && /^[=+\-@\t\r]/.test(t)) t = "'" + t;
+      return /[",\n\r;]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+    };
     return [cols.join(','), ...linhas.map((l) => cols.map((c) => cel(l[c])).join(','))].join('\r\n') + '\r\n';
   }
 

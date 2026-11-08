@@ -131,11 +131,13 @@ Bases de conhecimento (o que os agentes podem ler, por escopo)
 
 Pessoas (quem trabalha com os agentes, pelo arquivo de papeis)
   dgclaw pessoa listar                  as pessoas de /etc/dgclaw/papeis.json, o estado, os grupos e os agentes de cada uma
-  dgclaw pessoa desligar <pessoa> [--sim]
+  dgclaw pessoa desligar <pessoa> [--sim] [--base <nome>]
       Marca a pessoa como desligada (todo acesso dela a dados, bases, ferramentas e skills e negado na hora,
       e os pedidos pendentes dos agentes dela caem), para os agentes dela (a casa fica inteira) e copia a
       memoria de trabalho deles para a base de conhecimento entrega-<pessoa>, no escopo do grupo dela, para o
       sucessor consultar. Nada e apagado. Pede confirmacao quando ha terminal. docs/PROPRIEDADE-DO-CONHECIMENTO.md
+      --base <nome> escolhe outro nome para a base (ate 40 caracteres; preciso quando o nome da pessoa e
+      longo). Base que ja esta no catalogo fica com o escopo que o dono deixou.
       Exemplo:  sudo dgclaw pessoa desligar marta --sim
   dgclaw pessoa religar <pessoa>        volta a pessoa para ativa (os agentes dela voltam com: dgclaw agente iniciar <slug>)
 
@@ -2199,15 +2201,27 @@ pessoa_listar() {
 pessoa_desligar() {
     [ $# -ge 1 ] || falha "faltou o nome da pessoa." "exemplo: sudo dgclaw pessoa desligar marta --sim"
     local nome="$1"; shift
-    local sim=0 a slug n
-    for a in "$@"; do case "$a" in --sim) sim=1 ;; *) falha "opcao desconhecida: $a" "use: dgclaw pessoa desligar <pessoa> [--sim]" ;; esac; done
+    local sim=0 a slug n base="" esperando=""
+    for a in "$@"; do
+        if [ -n "$esperando" ]; then base="$a"; esperando=""; continue; fi
+        case "$a" in
+            --sim) sim=1 ;;
+            --base) esperando=base ;;
+            --base=*) base="${a#--base=}" ;;
+            *) falha "opcao desconhecida: $a" "use: dgclaw pessoa desligar <pessoa> [--sim] [--base <nome>]" ;;
+        esac
+    done
+    [ -z "$esperando" ] || falha "faltou o nome depois de --base." "exemplo: dgclaw pessoa desligar $nome --base entrega-$nome"
     exigir_ferramentas jq node
     [[ "$nome" =~ $RX_NOME_PESSOA ]] || falha "o nome '$nome' nao e valido." "veja as pessoas com: dgclaw pessoa listar"
     [ -s "$DG_PAPEIS_JSON" ] && jq -e --arg n "$nome" '.pessoas[$n] != null' "$DG_PAPEIS_JSON" >/dev/null 2>&1 \
         || falha "a pessoa '$nome' nao esta em ${DG_PAPEIS_JSON#"$R"}." "veja as pessoas com: dgclaw pessoa listar"
+    # O nome da base e conferido antes de qualquer mudanca: falhar no passo 3 deixaria a pessoa desligada e
+    # os agentes parados sem a entrega.
+    base="$(pessoas_base_entrega "$nome" "$base")"
     if [ "$sim" != 1 ]; then
         [ -t 0 ] || falha "sem terminal para confirmar." "rode com --sim para desligar sem perguntar: dgclaw pessoa desligar $nome --sim"
-        printf 'Vou desligar %s: todo acesso dela e negado, os agentes dela (%s) param e a memoria deles vai para a base entrega-%s.\nNada e apagado. Digite o nome (%s) para confirmar: ' "$nome" "$(pessoas_agentes "$nome" | tr '\n' ' ')" "$nome" "$nome"
+        printf 'Vou desligar %s: todo acesso dela e negado, os agentes dela (%s) param e a memoria deles vai para a base %s.\nNada e apagado. Digite o nome (%s) para confirmar: ' "$nome" "$(pessoas_agentes "$nome" | tr '\n' ' ')" "$base" "$nome"
         local resp; read -r resp
         [ "$resp" = "$nome" ] || falha "a confirmacao nao confere (digitado: '$resp')." "nada foi feito. Rode de novo e digite $nome."
     fi
@@ -2221,10 +2235,10 @@ pessoa_desligar() {
             podman stop "dgclaw-$slug" >/dev/null && ok "agente $slug parado (a casa dele fica inteira)" || aviso "nao consegui parar o agente $slug; pare com: dgclaw agente parar $slug"
         else info "agente $slug ja estava parado"; fi
     done
-    passo "Entregando a memoria de trabalho dos agentes para a base entrega-$nome"
-    n="$(pessoas_entregar_memoria "$nome")"
-    if [ "$ENSAIO" = 1 ]; then return 0; fi
-    if [ "${n:-0}" -gt 0 ]; then ok "$n arquivo(s) copiado(s) para ${DG_BASES_DIR#"$R"}/entrega-$nome (base entrega-$nome, para o grupo dela ou a empresa)"
+    passo "Entregando a memoria de trabalho dos agentes para a base $base"
+    if [ "$ENSAIO" = 1 ]; then pessoas_entregar_memoria "$nome" "$base" 2>&1; return 0; fi
+    n="$(pessoas_entregar_memoria "$nome" "$base")"
+    if [ "${n:-0}" -gt 0 ]; then ok "$n arquivo(s) copiado(s) para ${DG_BASES_DIR#"$R"}/$base (base $base, para o grupo dela ou a empresa)"
     else info "nenhum arquivo de memoria para entregar (agentes sem memoria ou sem casa)"; fi
     info "para voltar atras: dgclaw pessoa religar $nome, e depois dgclaw agente iniciar <slug> para cada agente"
 }

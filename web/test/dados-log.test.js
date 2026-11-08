@@ -82,5 +82,9 @@ test('filtrar, resumo e csv: por agente, pessoa, fonte, decisão e período; csv
     assert.equal(linhas[0], 'quando,agente,pessoa,papel,fonte,escopo,operacao,acao,decisao,motivo,status,itens,bytes,aprovacao,por');
     assert.ok(linhas[1].includes('"a pessoa ""caio"", com vírgula, nega"'), linhas[1]);
     assert.ok(csv.includes('2026-11-08T12:00:00.000Z,ana,marta,r,clientes,,listar,,permitido,ok,200,2,100,,'));
+    // célula que uma planilha leria como fórmula ganha apóstrofo; número negativo (itens) fica número
+    const perigoso = l.csv([{ quando: '2026-11-08T12:00:00.000Z', agente: 'ana', motivo: '=HYPERLINK("http://x")', fonte: '+a', operacao: '@b', papel: '-c', itens: -1 }]);
+    assert.ok(perigoso.includes('"\'=HYPERLINK(""http://x"")"'), perigoso);
+    assert.ok(perigoso.includes(",'+a,,'@b,") && perigoso.includes(",'-c,") && perigoso.includes(',-1,'), perigoso);
   } finally { fs.rmSync(base, { recursive: true, force: true }); }
 });

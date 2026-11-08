@@ -50,7 +50,10 @@ sudo dgclaw pessoa desligar marta
 3. A memória de trabalho de cada agente (`MEMORY.md`, `working-memory.md`, `memory/*.md`) é copiada para a
    base de conhecimento `entrega-<pessoa>`, no escopo do **primeiro grupo** da pessoa (ou da empresa, se ela
    não tem grupo), com dono root e permissão 600/700. O sucessor, no mesmo grupo, consulta essa base pelo
-   agente dele. A base `privada` da pessoa **não** é copiada nem exposta.
+   agente dele. A base `privada` da pessoa **não** é copiada nem exposta. Se o nome da pessoa é longo demais
+   para o nome da base caber (40 caracteres), o comando recusa antes de mudar qualquer coisa e pede
+   `--base <nome-curto>`. Se a base já estava no catálogo (por exemplo, o dono a estreitou para `privada`
+   depois de um primeiro desligamento), ela fica como o dono deixou: só os arquivos são copiados de novo.
 4. Para desfazer: `sudo dgclaw pessoa religar marta` e `sudo dgclaw agente iniciar <slug>` para cada agente.
 
 O que fica fora, de propósito: as conversas (transcrições) não são copiadas, porque podem ter dado pessoal

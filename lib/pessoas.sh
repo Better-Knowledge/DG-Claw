@@ -41,26 +41,46 @@ _pessoas_validar_e_gravar() {
     printf '%s\n' "$novo" | escrever_arquivo "$DG_PAPEIS_JSON" 600
 }
 
+# _pessoas_mudar_estado <pessoa> <estado>: le, edita e grava DENTRO da trava, para uma edicao concorrente do
+# papeis.json (outro comando, o dono no editor) nao ser perdida entre a leitura e a escrita.
+_pessoas_mudar_estado() {
+    local novo
+    novo="$(jq --arg n "$1" --arg e "$2" '.pessoas[$n].estado = $e' "$DG_PAPEIS_JSON")" \
+        || falha "nao consegui editar ${DG_PAPEIS_JSON#"$R"} (o jq recusou o conteudo)." "confira com: jq . $DG_PAPEIS_JSON"
+    _pessoas_validar_e_gravar "$novo"
+}
+
 # pessoas_estado <pessoa> <ativa|desligada>: troca so o campo estado da pessoa.
 pessoas_estado() {
-    local nome="$1" estado="$2" novo
+    local nome="$1" estado="$2"
     [[ "$nome" =~ $RX_NOME_PESSOA ]] || falha "o nome '$nome' nao e valido." "veja as pessoas com: dgclaw pessoa listar"
     [ -s "$DG_PAPEIS_JSON" ] || falha "nao existe ${DG_PAPEIS_JSON#"$R"}." "crie o arquivo de papeis (web/docs/DADOS-POR-PAPEL.md)"
     jq -e --arg n "$nome" '.pessoas[$n] != null' "$DG_PAPEIS_JSON" >/dev/null 2>&1 \
         || falha "a pessoa '$nome' nao esta em ${DG_PAPEIS_JSON#"$R"}." "veja as pessoas com: dgclaw pessoa listar"
-    novo="$(jq --arg n "$nome" --arg e "$estado" '.pessoas[$n].estado = $e' "$DG_PAPEIS_JSON")" \
-        || falha "nao consegui editar ${DG_PAPEIS_JSON#"$R"} (o jq recusou o conteudo)." "confira com: jq . $DG_PAPEIS_JSON"
     if [ "$ENSAIO" = 1 ]; then info "[ensaio] poria estado=$estado na pessoa $nome em ${DG_PAPEIS_JSON#"$R"}"; return 0; fi
-    com_trava _pessoas_validar_e_gravar "$novo"
+    com_trava _pessoas_mudar_estado "$nome" "$estado"
 }
 
-# pessoas_entregar_memoria <pessoa>: copia a memoria dos agentes dela para a base entrega-<pessoa>.
-# Imprime quantos arquivos copiou. A base nasce no escopo do primeiro grupo da pessoa (ou empresa).
+# pessoas_base_entrega <pessoa> [base]: o nome da base que recebe a memoria (entrega-<pessoa> por padrao).
+# O catalogo aceita nomes de ate 40 caracteres; "entrega-" mais um nome de pessoa longo passa disso, e um
+# catalogo invalido fecharia TODAS as bases. Por isso o nome e conferido ANTES de qualquer mudanca.
+pessoas_base_entrega() {
+    local base="${2:-entrega-$1}"
+    [[ "$base" =~ ^[a-z][a-z0-9_-]{0,39}$ ]] \
+        || falha "o nome da base de entrega '$base' nao serve (ate 40 caracteres entre a-z, 0-9, _ e -, comecando por letra)." "escolha um nome curto com: dgclaw pessoa desligar $1 --base entrega-<nome-curto>"
+    printf '%s' "$base"
+}
+
+# pessoas_entregar_memoria <pessoa> [base]: copia a memoria dos agentes dela para a base (entrega-<pessoa>).
+# Imprime quantos arquivos copiou (so isso no stdout; avisos vao para o stderr). A base nasce no escopo do
+# primeiro grupo da pessoa (ou empresa). Base que JA ESTA no catalogo fica como esta: o dono pode ter
+# estreitado o escopo dela (para privada, por exemplo), e rodar o desligar de novo nao pode reabri-la.
 pessoas_entregar_memoria() {
-    local nome="$1" base="entrega-$1" grupo escopo destino slug casa arq n=0 rel
+    local nome="$1" base grupo escopo destino slug casa arq n=0 rel
+    base="$(pessoas_base_entrega "$nome" "${2:-}")" || return 1
     grupo="$(jq -r --arg n "$nome" '(.pessoas[$n].grupos // [])[0] // ""' "$DG_PAPEIS_JSON" 2>/dev/null)"
     if [ -n "$grupo" ]; then escopo="grupo:$grupo"; else escopo=empresa; fi
-    if [ "$ENSAIO" = 1 ]; then info "[ensaio] copiaria a memoria dos agentes de $nome para a base $base (escopo $escopo)"; return 0; fi
+    if [ "$ENSAIO" = 1 ]; then info "[ensaio] copiaria a memoria dos agentes de $nome para a base $base (escopo $escopo)" >&2; return 0; fi
     destino="$DG_BASES_DIR/$base"
     for slug in $(pessoas_agentes "$nome"); do
         casa="$DG_CASAS/$slug/home"
@@ -83,7 +103,11 @@ pessoas_entregar_memoria() {
         bases_garantir_arquivo
         local obj
         obj="$(jq -nc --arg e "${escopo%%:*}" --arg g "${grupo}" --arg t "Entrega de $nome" '{escopo: $e, nome: $t, classificacao: "interno", finalidade: "memoria de trabalho dos agentes de uma pessoa desligada, para o sucessor"} + (if $g != "" then {grupo: $g} else {} end)')"
-        bases_registrar "$base" "$obj"
+        if [ -n "$(bases_obter "$base")" ]; then
+            aviso "a base $base ja estava no catalogo; mantive o escopo e os campos dela como estavam (so os arquivos foram copiados)"
+        else
+            bases_registrar "$base" "$obj"
+        fi
     fi
     printf '%s\n' "$n"
 }
