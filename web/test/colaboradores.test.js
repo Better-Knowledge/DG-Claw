@@ -480,3 +480,18 @@ test('colaboradores.json: uma chave alheia na raiz (comentário do dono) sobrevi
     assert.equal(j.versao, 1); assert.equal(j.colaboradores.length, 1);
   } finally { await s.fechar(); }
 });
+
+test('força bruta por conta do colaborador: IP novo tranca, o IP de onde ele já entrou passa, o dono não é afetado, revogar esquece os IPs', async () => {
+  const s = await cenario();
+  try {
+    const x = await colaboradorAtivo(s); // entrou de 127.0.0.1 (a conexão de teste)
+    const arq = path.join(s.t.dados, 'sessoes.json');
+    assert.ok(JSON.parse(fs.readFileSync(arq, 'utf8')).ips_ok['colab:' + x.id], 'a memória de IPs é por registro');
+    for (let i = 0; i < 20; i += 1) await cliente(s.t.porta).post('/login', { json: { usuario: x.email, senha: 'errada-' + i }, headers: { 'X-Forwarded-For': `203.0.113.${i + 1}` } });
+    assert.equal((await cliente(s.t.porta).post('/login', { json: { usuario: x.email, senha: x.nova }, headers: { 'X-Forwarded-For': '198.51.100.9' } })).status, 429, 'IP novo com a senha certa: espera');
+    assert.equal((await cliente(s.t.porta).post('/login', { json: { usuario: x.email, senha: x.nova } })).status, 200, 'o IP de onde ela já entrou passa');
+    assert.equal((await cliente(s.t.porta).post('/login', { json: { usuario: 'dono', senha: s.t.senha }, headers: { 'X-Forwarded-For': '198.51.100.10' } })).status, 200, 'o dono não é afetado');
+    assert.equal((await s.dono.pedir('DELETE', '/api/v1/colaboradores/' + x.id)).status, 200);
+    assert.equal(JSON.parse(fs.readFileSync(arq, 'utf8')).ips_ok['colab:' + x.id], undefined, 'revogar apaga a memória de IPs do registro');
+  } finally { await s.fechar(); }
+});

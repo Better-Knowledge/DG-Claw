@@ -15,6 +15,12 @@ const TENTATIVAS_MAX = 5;
 // tentativas e chutar a senha do dono sem parar.
 const TENTATIVAS_MAX_POR_IP = 20;
 const JANELA_MS = 15 * 60 * 1000;
+// Terceiro contador: por CONTA, somando todos os IPs (força bruta distribuída contra um login só). Conta sob ataque
+// só aceita chaves de IP que JÁ ENTRARAM nela com sucesso nos últimos 30 dias (lembradas em sessoes.json).
+const TENTATIVAS_CONTA_MAX = 20;
+const IPS_OK_POR_CONTA = 10;
+const IPS_OK_MS = 30 * 24 * 60 * 60 * 1000;
+const MAX_CONTAS_LEMBRADAS = 5000;
 const MAX_SESSOES = 200;
 const MAX_SESSOES_POR_COLABORADOR = 10;
 // scrypt com N alto pode usar centenas de MB por chamada: no máximo 2 contas ao mesmo tempo,
@@ -145,6 +151,7 @@ function criarAuth({ config, log, agora, colaboradores: colabsInicial }) {
         if (!marcaConfere(v)) { descartadas++; continue; }
         sessoes.set(k, v);
       }
+      for (const [conta, m] of Object.entries(j.ips_ok || {})) if (m && typeof m === 'object') ipsOk.set(conta, new Map(Object.entries(m).filter(([, t]) => typeof t === 'number' && relogio() - t < IPS_OK_MS)));
       if (descartadas) {
         log('info', `${descartadas} sessão(ões) do painel descartada(s): a senha ou o usuário do painel mudou (ou a sessão é de uma versão antiga, sem a marca da senha); quem estava logado precisa entrar de novo.`);
         salva();
@@ -156,7 +163,7 @@ function criarAuth({ config, log, agora, colaboradores: colabsInicial }) {
   function salva() {
     try {
       const tmp = `${arquivo}.${process.pid}.tmp`;
-      fs.writeFileSync(tmp, JSON.stringify({ versao: 1, sessoes: Object.fromEntries(sessoes) }), { mode: 0o600 });
+      fs.writeFileSync(tmp, JSON.stringify({ versao: 1, sessoes: Object.fromEntries(sessoes), ips_ok: Object.fromEntries([...ipsOk].map(([c, m]) => [c, Object.fromEntries(m)])) }), { mode: 0o600 });
       fs.renameSync(tmp, arquivo);
     } catch (e) {
       log('erro', `Não consegui gravar as sessões em ${arquivo} (${e.code || e.message}). O login continua valendo até o próximo restart; confira a permissão de ${config.dataDir}.`);
@@ -174,6 +181,37 @@ function criarAuth({ config, log, agora, colaboradores: colabsInicial }) {
       sessoes.delete(alvo !== null ? alvo : sessoes.keys().next().value);
     }
   }
+  // ── IPs com login certo por conta (lidos por carrega(), então declarados antes dela rodar) ──────────────────
+  const falhasConta = new Map(); // identidade -> [timestamps], somando todos os IPs
+  const ipsOk = new Map();       // chave da conta -> Map(chave de ip -> instante do último login certo)
+  /** A chave do IP para a memória da conta: IPv4 inteiro; IPv6 agrupado por /64 (um aparelho tem o /64 inteiro). */
+  function chaveIp(ip) {
+    const s = String(ip || '');
+    if (!s.includes(':')) return s;
+    const [cabeca, cauda] = s.split('::');
+    const a = cabeca ? cabeca.split(':') : [];
+    const b = cauda ? cauda.split(':') : [];
+    const grupos = a.concat(new Array(Math.max(0, 8 - a.length - b.length)).fill('0'), b).map((g) => g.padStart(4, '0').toLowerCase());
+    return grupos.slice(0, 4).join(':') + '::/64';
+  }
+  function ipConhecido(conta, ip) {
+    const m = ipsOk.get(conta);
+    if (!m || !ip) return false;
+    const t = m.get(chaveIp(ip));
+    return typeof t === 'number' && relogio() - t < IPS_OK_MS;
+  }
+  // Os mapas despejam pela ordem de inserção; apagar antes de gravar move o usado agora para o fim (despejo por uso).
+  function lembraIpOk(conta, ip) {
+    if (!conta || !ip) return;
+    const m = ipsOk.get(conta) || new Map();
+    const k = chaveIp(ip);
+    m.delete(k); m.set(k, relogio());
+    for (const [kk, t] of m) if (relogio() - t >= IPS_OK_MS) m.delete(kk);
+    while (m.size > IPS_OK_POR_CONTA) m.delete(m.keys().next().value);
+    ipsOk.delete(conta); ipsOk.set(conta, m);
+    while (ipsOk.size > MAX_CONTAS_LEMBRADAS) ipsOk.delete(ipsOk.keys().next().value);
+  }
+  function esqueceIpsOk(conta) { if (ipsOk.delete(conta)) salva(); }
   carrega();
 
   // ── limite de tentativas ─────────────────────────────────────────────────
@@ -190,13 +228,20 @@ function criarAuth({ config, log, agora, colaboradores: colabsInicial }) {
   }
   const chaveIdentidade = (identidade, ip) => `${identidade}\n${ip}`;
   function segundosAte(lista) { return Math.max(1, Math.ceil((lista[0] + JANELA_MS - relogio()) / 1000)); }
-  /** Devolve { bloqueado, retryAfter } (segundos) para esta identidade neste IP, olhando os dois contadores. */
-  function bloqueioLogin(identidade, ip) {
+  /**
+   * Devolve { bloqueado, retryAfter } (segundos) para esta identidade neste IP, olhando os três contadores. O da conta
+   * (20 erros em 15 min, de qualquer origem) só é ignorado para um IP que já entrou nela (`contaIpsOk` é a chave da
+   * memória; por padrão a própria identidade). Um login certo NÃO zera esse contador: zerar devolveria 20 tentativas
+   * a qualquer origem a cada entrada do dono.
+   */
+  function bloqueioLogin(identidade, ip, contaIpsOk) {
     let espera = 0;
     const da = janelaDe(falhasIdentidade, chaveIdentidade(identidade, ip));
     if (da.length >= TENTATIVAS_MAX) espera = segundosAte(da);
     const doIp = janelaDe(falhasIp, ip);
     if (doIp.length >= TENTATIVAS_MAX_POR_IP) espera = Math.max(espera, segundosAte(doIp));
+    const daConta = janelaDe(falhasConta, identidade);
+    if (daConta.length >= TENTATIVAS_CONTA_MAX && !ipConhecido(contaIpsOk || identidade, ip)) espera = Math.max(espera, segundosAte(daConta));
     return espera ? { bloqueado: true, retryAfter: espera } : { bloqueado: false, retryAfter: 0 };
   }
   function registraFalhaLogin(identidade, ip) {
@@ -204,6 +249,8 @@ function criarAuth({ config, log, agora, colaboradores: colabsInicial }) {
     const k = chaveIdentidade(identidade, ip);
     falhasIdentidade.set(k, [...janelaDe(falhasIdentidade, k), t]);
     falhasIp.set(ip, [...janelaDe(falhasIp, ip), t]);
+    falhasConta.set(identidade, [...janelaDe(falhasConta, identidade), t]);
+    if (falhasConta.size > MAX_CONTAS_LEMBRADAS) for (const [c, v] of falhasConta) if (!v.some((x) => t - x < JANELA_MS)) falhasConta.delete(c);
   }
   /** Acerto: zera só o contador desta identidade neste IP. O do IP inteiro continua contando. */
   const limpaFalhasDe = (identidade, ip) => falhasIdentidade.delete(chaveIdentidade(identidade, ip));
@@ -259,7 +306,7 @@ function criarAuth({ config, log, agora, colaboradores: colabsInicial }) {
       const senhaOk = calculado.length === parsed.hash.length && crypto.timingSafeEqual(calculado, parsed.hash);
       const usuarioOk = comparaTempoConstante(usuarioInformado == null ? '' : usuarioInformado, usuario);
       if (senhaOk && usuarioOk) {
-        if (ip) limpaFalhasDe(IDENT_DONO, ip);
+        if (ip) { limpaFalhasDe(IDENT_DONO, ip); lembraIpOk(IDENT_DONO, ip); }
         return { ok: true, usuario, papel: 'dono' };
       }
       if (ip) registraFalhaLogin(IDENT_DONO, ip);
@@ -300,6 +347,8 @@ function criarAuth({ config, log, agora, colaboradores: colabsInicial }) {
       if (colaborador) { const ags = registroAgentes(colaborador).slice(); Object.assign(reg, { papel: 'colaborador', colaborador_id: colaborador.id, agentes: ags, agente: ags[0], senha_versao: colaborador.senha_versao }); }
       sessoes.set(sha256hex(token), reg);
       limpaExpiradas();
+      // sessão aberta por aqui (login certo, link, troca de senha) conta como "este IP entrou nesta conta"
+      if (req && req.headers) lembraIpOk(colaborador ? `colab:${colaborador.id}` : IDENT_DONO, ipDoPedido(req, config.proxiesConfiaveis));
       salva();
       const cookie = montaCookie(token, config.sessaoDias * 86400, req);
       return { token, expira: expiraFinal, cookie, cookies: [cookie, montaCookiePapel(colaborador ? 'colaborador' : 'dono', req)] };
@@ -336,6 +385,9 @@ function criarAuth({ config, log, agora, colaboradores: colabsInicial }) {
       } finally { scryptEmCurso--; }
     },
 
+    /** Esquece os IPs que já entraram numa conta (colaborador revogado): a memória é por registro, e um convite novo nasce do zero. */
+    esqueceIpsOk(chave) { esqueceIpsOk(chave); },
+
     /** Apaga todas as sessões de um colaborador (revogação, convite novo, troca de senha). Devolve quantas. */
     encerraDoColaborador(id) {
       let n = 0;
@@ -355,13 +407,14 @@ function criarAuth({ config, log, agora, colaboradores: colabsInicial }) {
   // ── colaboradores (funções separadas das do dono, para facilitar o rebase) ──
   async function verificaColaborador(emailInformado, senha, ip) {
     const identidade = `colaborador:${String(emailInformado == null ? '' : emailInformado).trim().toLowerCase().slice(0, 200)}`;
-    const b = ip ? bloqueioLogin(identidade, ip) : { bloqueado: false };
+    const c = colaboradores.porEmailAtivo(emailInformado);
+    // a memória de IPs é por registro (`colab:<id>`): um convite novo para o mesmo e-mail nasce do zero
+    const b = ip ? bloqueioLogin(identidade, ip, c ? `colab:${c.id}` : identidade) : { bloqueado: false };
     if (b.bloqueado) return { ok: false, limite: true, retryAfter: b.retryAfter, erro: `Muitas tentativas erradas. Tente de novo em ${Math.ceil(b.retryAfter / 60)} min.` };
     if (scryptEmCurso >= SCRYPT_SIMULTANEOS) {
       log('aviso', `Login de ${ip || '(sem IP)'} recusado: já há ${scryptEmCurso} senhas sendo conferidas ao mesmo tempo.`);
       return { ok: false, limite: true, retryAfter: 2, erro: 'Muitas tentativas ao mesmo tempo. Tente de novo em alguns segundos.' };
     }
-    const c = colaboradores.porEmailAtivo(emailInformado);
     // O registro pode mudar DURANTE o scrypt (o dono reenvia o convite, o colaborador troca a senha) e os objetos
     // do registro são alterados no lugar. O que foi conferido fica em constantes aqui, antes do await.
     const visto = c ? { id: c.id, email: c.email, agentes: registroAgentes(c).slice(), hash: c.hash, versao: c.senha_versao || 1 } : null;
@@ -395,7 +448,7 @@ function criarAuth({ config, log, agora, colaboradores: colabsInicial }) {
       log('aviso', `Login de ${visto.email} (ip ${ip || '?'}) recusado: o convite era de uma instância antiga do(s) agente(s) ${registroAgentes(atual).join(', ')} (removido e recriado).`);
       return { ok: false, erro: MOTIVO_INSTANCIA };
     }
-    if (ip) limpaFalhasDe(identidade, ip);
+    if (ip) { limpaFalhasDe(identidade, ip); lembraIpOk(`colab:${atual.id}`, ip); }
     if (atual.trocar_senha && Number(atual.temporaria_expira) < relogio()) {
       return { ok: false, vencida: true, erro: 'A senha temporária venceu. Peça ao dono do DG Claw um convite novo.' };
     }

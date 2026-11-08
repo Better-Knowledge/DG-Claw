@@ -260,3 +260,49 @@ test('sessão: painel sem senha ainda não lança e o primeiro acesso cria sess�
   } finally { e.limpa(); }
 });
 void cliente;
+
+test('força bruta por conta: 20 erros de IPs diferentes trancam o login para IP novo, mesmo com a senha certa; IP que já entrou passa; sobrevive ao reinício', async () => {
+  const t = await subirWeb({ agentes: AG });
+  let t2 = null;
+  try {
+    // o dono entra da rede de casa: esse IP fica lembrado (sessoes.json)
+    assert.equal((await cliente(t.porta).post('/login', { json: { usuario: 'dono', senha: t.senha }, headers: { 'X-Forwarded-For': '10.9.9.9' } })).status, 200);
+    const salvo = JSON.parse(fs.readFileSync(path.join(t.dados, 'sessoes.json'), 'utf8'));
+    assert.ok(salvo.ips_ok && salvo.ips_ok.dono && typeof salvo.ips_ok.dono['10.9.9.9'] === 'number', 'o IP com login certo vai para o disco');
+    // 20 erros contra a conta do dono, cada um de um IP (nenhum IP chega ao limite de 5)
+    for (let i = 0; i < 20; i += 1) assert.equal((await cliente(t.porta).post('/login', { json: { usuario: 'dono', senha: 'errada-' + i }, headers: { 'X-Forwarded-For': `203.0.113.${i + 1}` } })).status, 401);
+    assert.equal((await cliente(t.porta).post('/login', { json: { usuario: 'dono', senha: t.senha }, headers: { 'X-Forwarded-For': '198.51.100.9' } })).status, 429, 'IP novo, mesmo limpo e com a senha certa: espera a janela');
+    let novos429 = 0;
+    for (let i = 0; i < 30; i += 1) if ((await cliente(t.porta).post('/login', { json: { usuario: 'dono', senha: 'palpite-' + i }, headers: { 'X-Forwarded-For': `2001:db8:0:${i.toString(16)}::1` } })).status === 429) novos429 += 1;
+    assert.equal(novos429, 30, 'força bruta distribuída por /64 novos não ganha nem uma tentativa');
+    assert.equal((await cliente(t.porta).post('/login', { json: { usuario: 'dono', senha: t.senha }, headers: { 'X-Forwarded-For': '10.9.9.9' } })).status, 200, 'o IP de casa passa mesmo com a conta sob ataque');
+    assert.equal((await cliente(t.porta).post('/login', { json: { usuario: 'dono', senha: 'errada-x' }, headers: { 'X-Forwarded-For': '198.51.100.77' } })).status, 429, 'o login certo de casa NÃO zerou o contador da conta');
+    assert.equal((await cliente(t.porta).post('/login', { json: { usuario: 'outra@x.com', senha: 'x' }, headers: { 'X-Forwarded-For': '198.51.100.78' } })).status, 401, 'outra identidade não é afetada');
+    // IPv6: outro endereço do mesmo /64 de casa conta como o mesmo aparelho
+    assert.equal((await cliente(t.porta).post('/login', { json: { usuario: 'dono', senha: t.senha }, headers: { 'X-Forwarded-For': '2001:db8:1:2::1' } })).status, 429);
+    await t.fechar();
+    // reinício na MESMA pasta: o ips_ok é lido sem aviso e o IP de casa continua valendo
+    t2 = await subirWeb({ agentes: AG, opcoesServidor: { dataDir: t.dados } });
+    assert.ok(!t2.log.linhas.some((l) => /Não li as sessões/.test(l)), `o arquivo de sessões foi lido inteiro: ${t2.log.linhas.join(' | ')}`);
+    for (let i = 0; i < 20; i += 1) await cliente(t2.porta).post('/login', { json: { usuario: 'dono', senha: 'errada-' + i }, headers: { 'X-Forwarded-For': `203.0.113.${i + 1}` } });
+    assert.equal((await cliente(t2.porta).post('/login', { json: { usuario: 'dono', senha: t.senha }, headers: { 'X-Forwarded-For': '198.51.100.9' } })).status, 429);
+    assert.equal((await cliente(t2.porta).post('/login', { json: { usuario: 'dono', senha: t.senha }, headers: { 'X-Forwarded-For': '10.9.9.9' } })).status, 200, 'o IP lembrado antes do reinício passa');
+  } finally { if (t2) await t2.fechar(); else await t.fechar(); }
+});
+
+test('força bruta por conta: a conta lembra até 10 chaves de IP e despeja a MENOS usada, não a mais antiga', () => {
+  const { criarAuth } = require('../lib/auth');
+  const { gerarHash, pastaTemp, capturaLog } = require('./ajuda');
+  const dados = pastaTemp('auth-ipsok');
+  let agora = 1_700_000_000_000;
+  const auth = criarAuth({ config: { env: { DGCLAW_PANEL_USER: 'dono', DGCLAW_PANEL_PASSWORD_HASH: gerarHash('senha-certa-123') }, dataDir: dados, sessaoDias: 1, proxiesConfiaveis: new Set() }, log: capturaLog().log, agora: () => agora });
+  const fakeReq = (ip) => ({ headers: {}, socket: { remoteAddress: ip } });
+  auth.criaSessao('dono', fakeReq('10.0.0.1')); // "casa", a primeira
+  for (let i = 0; i < 9; i += 1) { agora += 1000; auth.criaSessao('dono', fakeReq(`192.0.2.${i + 1}`)); }
+  agora += 1000; auth.criaSessao('dono', fakeReq('10.0.0.1')); // casa, usada de novo (vai para o fim)
+  agora += 1000; auth.criaSessao('dono', fakeReq('198.51.100.1')); // a 11ª: despeja a menos usada (192.0.2.1), não a casa
+  const ips = JSON.parse(fs.readFileSync(path.join(dados, 'sessoes.json'), 'utf8')).ips_ok.dono;
+  assert.equal(Object.keys(ips).length, 10);
+  assert.ok(ips['10.0.0.1'], 'a casa, usada hoje, continua lembrada');
+  assert.equal(ips['192.0.2.1'], undefined, 'a chave sem uso há mais tempo foi despejada');
+});

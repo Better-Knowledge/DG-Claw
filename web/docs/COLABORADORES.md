@@ -44,6 +44,10 @@ Um agente pode ter **várias** pessoas convidadas, e uma pessoa pode usar **vár
 
 A senha temporária vale por 7 dias. Passado o prazo, o login dela avisa que a senha venceu e você manda o convite de novo.
 
+Se alguém tentar adivinhar a senha dela (20 erros em 15 minutos, de qualquer lugar), o login dela fica fechado para
+endereços novos até a janela passar, mas continua aberto para os aparelhos de onde ela já entrou nos últimos 30 dias.
+Se ela precisar entrar de um lugar novo nesse meio tempo, mande o convite de novo.
+
 ### Mandar o convite de novo, revogar e a lista
 
 - **Mandar convite de novo** gera outra senha temporária, derruba as sessões abertas da pessoa e a obriga a criar a senha de novo. Serve para senha esquecida ou vencida.

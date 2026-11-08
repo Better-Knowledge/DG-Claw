@@ -188,6 +188,7 @@ function criarColaboradoresRotas({ colaboradores, auth, registro, email, config,
         if (m === 'DELETE') {
           const r = await colaboradores.revogar(id);
           derruba(id);
+          if (auth.esqueceIpsOk) auth.esqueceIpsOk(`colab:${id}`);
           log('info', `Acesso de ${r.email} (agentes ${r.agentes.join(', ')}) revogado (por ${sessao.usuario}).`);
           H.enviaJson(res, 200, { ok: true, colaborador: r });
           return true;
