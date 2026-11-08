@@ -47,17 +47,20 @@ const RX_CABECALHO_AGENTE = /^X-[A-Za-z0-9-]{1,59}$/;
 // (X-Remote-User, X-WebAuth-User, X-User...), autenticação e segredo (token, key, signature, cookie, session...),
 // proxy e reescrita (X-Forwarded-*, X-Real-IP, X-Rewrite-URL...), troca de método, e os cabeçalhos do próprio DG Claw.
 const CABECALHO_PREFIXOS_PROIBIDOS = /^x-(forwarded(-|$)|http-method|method-override|rewrite-url$|override-url$|host$|scheme$|real-ip$|remote-|webauth-|(cluster-)?client-ip$|originating-ip$|original-|dgclaw-(caixa|proxy|usuario)$|requested-with$|csrf|xsrf|auth)/i;
-const CABECALHO_SEGMENTOS_PROIBIDOS = new Set(['token', 'key', 'secret', 'signature', 'password', 'senha', 'cookie', 'session', 'user', 'username', 'email', 'group', 'groups', 'role', 'roles', 'admin', 'impersonate', 'authorization', 'credential', 'credentials']);
+const CABECALHO_SEGMENTOS_PROIBIDOS = new Set(['token', 'key', 'secret', 'signature', 'password', 'passwd', 'pwd', 'pass', 'senha', 'cookie', 'session', 'user', 'username', 'userid', 'userinfo', 'uid', 'login', 'principal', 'identity', 'subject', 'consumer', 'email', 'group', 'groups', 'role', 'roles', 'admin', 'root', 'sudo', 'superuser', 'owner', 'impersonate', 'act', 'run', 'auth', 'authorization', 'credential', 'credentials', 'jwt', 'assertion', 'bypass', 'skip', 'internal']);
+// Um segmento colado também conta (X-ApiKey, X-AccessToken, X-ClientSecret): o sufixo de segredo é proibido em qualquer segmento.
+const RX_SEGMENTO_SUFIXO_SEGREDO = /(token|secret|password|passwd|senha|signature|jwt|key)$/;
 function cabecalhoAgenteProibido(nome) {
   const n = String(nome).toLowerCase();
   if (CABECALHO_PREFIXOS_PROIBIDOS.test(n)) return true;
-  return n.split('-').some((seg) => CABECALHO_SEGMENTOS_PROIBIDOS.has(seg));
+  return n.split('-').some((seg) => CABECALHO_SEGMENTOS_PROIBIDOS.has(seg) || RX_SEGMENTO_SUFIXO_SEGREDO.test(seg));
 }
 // A variável que leva o slug do agente ao servidor MCP tem de ser própria do DG Claw: uma lista negra nunca
 // alcança tudo o que muda como um programa roda (NODE_*, OPENSSL_*, GCONV_PATH, PAGER...).
-// DGCLAW_AGENTE (ou DGCLAW_AGENTE_<algo>): o prefixo DGCLAW_ sozinho é o espaço das variáveis que os programas do
-// próprio DG Claw leem (DGCLAW_RAIZ, DGCLAW_WEB_DATA...), e um wrapper que chame um script do projeto não pode recebê-las.
-const RX_ENV_AGENTE = /^DGCLAW_AGENTE(_[A-Z0-9_]{1,50})?$/;
+// Só DGCLAW_AGENTE ou DGCLAW_AGENTE_SLUG: o prefixo DGCLAW_ é o espaço das variáveis que os programas do próprio
+// DG Claw leem (DGCLAW_RAIZ, DGCLAW_WEB_DATA, e também DGCLAW_AGENTE_ID, que o runner e o monitor usam), e um wrapper
+// que chame um script do projeto não pode recebê-las com o valor que o gateway manda.
+const RX_ENV_AGENTE = /^DGCLAW_AGENTE(_SLUG)?$/;
 const CAMPOS_OP_COMUNS = ['escopo', 'params', 'acao', 'descricao', 'comentario', 'campos', 'max_itens'];
 const CAMPOS_OP_POR_TIPO = { api: ['metodo', 'rota'], banco: ['sql'], mcp: ['tool'] };
 const MAX_FERRAMENTAS = 200;
@@ -182,7 +185,7 @@ function validaFerramentas(bruto) {
         }
         norm.auth = ehObjeto(a) ? { tipo: a.tipo, nome: a.nome || null } : { tipo: 'nenhuma', nome: null };
         // O sistema de destino pode saber qual agente chamou: o gateway manda o slug neste cabeçalho (nunca a credencial).
-        if (f.cabecalho_agente !== undefined && (typeof f.cabecalho_agente !== 'string' || !RX_CABECALHO_AGENTE.test(f.cabecalho_agente) || cabecalhoAgenteProibido(f.cabecalho_agente) || (norm.auth.nome && f.cabecalho_agente.toLowerCase() === norm.auth.nome.toLowerCase()))) erros.push(`${onde}.cabecalho_agente precisa ser o nome de um cabeçalho HTTP próprio, começando por X- (ex.: X-DGClaw-Agente), que não seja de autenticação, de proxy (X-Forwarded-*, X-Real-IP) nem de troca de método (X-HTTP-Method-Override).`);
+        if (f.cabecalho_agente !== undefined && (typeof f.cabecalho_agente !== 'string' || !RX_CABECALHO_AGENTE.test(f.cabecalho_agente) || cabecalhoAgenteProibido(f.cabecalho_agente) || (norm.auth.nome && f.cabecalho_agente.toLowerCase() === norm.auth.nome.toLowerCase()))) erros.push(`${onde}.cabecalho_agente precisa ser o nome de um cabeçalho HTTP próprio, começando por X- (ex.: X-DGClaw-Agente), que não seja de autenticação, de proxy (X-Forwarded-*, X-Real-IP) nem de troca de método (X-HTTP-Method-Override), e sem um pedaço como token, key, user, email, session ou cookie no nome (X-Session-Id e X-ApiKey não servem).`);
         norm.cabecalho_agente = typeof f.cabecalho_agente === 'string' ? f.cabecalho_agente : null;
       }
       if (f.tipo === 'banco') {
@@ -195,7 +198,7 @@ function validaFerramentas(bruto) {
         if (f.args !== undefined && (!Array.isArray(f.args) || f.args.length > 30 || f.args.some((x) => typeof x !== 'string' || x.length > 300 || /[\u0000-\u001f]/.test(x)))) erros.push(`${onde}.args precisa ser uma lista de até 30 textos.`);
         if (f.credencial_env !== undefined && (typeof f.credencial_env !== 'string' || !RX_ENV.test(f.credencial_env))) erros.push(`${onde}.credencial_env precisa ser o nome de uma variável de ambiente (MAIÚSCULAS).`);
         if (temAlgumaCredencial && !f.credencial_env) erros.push(`${onde}: com "credencial" (ou "credenciais"), diga em qual variável ela vai ("credencial_env").`);
-        if (f.env_agente !== undefined && (typeof f.env_agente !== 'string' || !RX_ENV_AGENTE.test(f.env_agente) || f.env_agente === f.credencial_env || (ehObjeto(f.env) && Object.prototype.hasOwnProperty.call(f.env, f.env_agente)))) erros.push(`${onde}.env_agente precisa ser DGCLAW_AGENTE (ou DGCLAW_AGENTE_<algo>), diferente de credencial_env e das chaves de "env".`);
+        if (f.env_agente !== undefined && (typeof f.env_agente !== 'string' || !RX_ENV_AGENTE.test(f.env_agente) || f.env_agente === f.credencial_env || (ehObjeto(f.env) && Object.prototype.hasOwnProperty.call(f.env, f.env_agente)))) erros.push(`${onde}.env_agente precisa ser DGCLAW_AGENTE ou DGCLAW_AGENTE_SLUG, diferente de credencial_env e das chaves de "env".`);
         if (f.env !== undefined && (!ehObjeto(f.env) || Object.keys(f.env).length > 20 || Object.entries(f.env).some(([k, v]) => !RX_ENV.test(k) || typeof v !== 'string' || v.length > 300 || /[\u0000-\u001f]/.test(v)))) erros.push(`${onde}.env precisa ser um objeto { "VAR": "valor" } com até 20 itens.`);
         else if (f.env && f.credencial_env && Object.prototype.hasOwnProperty.call(f.env, f.credencial_env)) erros.push(`${onde}.env não pode definir ${f.credencial_env}: a credencial vem do cofre de sistemas.`);
         if (f.env && Object.keys(f.env).some((k) => /(TOKEN|SECRET|KEY|PASSWORD|SENHA)/.test(k))) erros.push(`${onde}.env parece ter um segredo (TOKEN, KEY, SECRET...). Segredo vai para o cofre de sistemas, não para o catálogo.`);
