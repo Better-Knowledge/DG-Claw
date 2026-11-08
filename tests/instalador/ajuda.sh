@@ -48,6 +48,7 @@ novo_cenario() {
     echo '{"name":"runner"}' >"$FALSO/runner/package.json"
     echo 'FROM scratch' >"$FALSO/container/Containerfile"
     echo '# Admin (Claude)' >"$FALSO/templates/admin/CLAUDE.md"
+    cp "$REPO/templates/papeis.exemplo.json" "$FALSO/templates/papeis.exemplo.json"
     echo '# Admin (Codex)' >"$FALSO/templates/admin/AGENTS.md"
     echo '# criar-agente' >"$FALSO/skills/criar-agente/SKILL.md"
     echo '# trocar-dominio' >"$FALSO/skills/trocar-dominio/SKILL.md"

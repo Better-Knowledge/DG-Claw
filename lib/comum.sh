@@ -26,10 +26,11 @@ DG_LOG="$R/var/log/dgclaw"
 DG_UNITS="$R/etc/systemd/system"
 DG_BIN="$R/usr/local/bin"
 DG_AGENTES_JSON="$DG_ETC/agentes.json"
+DG_PAPEIS_JSON="$DG_ETC/papeis.json"
 DG_REGISTRO="$DG_ETC/registro.tsv"
 DG_TRAVA="$DG_ETC/.agentes.lock"
 DG_IMAGEM_PADRAO="localhost/dgclaw-agente:latest"
-export R DG_ETC DG_OPT DG_APP DG_ADMIN DG_LIB DG_LOG DG_UNITS DG_BIN DG_AGENTES_JSON DG_REGISTRO DG_TRAVA
+export R DG_ETC DG_OPT DG_APP DG_ADMIN DG_LIB DG_LOG DG_UNITS DG_BIN DG_AGENTES_JSON DG_PAPEIS_JSON DG_REGISTRO DG_TRAVA
 
 ENSAIO="${ENSAIO:-0}"
 

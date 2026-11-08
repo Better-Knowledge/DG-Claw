@@ -1198,6 +1198,8 @@ FIM
     # Sem reiniciar sozinho: quem roda este instalador pode ser o proprio Admin.
     ligar_unidade dgclaw-admin.service avisar
 
+    # Papeis de acesso a dados: so cria se nao existe; o que o dono editou fica (web/docs/DADOS-POR-PAPEL.md).
+    papeis_garantir_arquivo "$SCRIPT_DIR/templates/papeis.exemplo.json"
     if tem_jq; then
         agentes_garantir_arquivo
         jq -n --arg prov "$PROVEDOR" --arg transcripts "$transcripts" --arg admin "$p_admin" --arg etc "$p_etc" '

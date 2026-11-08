@@ -40,6 +40,8 @@ caso_instalacao_cria_arquivos_com_os_modos_certos() {
     afirma "token do admin 600" modo_e "$e/runner/admin.token" 600
     afirma "token do admin com 64 hex" grep -qE '^[0-9a-f]{64}$' "$e/runner/admin.token"
     afirma "agentes.json 640" modo_e "$e/agentes.json" 640
+    afirma "papeis.json 600" modo_e "$e/papeis.json" 600
+    afirma "papeis.json vem do modelo e nega tudo (sem agente ligado)" jq -e '.versao == 1 and (.agentes | length) == 0 and (.papeis | length) >= 1' "$e/papeis.json"
     afirma "agentes.json com um Admin" jq -e '(.agentes | length) == 1 and .agentes[0].slug == "admin" and .agentes[0].tipo == "admin" and .agentes[0].runner == "http://127.0.0.1:4300" and .agentes[0].chat_id == "c_admin" and .agentes[0].transcripts_dir == "/root/.claude/projects/-opt-dgclaw-admin" and .agentes[0].runner_token_arquivo == "/etc/dgclaw/runner/admin.token" and .agentes[0].porta_painel == null' "$e/agentes.json"
     nega "agentes.json sem caminho da raiz de teste" tem "$e/agentes.json" "$RAIZ"
     afirma "pasta do admin 700" modo_e "$a/admin" 700
@@ -213,6 +215,25 @@ caso_reinstalar_preserva_chaves_do_web_env() {
     afirma "usuario certo" grep -qx 'DGCLAW_PANEL_USER=maria' "$e"
     afirma "hash no formato" grep -qE "^DGCLAW_PANEL_PASSWORD_HASH='scrypt[$]teste[$][0-9a-f]{64}'$" "$e"
     afirma "ainda 600" modo_e "$e" 600
+    limpar_cenario
+}
+
+caso_reinstalar_preserva_o_papeis_json_editado() {
+    novo_cenario
+    afirma "primeira rodada" instalacao_basica
+    local e="$RAIZ/etc/dgclaw/papeis.json"
+    # O dono ligou um agente a mao (um JSON proprio, diferente do modelo): a atualizacao nao pode voltar ao modelo.
+    printf '{"versao": 1, "comentario": "linha da pessoa", "pessoas": {"marta": {}}, "papeis": {"r": {}}, "agentes": {"ana": {"pessoa": "marta", "papel": "r"}}}\n' >"$e"
+    chmod 600 "$e"
+    cp "$e" "$TMP/papeis1"
+    afirma "segunda rodada" instalar "" --usuario maria --provedor claude
+    afirma "papeis.json editado continua igual" cmp "$TMP/papeis1" "$e"
+    afirma "ainda 600" modo_e "$e" 600
+    # E sem o modelo no repositorio (clone antigo, zip), a primeira instalacao grava a politica vazia em vez de falhar.
+    rm -f "$e" "$FALSO/templates/papeis.exemplo.json"
+    afirma "terceira rodada sem o modelo" instalar "" --usuario maria --provedor claude
+    afirma "papeis.json vazio e valido" jq -e '.versao == 1 and (.agentes | length) == 0' "$e"
+    afirma "600 tambem no vazio" modo_e "$e" 600
     limpar_cenario
 }
 

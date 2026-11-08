@@ -1,0 +1,39 @@
+{
+  "versao": 1,
+  "comentario": "Papéis de acesso a dados dos agentes (web/docs/DADOS-POR-PAPEL.md). O que não está escrito aqui é negado. Um agente só alcança uma fonte se a PESSOA dele e o PAPEL dele a liberam; os campos são a interseção dos dois. Toda ação (enviar e-mail, por exemplo) pede a aprovação de uma pessoa no painel, em /dados. Para ligar um agente, acrescente-o em \"agentes\" apontando para uma pessoa e um papel. Os nomes abaixo são só modelo: troque pelos seus. O Web relê o arquivo sozinho quando ele muda; se ficar inválido, todo acesso a dados fica negado até você corrigir.",
+  "pessoas": {
+    "exemplo-pessoa": {
+      "nome": "Nome da pessoa (modelo)",
+      "fontes": {
+        "agenda": "leitura",
+        "clientes": { "nivel": "leitura", "campos": ["nome", "telefone", "email"] },
+        "pasta": "leitura"
+      },
+      "acoes": {
+        "enviar_email": "aprovacao_humana"
+      }
+    }
+  },
+  "papeis": {
+    "recepcao": {
+      "comentario": "Vê a agenda, só nome e telefone dos clientes e a pasta de documentos. Nunca a folha. Enviar e-mail só com aprovação.",
+      "fontes": {
+        "agenda": "leitura",
+        "clientes": { "nivel": "leitura", "campos": ["nome", "telefone"] },
+        "pasta": "leitura",
+        "folha": "negado"
+      },
+      "acoes": {
+        "enviar_email": "aprovacao_humana",
+        "apagar_arquivo": "negado"
+      }
+    },
+    "analista": {
+      "comentario": "Só a agenda. Sem ação externa.",
+      "fontes": {
+        "agenda": "leitura"
+      }
+    }
+  },
+  "agentes": {}
+}
