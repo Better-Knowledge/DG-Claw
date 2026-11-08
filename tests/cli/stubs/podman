@@ -2,6 +2,8 @@
 # podman de mentira: registra o argv e simula so o estado que os testes consultam.
 echo "podman $*" >> "${STUB_LOG:?}"
 est="${STUB_ESTADO:?}"
+# podman-quebrado: tudo falha com 125 (banco travado, servico fora), como o podman de verdade faz.
+if [ -f "$est/podman-quebrado" ]; then echo "Error: database is locked" >&2; exit 125; fi
 case "${1:-}" in
     image)
         # `image inspect -f {{.Id}}`: o id da imagem "atual" (muda quando o teste escreve estado/imagem-id).

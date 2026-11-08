@@ -2198,6 +2198,20 @@ pessoa_listar() {
     printf '%s\n' "$tsv" | awk -F'\t' '{printf "%-20s %-10s %-28s %s\n", $1, $2, ($3 == "" ? "-" : $3), ($4 == "" ? "-" : $4)}'
 }
 
+# _pessoa_estado_agente <slug>: o estado do container do agente para o desligar. "ausente" so quando o podman
+# CONFIRMA que o container nao existe (container exists devolve 1); qualquer outro erro vira "erro:<codigo>",
+# para a entrega bloquear em vez de tratar podman travado como agente parado.
+_pessoa_estado_agente() {
+    local c="dgclaw-$1" rc=0 est
+    podman container exists "$c" >/dev/null 2>&1 || rc=$?
+    case "$rc" in
+        0) est="$(podman inspect -f '{{.State.Status}}' "$c" 2>/dev/null)" || { printf 'erro:inspect'; return 0; }
+           printf '%s' "${est:-erro:vazio}" ;;
+        1) printf 'ausente' ;;
+        *) printf 'erro:%s' "$rc" ;;
+    esac
+}
+
 pessoa_desligar() {
     [ $# -ge 1 ] || falha "faltou o nome da pessoa." "exemplo: sudo dgclaw pessoa desligar marta --sim"
     local nome="$1"; shift
@@ -2212,6 +2226,7 @@ pessoa_desligar() {
         esac
     done
     [ -z "$esperando" ] || falha "faltou o nome depois de --base." "exemplo: dgclaw pessoa desligar $nome --base entrega-$nome"
+    exigir_ferramentas podman
     if [ -n "$base" ] || [[ " $* " == *" --base "* ]] || [[ " $* " == *" --base= "* ]]; then [ -n "$base" ] || falha "faltou o nome depois de --base." "exemplo: dgclaw pessoa desligar $nome --base entrega-$nome"; fi
     exigir_ferramentas jq node
     [[ "$nome" =~ $RX_NOME_PESSOA ]] || falha "o nome '$nome' nao e valido." "veja as pessoas com: dgclaw pessoa listar"
@@ -2232,21 +2247,33 @@ pessoa_desligar() {
     pessoas_estado "$nome" desligada
     [ "$ENSAIO" = 1 ] || ok "estado: desligada (o Web nega na hora e revoga os pedidos pendentes dos agentes dela)"
     passo "Parando os agentes de $nome"
-    local parou_tudo=1 est
-    for slug in $(pessoas_agentes "$nome"); do
-        if [ "$ENSAIO" = 1 ]; then info "[ensaio] pararia o agente $slug"; continue; fi
-        if [ "$(podman inspect -f '{{.State.Status}}' "dgclaw-$slug" 2>/dev/null)" = running ]; then
-            podman stop "dgclaw-$slug" >/dev/null && ok "agente $slug parado (a casa dele fica inteira)" || { aviso "nao consegui parar o agente $slug"; parou_tudo=0; }
-        else info "agente $slug ja estava parado"; fi
-    done
     # A memoria so e copiada com os agentes parados: a copia roda como root no host, e um agente vivo poderia
     # trocar um arquivo por atalho entre a conferencia e a copia. O acesso da pessoa ja esta negado pelo Web.
+    # Por isso a conferencia e por lista de PERMITIDOS (exited, stopped, created, ou container que nao existe),
+    # e qualquer erro do podman bloqueia a entrega, em vez de valer como "parado".
+    local parou_tudo=1 est i tempo="${DGCLAW_TEMPO_PARADA:-90}"
+    for slug in $(pessoas_agentes "$nome"); do
+        if [ "$ENSAIO" = 1 ]; then info "[ensaio] pararia o agente $slug"; continue; fi
+        est="$(_pessoa_estado_agente "$slug")"
+        case "$est" in
+            running|stopping|initialized|paused)
+                podman stop -t 60 "dgclaw-$slug" >/dev/null 2>&1 || aviso "o 'podman stop' do agente $slug devolveu erro; vou esperar o estado dele mesmo assim"
+                for ((i = 0; i < tempo; i++)); do
+                    est="$(_pessoa_estado_agente "$slug")"
+                    case "$est" in running|stopping|initialized|paused) sleep 1 ;; *) break ;; esac
+                done
+                est="$(_pessoa_estado_agente "$slug")"
+                case "$est" in
+                    ausente|exited|stopped|created) ok "agente $slug parado (a casa dele fica inteira)" ;;
+                    stopping) aviso "o agente $slug ficou preso em 'stopping' (um defeito conhecido do podman). Quem resolve e: dgclaw agente recriar $slug (a casa fica; depois pare com: dgclaw agente parar $slug)"; parou_tudo=0 ;;
+                    *) aviso "o agente $slug continua em '$est' depois de ${tempo}s"; parou_tudo=0 ;;
+                esac ;;
+            ausente|exited|stopped|created) info "agente $slug ja estava parado ($est)" ;;
+            *) aviso "nao consegui saber o estado do agente $slug ($est)"; parou_tudo=0 ;;
+        esac
+    done
     if [ "$ENSAIO" != 1 ]; then
-        for slug in $(pessoas_agentes "$nome"); do
-            est="$(podman inspect -f '{{.State.Status}}' "dgclaw-$slug" 2>/dev/null)" || est=ausente
-            case "$est" in running|stopping|paused|restarting) aviso "o agente $slug ainda esta em '$est'"; parou_tudo=0 ;; esac
-        done
-        [ "$parou_tudo" = 1 ] || falha "um agente de $nome continua rodando; a memoria nao e copiada com o agente vivo (a pessoa ja esta desligada e o Web ja nega o acesso dela)." "pare com: dgclaw agente parar <slug>, confira com: dgclaw agente listar, e rode de novo: dgclaw pessoa desligar $nome --sim --base $base"
+        [ "$parou_tudo" = 1 ] || falha "um agente de $nome continua rodando (ou o podman nao respondeu); a memoria nao e copiada com o agente vivo. A pessoa ja esta desligada e o Web ja nega o acesso dela." "veja os avisos acima, confira com: dgclaw agente listar, e rode de novo: dgclaw pessoa desligar $nome --sim --base $base"
     fi
     passo "Entregando a memoria de trabalho dos agentes para a base $base (escopo $escopo)"
     if [ "$ENSAIO" = 1 ]; then pessoas_entregar_memoria "$nome" "$base" "$escopo" 2>&1; return 0; fi

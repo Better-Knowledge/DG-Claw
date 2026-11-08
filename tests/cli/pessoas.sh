@@ -4,6 +4,7 @@ set -uo pipefail
 # shellcheck source=tests/cli/_comum.sh
 . "$(dirname "$0")/_comum.sh"
 preparar
+export DGCLAW_TEMPO_PARADA=3   # espera de 3 s em vez de 90 s, para o teste ser rapido
 
 PAP="$ETC/papeis.json"
 cat >"$PAP" <<'EOF'
@@ -35,8 +36,8 @@ afirma "desligar --sim" dgclaw pessoa desligar marta --sim
 igual "estado desligada no papeis.json" "desligada" "$(jq -r .pessoas.marta.estado "$PAP")"
 afirma "o resto do arquivo ficou" jq -e '.pessoas.caio and .agentes.ana.papel == "analista" and .grupos.financeiro' "$PAP"
 afirma "papeis.json continua 600" test "$(stat -c %a "$PAP")" = 600
-afirma "parou os dois agentes dela" bash -c "grep -q '^podman stop dgclaw-ana' '$STUB_LOG' && grep -q '^podman stop dgclaw-edu' '$STUB_LOG'"
-nega "nao parou o agente de outra pessoa" grep -q '^podman stop dgclaw-bia' "$STUB_LOG"
+afirma "parou os dois agentes dela" bash -c "grep -q '^podman stop .*dgclaw-ana' '$STUB_LOG' && grep -q '^podman stop .*dgclaw-edu' '$STUB_LOG'"
+nega "nao parou o agente de outra pessoa" grep -q '^podman stop .*dgclaw-bia' "$STUB_LOG"
 E="$LIB/bases/entrega-marta"
 afirma "a memoria da Ana foi para a base entrega-marta" bash -c "grep -q 'dia 5' '$E/ana/MEMORY.md' && grep -q conciliei '$E/ana/working-memory.md' && [ -f '$E/ana/memory/2026-11-07.md' ]"
 nega "json de relacoes e atalho nao vao" bash -c "[ -e '$E/ana/memory/relationships.json' ] || [ -e '$E/ana/memory/atalho.md' ]"
@@ -95,10 +96,20 @@ rm -rf "$LIB/bases/entrega-marta"
 nega "desligar com um agente que fica em stopping: falha" dgclaw pessoa desligar marta --sim
 igual "a pessoa FICA desligada (o acesso ja foi negado pelo Web)" "desligada" "$(jq -r .pessoas.marta.estado "$PAP")"
 nega "nada foi copiado" test -e "$LIB/bases/entrega-marta/ana"
+dgclaw pessoa desligar marta --sim >"$TMP/preso.txt" 2>&1 || true
+afirma "a dica aponta o comando que resolve o stopping preso" grep -q 'dgclaw agente recriar ana' "$TMP/preso.txt"
 rm -f "$STUB_ESTADO/stop-trava-dgclaw-ana"; echo exited >"$STUB_ESTADO/c-dgclaw-ana"
 afirma "rodar de novo com o agente parado completa a entrega" dgclaw pessoa desligar marta --sim
 afirma "agora copiou" test -f "$LIB/bases/entrega-marta/ana/MEMORY.md"
 jq '.pessoas.marta.estado = "ativa"' "$PAP" >"$TMP/p5.json" && cp "$TMP/p5.json" "$PAP"
+
+echo "podman que nao responde: nada e copiado (erro nao vale como 'parado')"
+rm -rf "$LIB/bases/entrega-marta"
+echo running >"$STUB_ESTADO/c-dgclaw-ana"; touch "$STUB_ESTADO/podman-quebrado"
+nega "desligar com podman devolvendo 125 em tudo: falha" dgclaw pessoa desligar marta --sim
+nega "nada foi copiado" test -e "$LIB/bases/entrega-marta/ana"
+rm -f "$STUB_ESTADO/podman-quebrado"; echo exited >"$STUB_ESTADO/c-dgclaw-ana"
+jq '.pessoas.marta.estado = "ativa"' "$PAP" >"$TMP/p6.json" && cp "$TMP/p6.json" "$PAP"
 
 echo "o catalogo muda entre a confirmacao e a copia: a copia e recusada"
 entregar() { APP_DIR="$REPO" DGCLAW_RAIZ="$DGCLAW_RAIZ" ENSAIO=0 bash -c ". '$REPO/lib/comum.sh'; . '$REPO/lib/agentes.sh'; . '$REPO/lib/bases.sh'; . '$REPO/lib/pessoas.sh'; pessoas_entregar_memoria \"\$@\"" _ "$@"; }
