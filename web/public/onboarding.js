@@ -252,7 +252,7 @@
       };
       host.querySelector('#nasGerarFoto').onclick = () => {
         const c = document.createElement('canvas'); c.width = c.height = 320;
-        const x = c.getContext('2d'), cores = [['#e1ecdc','#477553'],['#e7e2f3','#7963a7'],['#f5e3d6','#b57750'],['#dceaf3','#497c9a']];
+        const x = c.getContext('2d'), cores = [['#e1ecdc','#477553'],['#e7e2f3','#7963a7'],['#f5e3d6','#b57750'],['#dceaf3','#497c9a']]; /* cor-fixa: paleta da mascote desenhada no canvas (vira imagem) */
         const cor = cores[crypto.getRandomValues(new Uint8Array(1))[0] % cores.length];
         x.fillStyle = cor[0]; x.fillRect(0,0,320,320);
         x.fillStyle = cor[1]; x.beginPath(); x.roundRect(70,82,180,158,55); x.fill();

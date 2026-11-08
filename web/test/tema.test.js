@@ -67,8 +67,9 @@ test('nenhum JS ou HTML de tela pinta cor fixa em estilo inline ou em <style> (s
     // o miolo de cada <style> de um HTML é CSS: vale a mesma regra dos arquivos .css
     if (nome.endsWith('.html')) for (const m of texto.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)) {
       const antes = texto.slice(0, m.index).split('\n').length;
+      const crus = m[1].split('\n'); // a marca cor-fixa fica num comentário, então é lida na linha crua, antes de apagá-los
       m[1].replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' ')).split('\n').forEach((linha, i) => {
-        if (/cor-fixa/.test(linha)) return;
+        if (/cor-fixa/.test(crus[i])) return;
         if (RX_COR_FIXA.test(linha)) achados.push(`${nome}:${antes + i}: <style> ${linha.trim().slice(0, 90)}`);
       });
     }
