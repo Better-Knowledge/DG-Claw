@@ -183,6 +183,20 @@ atende outra pessoa usa a credencial dela.
   token do runner, segredo do proxy.
 - Log de erro diz o que falhou e com que entrada, sem o valor do segredo.
 
+## Dados por papel
+
+- O agente alcança fontes de dados e ações só pela rota `/api/v1/dados`, pela caixa. Quem decide é
+  o Web, lendo `/etc/dgclaw/papeis.json` (root, 600): a pessoa dona do agente E o papel precisam
+  liberar a fonte; os campos são a interseção; o que não está escrito é negado; arquivo inválido
+  fecha a rota. O conteúdo recuperado volta marcado como dado não confiável e a decisão nunca o lê.
+- Ação (enviar e-mail) nunca executa pelo pedido do agente: vira um pedido com os parâmetros
+  congelados e o hash da ação exata, que o dono aprova no painel; um byte diferente, prazo vencido
+  ou pedido já usado é recusado, e revogar a pessoa ou o agente derruba os pendentes.
+- Uma linha de log por pedido, sem parâmetros nem conteúdo. Contrato e limites em
+  `web/docs/DADOS-POR-PAPEL.md`.
+- **O que fica fora:** o que o agente alcança por outro caminho (arquivo montado, rede, canal) e o
+  que ele já recebeu e anotou na própria casa; a revogação fecha a porta, não apaga o que passou.
+
 ## Pendências conhecidas
 
 | Item | Risco | Situação |
@@ -191,4 +205,5 @@ atende outra pessoa usa a credencial dela.
 | Instalação baixa pacotes e a chave do repositório do Node | quem controlar um dos endereços de onde o instalador baixa pacotes executa código na máquina | o DG Claw em si se instala por `git clone` do repositório público e `sudo ./install.sh`, sem `curl \| bash`; as fontes externas usam HTTPS (`curl --proto '=https' --tlsv1.2`); fixar versão e conferir hash fica para depois |
 | Cabeçalhos contra iframe no painel | uma página hostil poderia carregar o painel num iframe e induzir cliques | o painel precisa abrir dentro de outra página em algumas instalações; o login com `SameSite` e a checagem de `Origin` seguram as ações |
 | Escrita de arquivo pelo painel | entre conferir o caminho e gravar, um agente malicioso poderia trocar uma pasta por atalho | exige um agente já comprometido dentro do próprio container |
+| Dados por papel só valem para o que passa pela rota | dado alcançado por outro caminho (arquivo montado, página, canal) ou já anotado na casa do agente não é filtrado nem apagado na revogação | aceito nesta versão; as fontes são locais e de exemplo, e a camada é o ponto de partida para o gateway de sistemas reais |
 | Token do runner e segredo do proxy dentro do container | quem controla o agente consegue falar com o próprio runner | aceitável na v1: cada token vale só para aquele agente, e o token do Admin nunca entra em container |

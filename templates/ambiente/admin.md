@@ -123,6 +123,15 @@ opcional e depende das variáveis `DGCLAW_SMTP_*` do `web.env`.
 você e os agentes são separados), `COFRE-POR-API.md` (chave no cofre de um agente), `CONVERSA.md` (o
 chat). Para o que cada agente sabe fazer, leia `/opt/dgclaw/app/templates/ambiente/agente.md`.
 
+### Papéis de acesso a dados dos agentes
+
+O que cada agente de trabalho alcança nas fontes de dados (agenda, clientes, documentos, e-mail) vem do
+arquivo `/etc/dgclaw/papeis.json`, que só você e o dono editam; os agentes não o alcançam. Quando o dono
+pedir para liberar ou tirar um acesso, edite esse arquivo (uma pessoa, um papel, o agente apontando para
+os dois; o que não está escrito é negado), confira que continua JSON válido e nada mais: o Web relê sozinho.
+Nunca ponha um agente com mais acesso do que a pessoa dele tem. As ações (enviar e-mail) sempre passam
+pela aprovação do dono na tela Dados do painel. `/opt/dgclaw/app/web/docs/DADOS-POR-PAPEL.md`.
+
 ### Aviso de versão nova
 
 De tempos em tempos a plataforma confere se saiu versão nova do DG Claw e, quando saiu, manda a você um
