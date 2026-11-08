@@ -54,6 +54,13 @@ skills_escopo_pasta() {
     esac
 }
 
+# skills_padroes_segredo: a lista de lib/segredos.regex normalizada como o Web faz (carregaSegredos em
+# web/lib/dados-fontes/skills.js): espaco nas pontas fora, linha vazia e comentario fora (vazio casaria qualquer
+# linha). O teste do Web chama esta funcao para garantir que os dois lados leem a lista igual.
+skills_padroes_segredo() {
+    sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' "$SKILLS_SEGREDOS_REGEX" | grep -Ev '^(#|$)'
+}
+
 # skills_conferir_pasta <pasta de origem> <nome>: recusa o que nao pode virar skill compartilhada.
 skills_conferir_pasta() {
     local origem="$1" nome="$2" bytes achado
@@ -70,14 +77,14 @@ skills_conferir_pasta() {
     [ "$achado" = "$nome" ] || falha "o SKILL.md diz 'name: ${achado:-(nada)}', mas a skill se chama '$nome'." "corrija o name no frontmatter do SKILL.md para $nome"
     # Segredo nunca entra em skill: o arquivo fica legivel por todo agente que a recebe. Padroes em lib/segredos.regex.
     [ -s "$SKILLS_SEGREDOS_REGEX" ] || falha "nao achei a lista de padroes de segredo em $SKILLS_SEGREDOS_REGEX." "a copia do DG Claw esta incompleta; reinstale"
-    # A lista e normalizada como o Web faz (carregaSegredos): espaco nas pontas fora, linha vazia e comentario
-    # fora (vazio casaria qualquer linha). Lista que fica vazia e erro, nao "sem segredo" (fechado).
+    # Lista que fica vazia e erro, nao "sem segredo" (fechado).
     local padroes
-    padroes="$(sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' "$SKILLS_SEGREDOS_REGEX" | grep -Ev '^(#|$)')" || padroes=""
+    padroes="$(skills_padroes_segredo)" || padroes=""
     [ -n "$padroes" ] || falha "a lista de padroes de segredo em $SKILLS_SEGREDOS_REGEX esta vazia." "a copia do DG Claw esta incompleta; reinstale"
     # Byte NUL no meio de um "texto" faria o grep tratar o arquivo como binario e pular a busca; texto de skill
-    # nao tem NUL, entao e recusado. E a busca usa -a, para nunca pular arquivo.
-    if LC_ALL=C grep -rlP '\x00' "$origem" >/dev/null 2>&1; then
+    # nao tem NUL, entao e recusado (-a: sem ele o grep troca o NUL por fim de linha e nunca o acha). E a busca
+    # de segredo tambem usa -a, para nunca pular arquivo.
+    if LC_ALL=C grep -rlaP '\x00' "$origem" >/dev/null 2>&1; then
         falha "a pasta '$origem' tem um arquivo com byte nulo (nao e texto)." "tire ou reescreva o arquivo; skill compartilhada so tem texto"
     fi
     if grep -rEain -f <(printf '%s\n' "$padroes") "$origem" >/dev/null; then
