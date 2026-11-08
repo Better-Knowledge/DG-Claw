@@ -11,6 +11,9 @@ done
 nega "slug 'admin' recusado" dgclaw agente criar admin --nome "Admin"
 dgclaw agente criar admin --nome "Admin" >"$TMP/o.txt" 2>&1
 afirma "a mensagem do admin diz que e reservado" grep -q "reservado" "$TMP/o.txt"
+nega "slug 'dono' recusado (e como a rota de dados registra os pedidos da pessoa)" dgclaw agente criar dono --nome "Dono"
+dgclaw agente criar dono --nome "Dono" >"$TMP/o.txt" 2>&1
+afirma "a mensagem do dono diz que e reservado" grep -q "reservado" "$TMP/o.txt"
 nega "sem --nome recusado" dgclaw agente criar ana
 nega "provedor invalido recusado" dgclaw agente criar ana --nome X --provedor gpt
 nega "canal invalido recusado" dgclaw agente criar ana --nome X --canal sinal

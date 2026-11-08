@@ -49,7 +49,10 @@ O Web relê o arquivo sozinho quando ele muda.
   todo acesso fica negado e o motivo vai para o log do Web e para `GET /api/v1/dados/papeis`. O painel
   continua funcionando, porque é por ele que você conserta.
 - Nomes (pessoas, papéis, fontes, ações, campos): `a-z`, `0-9`, `_` e `-`, começando por letra. Slug de
-  agente: o mesmo do registro. O Admin não entra: ele não usa a caixa.
+  agente: o mesmo do registro. O Admin não entra: ele não usa a caixa. `dono` é reservado: é como a rota
+registra os pedidos feitos pela própria pessoa no painel, e o `dgclaw agente criar` o recusa como slug.
+Emoji compostos (família, profissões, bandeiras) usam um caractere de formatação invisível (U+200D) e por
+isso são recusados em assunto e texto de e-mail; é uma escolha de segurança, não um defeito.
 
 ## As fontes desta versão
 

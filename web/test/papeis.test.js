@@ -44,6 +44,7 @@ test('validaPapeis recusa o que não está no contrato, com uma frase por proble
     [{ versao: 1, pessoas: { marta: {} }, papeis: { r: {} }, agentes: { ana: { pessoa: 'marta' } } }, /agentes.ana.papel é obrigatório/],
     [{ versao: 1, pessoas: { marta: {} }, papeis: { r: {} }, agentes: { admin: { pessoa: 'marta', papel: 'r' } } }, /Admin não entra/],
     [{ versao: 1, agentes: { 'Ana!': { pessoa: 'm', papel: 'r' } } }, /slug "Ana!" não vale/],
+    [{ versao: 1, pessoas: { marta: {} }, papeis: { r: {} }, agentes: { dono: { pessoa: 'marta', papel: 'r' } } }, /"dono" é reservado/],
     [{ versao: 1, pessoas: { marta: { fontes: { 'a/b': 'leitura' } } } }, /nome "a\/b" não vale/],
   ];
   for (const [entrada, rx] of casos) {

@@ -1127,6 +1127,7 @@ agente_criar() {
         || falha "o nome curto '$C_SLUG' nao serve: use 2 a 31 caracteres, so letras minusculas, numeros e hifen, comecando por letra ou numero." \
                  "exemplo: ana, suporte-vendas"
     [ "$C_SLUG" != admin ] || falha "o nome curto 'admin' e reservado ao agente de sistema." "escolha outro nome curto."
+    [ "$C_SLUG" != dono ] || falha "o nome curto 'dono' e reservado: e como o painel registra os pedidos de dados feitos pela propria pessoa." "escolha outro nome curto."
     [ -n "$C_NOME" ] || falha "faltou o nome do agente (--nome)." "exemplo: dgclaw agente criar $C_SLUG --nome \"Ana\""
     case "$C_PROVEDOR" in claude|codex) ;; *) falha "provedor '$C_PROVEDOR' nao existe." "use --provedor claude ou --provedor codex." ;; esac
     case "$C_AUTH" in assinatura|api) ;; *) falha "autenticacao '$C_AUTH' nao existe." "use --auth assinatura ou --auth api." ;; esac
