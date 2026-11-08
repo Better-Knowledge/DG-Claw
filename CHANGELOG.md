@@ -17,6 +17,19 @@ inteira. Quem já tinha convidado alguém não precisa fazer nada: o convite ant
 Pelo chat, o Admin também convida, troca os agentes, reenvia e revoga (`sudo dgclaw colaborador ...`), com o mesmo
 arquivo e as mesmas regras da tela.
 
+**Tema escuro.** O painel inteiro ganhou tema escuro: a conversa, o menu, a Mesa, os Lembretes, os Avisos, Dados,
+Observabilidade, Segurança, Conectar, Colaboradores, Acessos e as telas de entrada. Escolha no menu ☰, em
+Configurações: claro, escuro ou "como o aparelho" (o padrão, que segue o modo do
+celular ou do computador). A escolha fica guardada no aparelho, vale antes da primeira pintura da tela, sem
+piscar, e é a mesma do painel de cada agente (que já tinha o botão de tema). As cores vivem num arquivo só (`web/public/tema.css`), e um teste impede que uma tela nova volte a ter
+cor fixa fora dele.
+
+### Como atualizar (tema escuro)
+
+Peça ao Admin, no chat: "atualiza o DG Claw". Nada precisa ser configurado. Se o seu aparelho já está no modo
+escuro, o painel acompanha sozinho na próxima vez que abrir; para fixar um tema, use o menu ☰, em Configurações. No celular,
+feche e abra o app instalado uma vez para ele pegar os arquivos novos.
+
 **Uma credencial por escopo nos sistemas de fora, e a observabilidade por agente.** Quando o CRM (ou o ERP,
 ou um servidor MCP) oferece chaves com poderes diferentes, você agora cadastra uma por escopo: `crm:ler` usa
 a chave só de leitura e `crm:escrever` usa a outra, cada uma com o seu nome no cofre de sistemas

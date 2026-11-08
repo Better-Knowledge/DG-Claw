@@ -103,7 +103,7 @@ test('seletor: bolinha de não lidas em .ml-nl com número, 99+, e sem ela no at
   assert.doesNotMatch(M.itemAgente({ id: 'a', nome: 'A', nao_lidas: null }, 'b'), /ml-nl/);
   assert.doesNotMatch(M.itemAgente({ id: 'a', nome: 'A', nao_lidas: 0 }, 'b'), /ml-nl/);
   assert.doesNotMatch(M.itemAgente({ id: 'a', nome: 'A' }, 'b'), /ml-nl/);
-  assert.match(pub('menu-lado.css'), /\.ml-nl\{[^}]*background:#d93025/);
+  assert.match(pub('menu-lado.css'), /\.ml-nl\{[^}]*background:var\(--t-perigo\)/);
 });
 
 test('totalNaoLidas soma só os outros agentes e ignora null', () => {

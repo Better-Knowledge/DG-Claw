@@ -27,7 +27,8 @@ O **runner** mantém a sessão do programa de IA, recebe os pedidos e acompanha 
 O **MCP dgchat** permite que a sessão envie respostas e anexos para a conversa certa.
 As respostas e os registros da sessão alimentam a conversa exibida no navegador.
 
-O painel de cada agente, em `/p/<nome>/`, reúne configurações como assinatura, conexões,
+As cores de todas as telas vêm de `web/public/tema.css` (tokens nos temas claro e escuro, aplicados por
+`tema.js` antes da primeira pintura; a escolha fica no aparelho). O painel de cada agente, em `/p/<nome>/`, reúne configurações como assinatura, conexões,
 arquivos e memória. O chat fica em `/a/<nome>`. O Admin tem a conversa `/a/admin`, que só o dono abre;
 um colaborador vê só os agentes marcados para ele. O dono edita o que cada agente alcança nos dados em
 `/acessos` (`web/docs/ACESSOS.md`).

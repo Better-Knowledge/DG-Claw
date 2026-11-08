@@ -1,0 +1,178 @@
+/* tema.css: os tokens de cor do DG Claw Web, nos dois temas. Carregado ANTES dos outros CSS em toda tela.
+
+   Como funciona: o tema.js (no <head>, antes da primeira pintura) lê a escolha da pessoa
+   (localStorage "dgclaw-tema": claro, escuro ou sistema; a mesma chave do painel do agente) e põe data-tema="claro" ou "escuro" no <html>.
+   Sem escolha (sistema), vale o prefers-color-scheme do aparelho. Os CSS das telas usam só os tokens
+   daqui (ou os próprios, redefinidos aqui para o escuro); cor fixa fora deste arquivo é erro de teste
+   (web/test/tema.test.js), salvo linha marcada com cor-fixa.
+
+   Tokens gerais (prefixo t-):
+     --t-fundo        fundo da página            --t-superficie   cartão, painel, cabeçalho, menu
+     --t-superficie-2 campo, faixa, linha zebrada --t-texto        texto principal
+     --t-fraco        texto secundário            --t-linha        bordas e divisórias
+     --t-acento       a cor do DG Claw (ou do agente, via --accent)   --t-sobre-acento texto em cima do acento
+     --t-ok/-fundo, --t-aviso/-fundo/-borda, --t-erro/-fundo/-borda, --t-info   estados
+     --t-sombra       sombra padrão               --t-veu          véu por trás de modais e gavetas
+   Os nomes antigos das telas (--txt, --muted, --line, --header, --bub-*, --lp-*, --ml-*, --fundo, --cartao,
+   --suave) continuam valendo: são definidos aqui a partir dos tokens, nos dois temas. */
+
+:root {
+  color-scheme: light;
+  --accent: #2f9e5e;
+  --t-fundo: #f3f6f3;
+  --t-superficie: #ffffff;
+  --t-superficie-2: #f2f6f2;
+  --t-superficie-3: #e8ebe8;
+  --t-texto: #0f1c14;
+  --t-fraco: #5f7566;
+  --t-fraco-2: #82997f;
+  --t-linha: #dfe7e1;
+  --t-linha-suave: rgba(0, 0, 0, .08);
+  --t-acento: var(--accent);
+  --t-acento-forte: #23814a;
+  --t-sobre-acento: #ffffff;
+  --t-ok: #1d6b3c;
+  --t-ok-fundo: #e3f5ea;
+  --t-ok-borda: #63c883;
+  --t-aviso: #7a5a00;
+  --t-aviso-fundo: #fff7e0;
+  --t-aviso-borda: #f0d98c;
+  --t-erro: #8a1c1c;
+  --t-erro-fundo: #fde8e8;
+  --t-erro-borda: #e3b4b4;
+  --t-info: #1f7ac2;
+  --t-info-fundo: #e6ecf8;
+  --t-balao-fora: #e4fbcd;
+  --t-sombra: 0 1px 4px rgba(0, 0, 0, .08);
+  --t-sombra-forte: 0 4px 22px rgba(0, 0, 0, .16);
+  --t-veu: rgba(0, 0, 0, .35);
+  --t-grad-fundo: radial-gradient(ellipse at 15% 0%, rgba(255, 255, 255, .55), transparent 55%),
+    radial-gradient(ellipse at 90% 100%, rgba(139, 196, 146, .40), transparent 55%),
+    linear-gradient(165deg, #e6f2df 0%, #d8ead1 45%, #cde3c6 100%);
+  --t-codigo-fundo: rgba(127, 127, 127, .12);
+
+  /* nomes que as telas já usavam */
+  --txt: var(--t-texto); --muted: var(--t-fraco); --time: var(--t-fraco-2); --line: var(--t-linha-suave);
+  --header: var(--t-superficie); --bub-in: var(--t-superficie); --bub-out: var(--t-balao-fora);
+  --fundo: var(--t-fundo); --cartao: var(--t-superficie); --suave: var(--t-superficie-2);
+}
+
+/* ── escuro ─────────────────────────────────────────────────────────────── */
+html[data-tema="escuro"] {
+  color-scheme: dark;
+  --t-fundo: #0f1713;
+  --t-superficie: #18241d;
+  --t-superficie-2: #223229;
+  --t-superficie-3: #26302a;
+  --t-texto: #e2f5e8;
+  --t-fraco: #9bb5a4;
+  --t-fraco-2: #8aa392;
+  --t-linha: #2c3c32;
+  --t-linha-suave: rgba(255, 255, 255, .14);
+  --t-acento-forte: #57c98a;
+  --t-sobre-acento: #ffffff;
+  --t-ok: #7fd9a3;
+  --t-ok-fundo: #193a28;
+  --t-ok-borda: #63c883;
+  --t-aviso: #f0c75a;
+  --t-aviso-fundo: #3c341b;
+  --t-aviso-borda: #e5bd4c;
+  --t-erro: #ffb3aa;
+  --t-erro-fundo: #4a2320;
+  --t-erro-borda: #a85a52;
+  --t-info: #8ab8ff;
+  --t-info-fundo: #1e2c44;
+  --t-balao-fora: #1f3a2a;
+  --t-sombra: 0 1px 4px rgba(0, 0, 0, .5);
+  --t-sombra-forte: 0 4px 22px rgba(0, 0, 0, .6);
+  --t-veu: rgba(0, 0, 0, .6);
+  --t-grad-fundo: radial-gradient(ellipse at 15% 0%, rgba(255, 255, 255, .06), transparent 55%),
+    radial-gradient(ellipse at 90% 100%, rgba(47, 158, 94, .25), transparent 55%),
+    linear-gradient(165deg, #121b15 0%, #0f1713 45%, #0c1410 100%);
+  --t-codigo-fundo: rgba(255, 255, 255, .08);
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-tema="claro"]) {
+    color-scheme: dark;
+    --t-fundo: #0f1713;
+    --t-superficie: #18241d;
+    --t-superficie-2: #223229;
+    --t-superficie-3: #26302a;
+    --t-texto: #e2f5e8;
+    --t-fraco: #9bb5a4;
+    --t-fraco-2: #8aa392;
+    --t-linha: #2c3c32;
+    --t-linha-suave: rgba(255, 255, 255, .14);
+    --t-acento-forte: #57c98a;
+    --t-sobre-acento: #ffffff;
+    --t-ok: #7fd9a3;
+    --t-ok-fundo: #193a28;
+    --t-ok-borda: #63c883;
+    --t-aviso: #f0c75a;
+    --t-aviso-fundo: #3c341b;
+    --t-aviso-borda: #e5bd4c;
+    --t-erro: #ffb3aa;
+    --t-erro-fundo: #4a2320;
+    --t-erro-borda: #a85a52;
+    --t-info: #8ab8ff;
+    --t-info-fundo: #1e2c44;
+    --t-balao-fora: #1f3a2a;
+    --t-sombra: 0 1px 4px rgba(0, 0, 0, .5);
+    --t-sombra-forte: 0 4px 22px rgba(0, 0, 0, .6);
+    --t-veu: rgba(0, 0, 0, .6);
+    --t-grad-fundo: radial-gradient(ellipse at 15% 0%, rgba(255, 255, 255, .06), transparent 55%),
+      radial-gradient(ellipse at 90% 100%, rgba(47, 158, 94, .25), transparent 55%),
+      linear-gradient(165deg, #121b15 0%, #0f1713 45%, #0c1410 100%);
+    --t-codigo-fundo: rgba(255, 255, 255, .08);
+  }
+}
+
+/* As telas de lista (body.lp) e o menu (aside#menu) definem variáveis próprias; aqui elas passam a vir dos tokens,
+   nos dois temas, sem mexer nos arquivos delas além da troca de cor fixa por variável. */
+body.lp { --lp-txt: var(--t-texto); --lp-fraco: var(--t-fraco); --lp-linha: var(--t-linha); --lp-acento: var(--t-acento); --lp-fundo: var(--t-fundo); --lp-cartao: var(--t-superficie); --lp-campo: var(--t-superficie); --lp-botao: var(--t-superficie-2); --lp-botao-txt: var(--t-texto); }
+aside#menu { --ml-painel: var(--t-superficie); --ml-fundo2: var(--t-superficie-2); --ml-linha: var(--t-linha); --ml-texto: var(--t-texto); --ml-fraco: var(--t-fraco); }
+
+/* O seletor de tema (menu e conta): três botões, o escolhido destacado. */
+.tema-seletor { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.tema-seletor button { font: inherit; font-size: 13px; min-height: 32px; padding: 0 12px; border-radius: 16px; border: 1px solid var(--t-linha); background: var(--t-superficie-2); color: var(--t-texto); cursor: pointer; }
+.tema-seletor button[aria-pressed="true"] { background: var(--t-acento); border-color: var(--t-acento); color: var(--t-sobre-acento); }
+
+/* tokens: telas da conversa (menu, cabeçalho, anexos, lightbox, tour, onboarding) */
+:root {
+  --t-acento-fundo: rgba(47, 158, 94, .14);          /* tinta do acento: item ativo, citação, anel de foco */
+  --t-grad-acento: linear-gradient(180deg, #57c98a, #2f9e5e); /* avatar sem foto */
+  --t-texto-botao: #38523f;                            /* texto do botão secundário e de etiquetas */
+  --t-veu-forte: rgba(10, 24, 16, .62);                /* chip sobre foto/vídeo e véu do tour, texto branco em cima */
+  --t-brilho: rgba(255, 255, 255, .35);                /* brilho branco translúcido: listras, borda do lightbox */
+  --t-escuro-fundo: #0b160f;                           /* lightbox: escuro nos dois temas */
+  --t-perigo: #c0392b;                                 /* vermelho saturado com texto branco: gravando, bolinha, botão perigoso */
+  --t-atencao: #e8890c;                                /* laranja saturado com texto branco: "precisa de você" */
+}
+html[data-tema="escuro"] {
+  --t-acento-fundo: rgba(87, 201, 138, .22);
+  --t-grad-acento: linear-gradient(180deg, #57c98a, #2f9e5e);
+  --t-texto-botao: #cfe3d5;
+  --t-veu-forte: rgba(0, 0, 0, .72);
+  --t-brilho: rgba(255, 255, 255, .22);
+  --t-escuro-fundo: #070d09;
+  --t-perigo: #e0453a;
+  --t-atencao: #f09a2a;
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-tema="claro"]) {
+    --t-acento-fundo: rgba(87, 201, 138, .22);
+    --t-grad-acento: linear-gradient(180deg, #57c98a, #2f9e5e);
+    --t-texto-botao: #cfe3d5;
+    --t-veu-forte: rgba(0, 0, 0, .72);
+    --t-brilho: rgba(255, 255, 255, .22);
+    --t-escuro-fundo: #070d09;
+    --t-perigo: #e0453a;
+    --t-atencao: #f09a2a;
+  }
+}
+
+/* tokens: telas de lista, avisos, mesa e faixas (cores sólidas que levam --t-sobre-acento por cima,
+   o vermelho de ação perigosa, o véu forte da visita guiada e a borda do estado info) */
+:root { --t-solido-azul: #2f6fd0; --t-solido-roxo: #8e44ad; --t-solido-ambar: #d68910; --t-solido-ciano: #16a0a0; --t-solido-laranja: #d35400; --t-solido-cinza: #6c8172; --t-info-borda: #a9c4ec; }
+html[data-tema="escuro"] { --t-solido-azul: #3a78d6; --t-solido-roxo: #9b59b6; --t-solido-ambar: #b8790f; --t-solido-ciano: #178a8a; --t-solido-laranja: #c45200; --t-solido-cinza: #5a7363; --t-info-borda: #3d5a8c; }
+@media (prefers-color-scheme: dark) { html:not([data-tema="claro"]) { --t-solido-azul: #3a78d6; --t-solido-roxo: #9b59b6; --t-solido-ambar: #b8790f; --t-solido-ciano: #178a8a; --t-solido-laranja: #c45200; --t-solido-cinza: #5a7363; --t-info-borda: #3d5a8c; } }

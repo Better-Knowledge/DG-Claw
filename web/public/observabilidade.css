@@ -1,10 +1,10 @@
 /* observabilidade.css: a tela /observabilidade (uso dos dados pelos agentes). Base lp- de lembretes.css e dp- de dados.css. */
 .ob-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:12px}
-.ob-tile{border:1px solid var(--lp-linha);border-radius:12px;padding:10px 12px;background:#fafcfa}
+.ob-tile{border:1px solid var(--lp-linha);border-radius:12px;padding:10px 12px;background:var(--t-superficie-2)}
 .ob-tile .n{font-size:24px;font-weight:700;line-height:1.1}
 .ob-tile .r{color:var(--lp-fraco);font-size:13px}
-.ob-tile.negado .n{color:#8a1c1c}
-.ob-tile.permitido .n,.ob-tile.executada .n{color:#1d6b3c}
+.ob-tile.negado .n{color:var(--t-erro)}
+.ob-tile.permitido .n,.ob-tile.executada .n{color:var(--t-ok)}
 .ob-colunas{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
 .ob-colunas h3{font-size:14px;margin:0 0 6px;color:var(--lp-fraco)}
 .ob-barra{display:flex;align-items:center;gap:8px;font-size:13.5px;margin:3px 0;overflow-wrap:anywhere}
@@ -16,6 +16,6 @@
 .ob-tabela{width:100%;border-collapse:collapse;font-size:13px}
 .ob-tabela th,.ob-tabela td{text-align:left;padding:5px 6px;border-top:1px solid var(--lp-linha);vertical-align:top;overflow-wrap:anywhere}
 .ob-tabela th{color:var(--lp-fraco);font-weight:600;border-top:0}
-.ob-tabela td.negado{color:#8a1c1c}
-.ob-tabela td.permitido,.ob-tabela td.executada{color:#1d6b3c}
+.ob-tabela td.negado{color:var(--t-erro)}
+.ob-tabela td.permitido,.ob-tabela td.executada{color:var(--t-ok)}
 .ob-rolagem{overflow-x:auto}

@@ -657,6 +657,7 @@
     }
     marca(opcoes.ativo || 'conversa');
     $('mlInstalar').onclick = aoInstalar;
+    if (raiz.DGTema && $('mlTemaSeletor')) raiz.DGTema.monta($('mlTemaSeletor'));
     // escolher uma página fecha a gaveta (a navegação em seguida troca a tela)
     $('mlTabs').addEventListener('click', ev => { if (ev.target.closest('a')) opcoes.fecha(); });
     if (colab) { const uso = $('mlUso'); if (uso) uso.remove(); } else ligaUso();

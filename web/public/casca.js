@@ -64,6 +64,7 @@
     '<div id="mlPainel" data-tour="gm-painel" hidden></div></nav>' +
     '<section class="ml-config" id="mlUso" aria-label="Uso das assinaturas"><details id="mlUsoDet"><summary class="ml-tab"><span class="ml-ico" aria-hidden="true">◔</span>Uso das assinaturas</summary><div class="ml-uso" id="mlUsoLista" aria-live="polite"></div></details></section>' +
     '<section class="ml-config" id="mlConfig" data-tour="gm-config" aria-label="Configurações"><h3>Configurações</h3>' +
+    '<div class="ml-tema" id="mlTema" data-tour="gm-tema"><span class="ml-tema-rotulo">Tema</span><div id="mlTemaSeletor"></div></div>' +
     '<button type="button" class="ml-tab" id="mlInstalar"><span class="ml-ico" aria-hidden="true">⤓</span><span class="ml-tx">Instalar o app<small id="mlInstalarSub"></small></span></button>' +
     '<p class="ml-ajuda" id="mlInstalarAjuda" role="status" hidden></p></section>' +
     '<section class="ml-config" id="mlSessao" data-tour="gm-reiniciar" aria-label="Sessão do agente" hidden><h3>Sessão</h3>' +

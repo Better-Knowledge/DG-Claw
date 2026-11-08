@@ -2,21 +2,21 @@
    página fica inerte, o foco fica preso nele e o Esc dispara o evento cancel. */
 #dlgLoginExpirado{border:1px solid var(--line);border-radius:16px;padding:20px 20px 16px;box-sizing:border-box;
                   width:min(440px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow-y:auto;overflow-x:hidden;
-                  color:#2a3d2f;background:#fff;box-shadow:0 10px 36px rgba(0,0,0,.28);overflow-wrap:anywhere}
-#dlgLoginExpirado::backdrop{background:rgba(0,0,0,.45)}
+                  color:var(--t-texto);background:var(--t-superficie);box-shadow:var(--t-sombra-forte);overflow-wrap:anywhere}
+#dlgLoginExpirado::backdrop{background:var(--t-veu)}
 #dlgLoginExpirado h2{margin:0 0 8px;font-size:18px;line-height:1.3}
 #dlgLoginExpirado p{margin:0 0 14px;font-size:14.5px;line-height:1.5}
 #dlgLoginExpirado [hidden]{display:none}
-#dlgLoginExpirado #leErro{color:#8f2f2f;background:#fbe0e0;border:1px solid #f0bcbc;border-radius:10px;padding:8px 10px;font-size:13.5px}
-#dlgLoginExpirado #leEstado{color:#1f6b3d;font-weight:600}
+#dlgLoginExpirado #leErro{color:var(--t-erro);background:var(--t-erro-fundo);border:1px solid var(--t-erro-borda);border-radius:10px;padding:8px 10px;font-size:13.5px}
+#dlgLoginExpirado #leEstado{color:var(--t-ok);font-weight:600}
 #dlgLoginExpirado #leCartao .lc{margin:0 0 12px;max-width:none;box-shadow:none}
 #dlgLoginExpirado .le-acoes{display:flex;flex-direction:column;align-items:stretch;gap:8px}
 #dlgLoginExpirado .le-acoes button{min-height:44px;padding:8px 16px;border-radius:22px;font-size:15px;font-weight:600;cursor:pointer;
-                                   border:1px solid var(--line);background:#f2f6f2;color:#38523f;box-sizing:border-box}
-#dlgLoginExpirado .le-acoes .le-primario{background:var(--accent);border-color:var(--accent);color:#fff}
-#dlgLoginExpirado .le-acoes .le-link{border:0;background:transparent;font-weight:500;text-decoration:underline;color:#4d6b55}
+                                   border:1px solid var(--line);background:var(--t-superficie-2);color:var(--t-texto-botao);box-sizing:border-box}
+#dlgLoginExpirado .le-acoes .le-primario{background:var(--accent);border-color:var(--accent);color:var(--t-sobre-acento)}
+#dlgLoginExpirado .le-acoes .le-link{border:0;background:transparent;font-weight:500;text-decoration:underline;color:var(--t-fraco)}
 #dlgLoginExpirado .le-acoes button:disabled{opacity:.6;cursor:default}
-#dlgLoginExpirado .le-acoes button:focus-visible{outline:3px solid #8fc7a3;outline-offset:2px}
+#dlgLoginExpirado .le-acoes button:focus-visible{outline:3px solid var(--t-acento);outline-offset:2px}
 @media (min-width:601px){
   #dlgLoginExpirado .le-acoes{flex-direction:row;flex-wrap:wrap;justify-content:flex-end;align-items:center}
 }
@@ -31,4 +31,5 @@
 }
 #dlgLoginExpirado .le-conectar{margin:10px 0 0;font-size:14px;text-align:center}
 #dlgLoginExpirado .le-conectar[hidden]{display:none}
-#dlgLoginExpirado .le-conectar a{color:#4d6b55;text-decoration:underline;display:inline-block;min-height:44px;line-height:44px}
+#dlgLoginExpirado .le-conectar a{color:var(--t-fraco);
+text-decoration:underline;display:inline-block;min-height:44px;line-height:44px}

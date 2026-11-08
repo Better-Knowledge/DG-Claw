@@ -3,7 +3,7 @@
    analisou, fica invisível. O texto cru nunca é pintado. Lógica em sigilo.js. */
 
 #btnSigilo{min-width:32px;min-height:32px;white-space:nowrap}
-#btnSigilo.on{background:var(--accent);color:#fff;border-color:transparent}
+#btnSigilo.on{background:var(--accent);color:var(--t-sobre-acento);border-color:transparent}
 
 /* 1) ainda não visto pelo JS: coberto por CSS (o JS marca data-sig antes da primeira pintura) */
 body.sigilo #wrap > :not(.topo):not(.dia):not([data-sig]),
@@ -60,9 +60,9 @@ body.sigilo #anexoLista{filter:blur(4px)}
   max-width:520px;margin:0 auto;font-size:12px;line-height:1.35;pointer-events:none}
 #sigAviso[hidden]{display:none}
 #sigAviso > button,#sigAviso > p{pointer-events:auto;display:block;width:100%;box-sizing:border-box;
-  background:#fff8db;color:#5b4300;border:1px solid #e5bd4c;border-radius:10px;padding:6px 10px;
+  background:var(--t-aviso-fundo);color:var(--t-aviso);border:1px solid var(--t-aviso-borda);border-radius:10px;padding:6px 10px;
   text-align:left;font:inherit}
 #sigAviso > button{min-height:32px;cursor:pointer}
 #sigAviso > p{margin:4px 0 0}
 #sigAviso > p[hidden]{display:none}
-html[data-tema="escuro"] #sigAviso > button,html[data-tema="escuro"] #sigAviso > p{background:#3c341b;color:#fff3c8;border-color:#e5bd4c}
+

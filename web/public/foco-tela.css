@@ -1,5 +1,5 @@
 /* foco-tela.css: o modo foco na conversa (painel à esquerda da coluna, ou faixa sob o cabeçalho). */
-.foco{box-sizing:border-box;background:#fff;color:var(--txt);border:1px solid var(--line);font-size:14px;line-height:1.35;z-index:21}
+.foco{box-sizing:border-box;background:var(--t-superficie);color:var(--txt);border:1px solid var(--line);font-size:14px;line-height:1.35;z-index:21}
 .foco[hidden]{display:none}
 .foco button{font:inherit;color:inherit;cursor:pointer;background:none;border:0;padding:0;text-align:left}
 .foco-cab{display:flex;align-items:center;gap:4px}
@@ -19,23 +19,23 @@
                          transition:grid-template-rows .22s ease,opacity .2s ease .04s,visibility 0s}
 .foco-int{min-height:0;overflow:hidden;padding:0 10px 0;transition:padding-bottom .22s ease}
 .foco.aberto .foco-int{padding-bottom:10px}
-.foco-barra{height:6px;border-radius:3px;background:rgba(0,0,0,.08);overflow:hidden;margin:2px 0 8px}
+.foco-barra{height:6px;border-radius:3px;background:var(--t-linha-suave);overflow:hidden;margin:2px 0 8px}
 .foco-enche{display:block;height:100%;width:0;background:var(--accent);border-radius:3px;transition:width .2s}
 .foco-lista{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
 .foco-tique{width:100%;min-height:36px;display:flex;align-items:flex-start;gap:10px;padding:6px 4px;border-radius:8px}
-.foco-tique:hover{background:rgba(0,0,0,.04)}
+.foco-tique:hover{background:var(--t-codigo-fundo)}
 .foco-caixa{flex:0 0 20px;width:20px;height:20px;margin-top:1px;border:2px solid var(--accent);border-radius:6px;box-sizing:border-box;
-            display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;background:#fff}
+            display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--t-sobre-acento);background:var(--t-superficie)}
 .foco-texto{flex:1;min-width:0;overflow-wrap:anywhere;word-break:break-word}
 .foco-item.feito .foco-caixa{background:var(--accent)}
 .foco-item.feito .foco-texto{text-decoration:line-through;color:var(--muted)}
-.foco-aviso{margin:8px 0 0;padding:6px 8px;border-radius:8px;background:#fdecea;color:#8a2a1f;font-size:13px;overflow-wrap:anywhere}
+.foco-aviso{margin:8px 0 0;padding:6px 8px;border-radius:8px;background:var(--t-erro-fundo);color:var(--t-erro);font-size:13px;overflow-wrap:anywhere}
 .foco-aviso[hidden]{display:none}
 /* Tudo ticado: a barra dá lugar ao aviso com o botão Concluir. `.foco .foco-conclui` pesa mais que `.foco button`. */
-.foco-ok{margin:2px 0 8px;padding:8px 10px;border-radius:10px;background:#e4fbcd;color:#23784a;font-weight:700;
+.foco-ok{margin:2px 0 8px;padding:8px 10px;border-radius:10px;background:var(--t-ok-fundo);color:var(--t-ok);font-weight:700;
          font-size:14px;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;text-align:center}
 .foco-ok[hidden]{display:none}
-.foco .foco-conclui{min-height:32px;padding:0 14px;border-radius:16px;background:var(--accent);color:#fff;
+.foco .foco-conclui{min-height:32px;padding:0 14px;border-radius:16px;background:var(--accent);color:var(--t-sobre-acento);
                     font-weight:700;text-align:center}
 .foco .foco-conclui:disabled{opacity:.6;cursor:default}
 .foco-so-erro .foco-corpo{grid-template-rows:1fr;opacity:1;visibility:visible}
@@ -46,7 +46,7 @@
 /* painel: pendurado à esquerda da coluna da conversa (a posição e a largura vêm do JS) */
 .foco-painel{position:fixed;top:calc(var(--header-h) + 12px);max-height:calc(100vh - var(--header-h) - var(--barra-h) - 24px);
              max-height:calc(100dvh - var(--header-h) - var(--barra-h) - 24px);overflow-y:auto;overflow-x:hidden;border-radius:14px;
-             box-shadow:0 2px 10px rgba(0,0,0,.08);transition:width .22s ease,border-radius .22s ease}
+             box-shadow:var(--t-sombra);transition:width .22s ease,border-radius .22s ease}
 /* recolhido no painel vira pílula; a largura vem do JS em linha, por isso o !important */
 .foco-painel:not(.aberto):not(.foco-so-erro){width:132px!important;border-radius:20px}
 .foco-painel:not(.aberto):not(.foco-so-erro) .foco-ajuda{display:none}
@@ -57,8 +57,9 @@
 .foco-faixa{position:relative;flex:0 0 auto;z-index:21;height:36px;border-left:0;border-right:0;border-top:0}
 .foco-faixa .foco-cab{height:36px}
 .foco-faixa:not(.aberto):not(.foco-so-erro) .foco-corpo{display:none}
-.foco-faixa .foco-corpo{position:absolute;top:36px;left:0;right:0;max-height:min(50vh,360px);overflow-y:auto;background:#fff;
-                        border-bottom:1px solid var(--line);box-shadow:0 8px 16px rgba(0,0,0,.12);padding-top:6px}
+.foco-faixa .foco-corpo{position:absolute;top:36px;left:0;right:0;max-height:min(50vh,360px);overflow-y:auto;background:var(--t-superficie);
+                        border-bottom:1px solid var(--line);box-shadow:var(--t-sombra-forte);padding-top:6px}
+
 .foco-faixa.foco-so-erro{overflow:hidden}
 .foco-faixa.foco-so-erro .foco-corpo{position:static;box-shadow:none;border:0;padding:0}
 .foco-faixa.foco-so-erro .foco-cab{display:none}

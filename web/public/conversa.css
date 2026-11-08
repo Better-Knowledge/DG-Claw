@@ -16,37 +16,37 @@
   .campo{position:relative;flex:1;min-width:0;display:flex}
   #entrada{flex:1;min-width:0;border:1px solid var(--line);border-radius:20px;
            padding:12px 14px;font:inherit;font-size:16px;line-height:20px;
-           background:#f4f8f4;color:var(--txt);height:46px;min-height:46px;
+           background:var(--t-superficie-2);color:var(--txt);height:46px;min-height:46px;
            outline:none;resize:none;overflow-y:hidden;display:block;
            box-sizing:border-box}
-  #entrada:focus{border-color:var(--accent);background:#fff}
+  #entrada:focus{border-color:var(--accent);background:var(--t-superficie)}
   #entrada::placeholder{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   #btnEnviar{flex:0 0 46px;width:46px;height:46px;border-radius:50%;border:0;
-             background:var(--accent);color:#fff;font-size:18px;cursor:pointer}
+             background:var(--accent);color:var(--t-sobre-acento);font-size:18px;cursor:pointer}
   #btnEnviar:disabled{opacity:.45}
   #btnMic{flex:0 0 56px;width:56px;height:56px;border-radius:50%;border:0;
-          background:var(--accent);color:#fff;font-size:24px;cursor:pointer;
+          background:var(--accent);color:var(--t-sobre-acento);font-size:24px;cursor:pointer;
           display:flex;align-items:center;justify-content:center}
-  #btnMic.gravando{background:#c0392b}
+  #btnMic.gravando{background:var(--t-perigo)}
   #btnMic:disabled{opacity:.45}
   /* Sem segunda linha no rodapé (10/10/2026): o estado do microfone fica DENTRO
      do campo ("● 0:07" gravando, "transcrevendo…"), sem mudar a altura dele. */
   #micTxt{position:absolute;right:14px;top:0;bottom:0;display:flex;align-items:center;
-          max-width:calc(100% - 28px);padding-left:8px;background:#f4f8f4;border-radius:20px;
+          max-width:calc(100% - 28px);padding-left:8px;background:var(--t-superficie-2);border-radius:20px;
           font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;
           text-overflow:ellipsis;pointer-events:none}
   #micTxt:empty{display:none}
-  #micTxt.vivo{color:#c0392b;font-weight:600}
-  #btnAnexo.cancela{background:#fdecec;border-color:#e8b4b0;color:#c0392b;font-weight:700}
-  .mini{border:1px solid var(--line);background:#f2f6f2;color:#38523f;border-radius:14px;
+  #micTxt.vivo{color:var(--t-erro);font-weight:600}
+  #btnAnexo.cancela{background:var(--t-erro-fundo);border-color:var(--t-erro-borda);color:var(--t-erro);font-weight:700}
+  .mini{border:1px solid var(--line);background:var(--t-superficie-2);color:var(--t-texto-botao);border-radius:14px;
         padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;min-height:36px;
         white-space:nowrap}
-  .mini.on{background:var(--accent);color:#fff;border-color:transparent}
+  .mini.on{background:var(--accent);color:var(--t-sobre-acento);border-color:transparent}
   .mini:active{opacity:.7}
 
   /* ── Anexo: botão da barra de baixo ── */
   #btnAnexo{flex:0 0 44px;width:44px;height:44px;border-radius:50%;border:1px solid var(--line);
-            background:#f2f6f2;color:#38523f;font-size:20px;cursor:pointer;
+            background:var(--t-superficie-2);color:var(--t-texto-botao);font-size:20px;cursor:pointer;
             display:flex;align-items:center;justify-content:center;padding:0}
   #btnAnexo:active{opacity:.7}
   #btnAnexo:disabled{opacity:.45}
@@ -54,34 +54,34 @@
   /* prints colados, arquivos arrastados ou escolhidos, esperando o Enter: um
      cartão por anexo, na ordem, rolando na horizontal quando não cabem (05/10/2026) */
   #anexoChip{display:block;padding:6px 6px 4px;border:1px solid var(--line);min-width:0;
-             border-radius:12px;background:#f2f6f2;font-size:13px;color:#38523f}
+             border-radius:12px;background:var(--t-superficie-2);font-size:13px;color:var(--t-texto-botao)}
   #anexoChip[hidden]{display:none}
   #anexoLista{display:flex;gap:8px;overflow-x:auto;overflow-y:hidden;min-width:0;
               padding-bottom:2px;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity}
   .anx{flex:0 0 96px;width:96px;position:relative;scroll-snap-align:start;
        display:flex;flex-direction:column;gap:2px}
   .anxmid{position:relative;width:96px;height:72px;border-radius:8px;overflow:hidden;
-          background:#dbe6dc;display:flex;align-items:center;justify-content:center}
+          background:var(--t-superficie-3);display:flex;align-items:center;justify-content:center}
   .anxmid img,.anxmid video{width:100%;height:100%;object-fit:cover;display:block}
   .anxico{font-size:30px;line-height:1}
-  .anxplay{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:#fff;
-           font-size:18px;text-shadow:0 1px 3px rgba(0,0,0,.6);pointer-events:none}
-  .anxest{position:absolute;left:0;right:0;bottom:0;background:rgba(10,24,16,.62);color:#fff;
+  .anxplay{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:var(--t-sobre-acento);
+           font-size:18px;text-shadow:0 1px 3px var(--t-veu-forte);pointer-events:none}
+  .anxest{position:absolute;left:0;right:0;bottom:0;background:var(--t-veu-forte);color:var(--t-sobre-acento);
           font-size:11.5px;font-weight:600;text-align:center;padding:2px 0}
-  .anx[data-estado="pronto"] .anxest{background:rgba(31,122,72,.78)}
-  .anx[data-estado="falhou"] .anxest{background:#c0392b}
-  .anx[data-estado="falhou"] .anxmid{outline:2px solid #c0392b;outline-offset:-2px}
+  .anx[data-estado="pronto"] .anxest{background:var(--t-acento-forte)}
+  .anx[data-estado="falhou"] .anxest{background:var(--t-perigo)}
+  .anx[data-estado="falhou"] .anxmid{outline:2px solid var(--t-perigo);outline-offset:-2px}
   .anxnome,.anxtam{font-size:11.5px;line-height:1.25;overflow:hidden;text-overflow:ellipsis;
                    white-space:nowrap}
-  .anxtam{color:#6b7f70}
+  .anxtam{color:var(--t-fraco)}
   .anxx{position:absolute;top:-2px;right:-2px;width:32px;height:32px;border-radius:50%;
-        border:0;background:rgba(10,24,16,.7);color:#fff;font-size:14px;cursor:pointer;
+        border:0;background:var(--t-veu-forte);color:var(--t-sobre-acento);font-size:14px;cursor:pointer;
         display:flex;align-items:center;justify-content:center;padding:0}
-  .anxde{border:1px solid #e5b4ae;background:#fdecea;color:#a3271b;border-radius:10px;
+  .anxde{border:1px solid var(--t-erro-borda);background:var(--t-erro-fundo);color:var(--t-erro);border-radius:10px;
          font-size:11.5px;font-weight:600;min-height:32px;padding:0 4px;cursor:pointer}
   .anxde[hidden]{display:none}
-  #anexoInfo{font-size:12px;color:#5b7062;padding:4px 2px 0;overflow-wrap:anywhere}
-  #anexoInfo.erro{color:#c0392b;font-weight:600}
+  #anexoInfo{font-size:12px;color:var(--t-fraco);padding:4px 2px 0;overflow-wrap:anywhere}
+  #anexoInfo.erro{color:var(--t-erro);font-weight:600}
   /* balão otimista com vários anexos: grade de duas colunas */
   .midgrade{display:block}
   .midgrade.varios{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px}
@@ -92,50 +92,50 @@
   .mid video{display:block;width:100%;max-height:260px}
 
   /* ── Mídia dentro do balão ── */
-  .mid{display:block;width:100%;margin:0 0 6px;padding:0;border:0;background:#dbe6dc;
+  .mid{display:block;width:100%;margin:0 0 6px;padding:0;border:0;background:var(--t-superficie-3);
        border-radius:10px;overflow:hidden;cursor:pointer;position:relative}
   .mid img{display:block;width:100%;max-height:260px;object-fit:cover}
   .mid.semthumb img{display:none}
   .midfb{display:none;align-items:center;gap:8px;padding:12px;font-size:13.5px;
-         color:#38523f;text-align:left;min-height:44px}
+         color:var(--t-texto-botao);text-align:left;min-height:44px}
   .mid.semthumb .midfb{display:flex}
-  .mid .lupa{position:absolute;right:7px;bottom:7px;background:rgba(10,24,16,.62);color:#fff;
+  .mid .lupa{position:absolute;right:7px;bottom:7px;background:var(--t-veu-forte);color:var(--t-sobre-acento);
              font-size:11.5px;padding:3px 8px;border-radius:10px}
   .midaudio{display:block;width:100%;margin:0 0 6px}
   .midaudio audio{display:block;width:100%;min-height:40px}
-  .midoff{display:block;background:#e8ebe8;border:1px solid var(--line);border-radius:10px;
-          padding:10px 12px;margin-bottom:6px;font-size:13px;color:#5d6b60}
-  .midpct{position:absolute;left:0;right:0;bottom:0;background:rgba(10,24,16,.62);color:#fff;
+  .midoff{display:block;background:var(--t-superficie-3);border:1px solid var(--line);border-radius:10px;
+          padding:10px 12px;margin-bottom:6px;font-size:13px;color:var(--t-fraco)}
+  .midpct{position:absolute;left:0;right:0;bottom:0;background:var(--t-veu-forte);color:var(--t-sobre-acento);
           font-size:12px;padding:4px 8px;text-align:center}
 
   /* ── Lightbox (mídia em tamanho cheio) ── */
-  #lightbox{position:fixed;inset:0;z-index:70;background:#0b160f;
+  #lightbox{position:fixed;inset:0;z-index:70;background:var(--t-escuro-fundo);
             display:none;flex-direction:column}
   #lightbox.abre{display:flex}
   .lbtopo{display:flex;align-items:center;gap:10px;padding:8px 10px;
-          padding-top:calc(8px + env(safe-area-inset-top));color:#fff}
+          padding-top:calc(8px + env(safe-area-inset-top));color:var(--t-sobre-acento)}
   .lbnome{flex:1;min-width:0;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;
           white-space:nowrap;opacity:.85}
   .lbtopo button[hidden]{display:none}
   .lbtopo button:disabled{opacity:.55}
-  .lbtopo a,.lbtopo button{border:1px solid rgba(255,255,255,.3);background:transparent;
-          color:#fff;border-radius:16px;padding:9px 14px;font-size:13.5px;font-weight:600;
+  .lbtopo a,.lbtopo button{border:1px solid var(--t-brilho);background:transparent;
+          color:var(--t-sobre-acento);border-radius:16px;padding:9px 14px;font-size:13.5px;font-weight:600;
           min-height:44px;display:flex;align-items:center;cursor:pointer;text-decoration:none}
   .lbcorpo{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;
            padding:8px;padding-bottom:calc(8px + env(safe-area-inset-bottom))}
   .lbcorpo img,.lbcorpo video{max-width:100%;max-height:100%;object-fit:contain}
-  .lbcorpo iframe{width:100%;height:100%;border:0;background:#fff;border-radius:8px}
+  .lbcorpo iframe{width:100%;height:100%;border:0;background:var(--t-superficie);border-radius:8px}
   .lbcorpo audio{width:min(100%,520px)}
-  .lbcorpo p{color:#cfe0d4;font-size:14px;text-align:center;max-width:26em}
+  .lbcorpo p{color:var(--t-sobre-acento);font-size:14px;text-align:center;max-width:26em}
 
   /* ── Reiniciar sessão (faixa de status no topo e diálogo) ── */
   #faixaReinicio{position:fixed;top:calc(var(--header-h) + env(safe-area-inset-top) + 8px);left:8px;right:8px;
                  max-width:560px;margin:0 auto;z-index:35;flex-wrap:wrap;align-items:center;gap:8px;
-                 padding:8px 12px;border-radius:10px;font-size:13.5px;line-height:1.4;box-shadow:0 2px 10px rgba(0,0,0,.18);
-                 background:#fdf3d0;color:#7a5c12;border:1px solid #efe0a8}
+                 padding:8px 12px;border-radius:10px;font-size:13.5px;line-height:1.4;box-shadow:var(--t-sombra-forte);
+                 background:var(--t-aviso-fundo);color:var(--t-aviso);border:1px solid var(--t-aviso-borda)}
   #faixaReinicio:not([hidden]){display:flex}
-  #faixaReinicio.ok{background:#e1f4e7;color:#1f6b3d;border-color:#b9e2c6}
-  #faixaReinicio.erro{background:#fbe0e0;color:#8f2f2f;border-color:#f0bcbc}
+  #faixaReinicio.ok{background:var(--t-ok-fundo);color:var(--t-ok);border-color:var(--t-ok-borda)}
+  #faixaReinicio.erro{background:var(--t-erro-fundo);color:var(--t-erro);border-color:var(--t-erro-borda)}
   #faixaReinicio .rico{flex:0 0 auto;width:18px;text-align:center;font-weight:700}
   #faixaReinicio .rtxt{flex:1 1 200px;min-width:0;overflow-wrap:anywhere}
   #faixaReinicio .racoes{flex:1 0 100%;display:flex;flex-wrap:wrap;gap:8px}
@@ -145,26 +145,26 @@
   }
   @keyframes reinicioGira{to{transform:rotate(360deg)}}
   #dlgReinicio{border:1px solid var(--line);border-radius:14px;padding:18px 18px 14px;
-               max-width:min(420px,calc(100vw - 32px));color:#2a3d2f;box-shadow:0 8px 30px rgba(0,0,0,.25)}
-  #dlgReinicio::backdrop{background:rgba(0,0,0,.4)}
+               max-width:min(420px,calc(100vw - 32px));color:var(--t-texto);background:var(--t-superficie);box-shadow:var(--t-sombra-forte)}
+  #dlgReinicio::backdrop{background:var(--t-veu)}
   #dlgReinicio h2{margin:0 0 8px;font-size:17px}
   #dlgReinicio p{margin:0 0 14px;font-size:14px;line-height:1.45}
   #dlgReinicio .dacoes{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}
   #dlgReinicio .dacoes button{min-height:36px;min-width:88px;padding:6px 14px;border-radius:10px;
                               font-size:14px;font-weight:600;cursor:pointer;
-                              border:1px solid var(--line);background:#f2f6f2;color:#38523f}
-  #dlgReinicio .dacoes button.perigo{background:#b3422e;border-color:#b3422e;color:#fff}
+                              border:1px solid var(--line);background:var(--t-superficie-2);color:var(--t-texto-botao)}
+  #dlgReinicio .dacoes button.perigo{background:var(--t-perigo);border-color:var(--t-perigo);color:var(--t-sobre-acento)}
 
   /* ── Faixas de aviso e de erro (nunca erro mudo) ── */
   .faixa{position:fixed;left:8px;right:8px;bottom:calc(var(--barra-h) + 8px);z-index:30;
          border-radius:10px;padding:10px 12px;font-size:13.5px;display:none;
-         box-shadow:0 2px 10px rgba(0,0,0,.18);line-height:1.4}
+         box-shadow:var(--t-sombra-forte);line-height:1.4}
   .faixa.aparece{display:flex;gap:8px;align-items:flex-start}
   .faixa .txt{flex:1}
   .faixa .x{border:0;background:transparent;color:inherit;font-size:16px;cursor:pointer;
             min-width:32px;min-height:32px}
-  #faixaErro{background:#fbe0e0;color:#8f2f2f;border:1px solid #f0bcbc}
-  #faixaAviso{background:#fdf3d0;color:#7a5c12;border:1px solid #efe0a8;
+  #faixaErro{background:var(--t-erro-fundo);color:var(--t-erro);border:1px solid var(--t-erro-borda)}
+  #faixaAviso{background:var(--t-aviso-fundo);color:var(--t-aviso);border:1px solid var(--t-aviso-borda);
               bottom:calc(var(--barra-h) + 8px)}
   #faixaErro.aparece + #faixaAviso.aparece{bottom:calc(var(--barra-h) + 66px)}
   /* botões dentro da faixa ("Tentar de novo", "Descartar"): numa linha própria
@@ -174,14 +174,14 @@
   .faixa .acoes .mini{min-height:36px}
   /* áudio que ficou no aparelho sem transcrição (05/10/2026); o JS põe a
      faixa em cima das outras duas quando elas aparecem juntas */
-  #faixaAudio{background:#fdf3d0;color:#7a5c12;border:1px solid #efe0a8}
+  #faixaAudio{background:var(--t-aviso-fundo);color:var(--t-aviso);border:1px solid var(--t-aviso-borda)}
 
   #btnMenu{position:relative}
   /* bolinha do ☰: soma das não lidas dos outros agentes (no computador a fileira de avatares não aparece) */
   /* ☰ com agente que precisa de você: a bolinha vira o selo âmbar com "!" */
-  #btnMenu.precisa .bolinha-menu{width:16px;height:16px;top:1px;right:1px;background:#e8890c;color:#fff;
+  #btnMenu.precisa .bolinha-menu{width:16px;height:16px;top:1px;right:1px;background:var(--t-atencao);color:var(--t-sobre-acento);
     font-size:11px;font-weight:800;line-height:12px;text-align:center;box-sizing:border-box}
-  #btnMenu .bolinha-menu{position:absolute;top:4px;right:4px;width:10px;height:10px;border-radius:50%;background:#d93025;border:2px solid var(--header,#fff);pointer-events:none}
+  #btnMenu .bolinha-menu{position:absolute;top:4px;right:4px;width:10px;height:10px;border-radius:50%;background:var(--t-perigo);border:2px solid var(--header);pointer-events:none}
   /* ── Cabeçalho: alvos de toque de verdade (eram 26 a 38 px) ── */
   header .btn{min-height:44px;min-width:44px}
   #btnMenu{font-size:20px}
@@ -195,9 +195,9 @@
   .ferr{display:contents}
   .ferr-sombra{display:none}
   .tools .btn{flex:0 0 auto}
-  .tools a.btn{text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:4px;color:#38523f;white-space:nowrap}
+  .tools a.btn{text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:4px;color:var(--t-texto-botao);white-space:nowrap}
   .tools a.btn[hidden]{display:none}
-  #btnContinua.on{background:var(--accent);color:#fff;border-color:transparent}
+  #btnContinua.on{background:var(--accent);color:var(--t-sobre-acento);border-color:transparent}
   #btnContinua:not(.on){opacity:.75}
   @media (max-width:700px){
     header{flex-wrap:wrap;row-gap:0;gap:0 8px;padding-left:6px;padding-right:6px}
@@ -213,8 +213,8 @@
     header .tools #btnParar{font-size:13px;padding:4px 12px}
     .ferr-sombra{display:block;position:absolute;top:0;bottom:0;width:22px;pointer-events:none;
                  opacity:0;transition:opacity .15s;z-index:2}
-    .ferr-sombra.esq{left:0;background:linear-gradient(90deg,var(--header),rgba(255,255,255,0))}
-    .ferr-sombra.dir{right:0;background:linear-gradient(270deg,var(--header),rgba(255,255,255,0))}
+    .ferr-sombra.esq{left:0;background:linear-gradient(90deg,var(--header),transparent)}
+    .ferr-sombra.dir{right:0;background:linear-gradient(270deg,var(--header),transparent)}
     .ferr.tem-esq .esq,.ferr.tem-dir .dir{opacity:1}
   }
 
@@ -222,52 +222,52 @@
   .topo{text-align:center;font-size:12px;color:var(--muted);padding:6px 0 2px}
 
   /* ── Citação, reação, código ── */
-  .cita{border-left:3px solid var(--accent);background:rgba(47,158,94,.08);border-radius:6px;
-        padding:4px 8px;margin:0 0 6px;font-size:13px;color:#4a6152;
+  .cita{border-left:3px solid var(--accent);background:var(--t-acento-fundo);border-radius:6px;
+        padding:4px 8px;margin:0 0 6px;font-size:13px;color:var(--t-fraco);
         overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
   .cita b{display:block;font-size:12px;color:var(--accent)}
-  .reac{display:inline-block;margin-top:4px;font-size:15px;background:rgba(0,0,0,.05);
+  .reac{display:inline-block;margin-top:4px;font-size:15px;background:var(--t-codigo-fundo);
         border-radius:12px;padding:1px 7px}
-  .bub code{font-family:ui-monospace,Menlo,monospace;font-size:13.5px;background:rgba(0,0,0,.06);
+  .bub code{font-family:ui-monospace,Menlo,monospace;font-size:13.5px;background:var(--t-codigo-fundo);
             border-radius:4px;padding:0 4px}
   .bub code.pre{display:block;white-space:pre-wrap;padding:6px 8px}
   /* ```bloco```: a "caixa de texto" pronta pra colar. Fundo um pouco mais
      escuro que o balão e o quadradinho de copiar no canto . */
-  .cod{position:relative;margin:8px 0 4px;background:rgba(0,0,0,.075);
-       border:1px solid rgba(0,0,0,.06);border-radius:8px}
+  .cod{position:relative;margin:8px 0 4px;background:var(--t-codigo-fundo);
+       border:1px solid var(--t-linha-suave);border-radius:8px}
   .p + .cod{margin-top:10px}
   .cod + .p{margin-top:10px}
   .cod pre{margin:0;padding:9px 44px 9px 11px;white-space:pre-wrap;
            overflow-wrap:anywhere;font-family:ui-monospace,Menlo,monospace;
-           font-size:13.5px;line-height:1.45;color:#1d2e23}
+           font-size:13.5px;line-height:1.45;color:var(--t-texto)}
   .codcopia{position:absolute;top:4px;right:4px;width:34px;height:34px;padding:0;
-            border:0;border-radius:8px;background:rgba(255,255,255,.75);color:#38523f;
+            border:0;border-radius:8px;background:var(--t-superficie);color:var(--t-texto-botao);
             display:flex;align-items:center;justify-content:center;cursor:pointer;
             -webkit-user-select:none;user-select:none}
-  .codcopia:active{background:#fff}
-  .codcopia.ok{background:var(--accent);color:#fff}
+  .codcopia:active{background:var(--t-superficie-2)}
+  .codcopia.ok{background:var(--accent);color:var(--t-sobre-acento)}
 
   /* ── Vídeo: o ▶ diz que não é foto ── */
   .mid .play{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:54px;height:54px;
-             border-radius:50%;background:rgba(10,24,16,.6);color:#fff;font-size:22px;
+             border-radius:50%;background:var(--t-veu-forte);color:var(--t-sobre-acento);font-size:22px;
              display:flex;align-items:center;justify-content:center;padding-left:4px}
   .mid.semthumb .play{display:none}
   /* o player de áudio espremia no computador (só um traço e três pontos) */
   .midaudio{min-width:min(260px,62vw)}
 
   /* ── Seta verde durante a gravação: "envia direto" ── */
-  #btnEnviar.direto{background:#1f7a47;box-shadow:0 0 0 3px rgba(47,158,94,.3)}
+  #btnEnviar.direto{background:var(--t-acento-forte);box-shadow:0 0 0 3px var(--t-acento-fundo)}
 
   /* ── BL-365: seta pro fim, busca e painel de compartilhados ── */
   /* A seta fica acima da barra E das faixas: a posição sai do JS (posicionaSeta),
      porque a barra muda de altura com o chip de anexo e as faixas vêm e vão. */
   .seta-fim{position:fixed;right:14px;bottom:120px;z-index:31;width:48px;height:48px;
-            border-radius:50%;border:1px solid var(--line);background:#fff;color:#38523f;
-            font-size:22px;line-height:1;box-shadow:0 2px 8px rgba(0,0,0,.22);cursor:pointer;
+            border-radius:50%;border:1px solid var(--line);background:var(--t-superficie);color:var(--t-texto-botao);
+            font-size:22px;line-height:1;box-shadow:var(--t-sombra-forte);cursor:pointer;
             display:flex;align-items:center;justify-content:center;padding:0}
   .seta-fim[hidden]{display:none}
   .fimnovas{position:absolute;top:-9px;left:50%;transform:translateX(-50%);min-width:22px;
-            height:22px;border-radius:11px;background:var(--accent);color:#fff;font-size:12px;
+            height:22px;border-radius:11px;background:var(--accent);color:var(--t-sobre-acento);font-size:12px;
             font-weight:700;padding:0 6px;display:flex;align-items:center;justify-content:center}
   .fimnovas[hidden]{display:none}
   /* Indicador "O agente está trabalhando · rodando um comando": faixa em fluxo
@@ -276,8 +276,8 @@
      não alcança mais aqui, mas #estado precisa respeitar o hidden. */
   .who #estado[hidden]{display:none}
   #atividade{flex:0 0 auto;display:flex;align-items:center;gap:8px;cursor:pointer;
-             padding:7px 14px;background:#cfe3c8;color:#38523f;font-size:13.5px;font-weight:600;
-             border-top:1px solid rgba(0,0,0,.05)}
+             padding:7px 14px;background:var(--t-balao-fora);color:var(--t-texto-botao);font-size:13.5px;font-weight:600;
+             border-top:1px solid var(--t-linha-suave)}
   #atividade[hidden]{display:none}
   #atividade .atv-txt{display:block;min-width:0;flex:1 1 auto;white-space:nowrap;overflow:hidden;
                 text-overflow:ellipsis}
@@ -288,21 +288,21 @@
      dos pontinhos sai e fica a onda de opacidade. Alerta e cinza ficam parados. O brilho é verde
      claro, não branco: o branco puxava o olho no meio da letra. */
   .atv-pts{flex:0 0 auto;display:inline-flex;gap:3px;align-items:center}
-  .atv-pts i{width:6px;height:6px;border-radius:50%;background:#2f9e5e;animation:atvPt 1.2s ease-in-out infinite}
+  .atv-pts i{width:6px;height:6px;border-radius:50%;background:var(--t-acento);animation:atvPt 1.2s ease-in-out infinite}
   .atv-pts i:nth-child(2){animation-delay:.2s}
   .atv-pts i:nth-child(3){animation-delay:.4s}
   @keyframes atvPt{0%,80%,100%{opacity:.25;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
   @keyframes atvPtSoOpacidade{0%,80%,100%{opacity:.25}40%{opacity:1}}
-  #atividade .atv-txt{background:linear-gradient(90deg,#38523f 0%,#38523f 38%,#5cb883 50%,#38523f 62%,#38523f 100%);
+  #atividade .atv-txt{background:linear-gradient(90deg,var(--t-texto-botao) 0%,var(--t-texto-botao) 38%,var(--t-ok-borda) 50%,var(--t-texto-botao) 62%,var(--t-texto-botao) 100%);
     background-size:250% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;
     animation:atvBrilho 2.4s linear infinite}
   @keyframes atvBrilho{from{background-position:100% 0}to{background-position:-150% 0}}
   #atividade.atv-alerta .atv-pts i,#atividade.atv-cinza .atv-pts i{animation:none;opacity:1}
-  #atividade.atv-alerta .atv-pts i{background:#b7791f}
-  #atividade.atv-cinza .atv-pts i{background:#8a948d}
+  #atividade.atv-alerta .atv-pts i{background:var(--t-atencao)}
+  #atividade.atv-cinza .atv-pts i{background:var(--t-fraco-2)}
   #atividade.atv-alerta .atv-txt,#atividade.atv-cinza .atv-txt{background:none;animation:none}
-  #atividade.atv-alerta .atv-txt{color:#8a5a0f}
-  #atividade.atv-cinza .atv-txt{color:#6f7a72}
+  #atividade.atv-alerta .atv-txt{color:var(--t-aviso)}
+  #atividade.atv-cinza .atv-txt{color:var(--t-fraco)}
   @media (prefers-reduced-motion:reduce){
     .atv-pts i{animation-name:atvPtSoOpacidade}
     #atividade .atv-acao{transition:none}
@@ -310,7 +310,7 @@
   .erroconfig{max-width:600px;margin:0 auto;padding:28px 18px;
               padding-top:calc(28px + env(safe-area-inset-top))}
   .erroconfig h1{font-size:21px;margin:0 0 10px}
-  .erroconfig p{color:#4a6152}
+  .erroconfig p{color:var(--t-fraco)}
   .erroconfig a{color:var(--accent);font-weight:600}
 
   /* ── Modo standalone do iPhone (app instalado pela Tela de Início), BL-265 ──
@@ -389,32 +389,32 @@
   /* bolinha de não lidas no canto do avatar; a borda na cor do fundo a recorta do avatar */
   /* precisa de você: âmbar com "!"; trabalhando: ponto verde que respira (parado para quem pede menos movimento) */
   .troca-baixo .selo-aten{position:absolute;top:-3px;right:-4px;width:18px;height:18px;border-radius:50%;
-    box-sizing:border-box;background:#e8890c;color:#fff;font-size:12px;font-weight:800;line-height:14px;
-    text-align:center;border:2px solid var(--header,#fff);pointer-events:none}
+    box-sizing:border-box;background:var(--t-atencao);color:var(--t-sobre-acento);font-size:12px;font-weight:800;line-height:14px;
+    text-align:center;border:2px solid var(--header);pointer-events:none}
   .troca-baixo .selo-trab{position:absolute;top:0;right:-1px;width:10px;height:10px;border-radius:50%;
-    background:#2f9e5e;border:2px solid var(--header,#fff);box-sizing:content-box;pointer-events:none;
+    background:var(--t-acento);border:2px solid var(--header);box-sizing:content-box;pointer-events:none;
     animation:seloTrab 1.4s ease-in-out infinite}
   .troca-baixo .bolinha-nl.ponto{min-width:10px;width:10px;height:10px;padding:0;top:0}
   @keyframes seloTrab{0%,100%{opacity:.35}50%{opacity:1}}
   @media (prefers-reduced-motion:reduce){.troca-baixo .selo-trab{animation:none;opacity:.8}}
   .troca-baixo .bolinha-nl{position:absolute;top:-2px;right:-3px;min-width:18px;height:18px;padding:0 4px;
-    box-sizing:border-box;border-radius:9px;background:#d93025;color:#fff;font-size:11px;font-weight:700;
-    line-height:14px;text-align:center;border:2px solid var(--header,#fff);pointer-events:none}
+    box-sizing:border-box;border-radius:9px;background:var(--t-perigo);color:var(--t-sobre-acento);font-size:11px;font-weight:700;
+    line-height:14px;text-align:center;border:2px solid var(--header);pointer-events:none}
 }
 
 /* ── Menu lateral: base ── */
   /* ── Menu lateral ── */
-  #overlayMenu{position:fixed;inset:0;background:rgba(10,24,16,.45);z-index:40;display:none}
+  #overlayMenu{position:fixed;inset:0;background:var(--t-veu);z-index:40;display:none}
   #overlayMenu.abre{display:block}
-  aside#menu{position:fixed;top:0;bottom:0;left:0;width:min(84vw,310px);background:#fff;z-index:41;
-        display:flex;flex-direction:column;box-shadow:2px 0 14px rgba(0,0,0,.2);
+  aside#menu{position:fixed;top:0;bottom:0;left:0;width:min(84vw,310px);background:var(--t-superficie);z-index:41;
+        display:flex;flex-direction:column;box-shadow:var(--t-sombra-forte);
         transform:translateX(-102%);transition:transform .22s ease;
         padding-top:env(safe-area-inset-top);
         padding-bottom:env(safe-area-inset-bottom)}
   aside#menu.abre{transform:translateX(0)}
   .av img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block}
   /* foto ainda pintando não pode mostrar o verde da cor do agente por baixo (iPhone, 21/10) */
-  .av:has(>img){background:#e4eae6 !important}
+  .av:has(>img){background:var(--t-superficie-3) !important}
   .pe{flex:0 0 auto;border-top:1px solid var(--line);padding:4px 8px 2px}
   .pe .conta{display:flex;align-items:center;justify-content:space-between;gap:8px;
         min-height:36px;padding:0 4px 0 8px}
@@ -425,25 +425,25 @@
 
 /* ── Pedaços que antes eram montados pelo JS (agora fixos aqui) ── */
 .lnkbaixa{display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:26px;
-  margin:0 3px;padding:0 8px;border:1px solid rgba(31,122,71,.35);border-radius:13px;background:#eef6f0;
-  color:#1f7a47;font-size:14px;line-height:1;vertical-align:middle;cursor:pointer;position:relative}
+  margin:0 3px;padding:0 8px;border:1px solid var(--t-ok-borda);border-radius:13px;background:var(--t-ok-fundo);
+  color:var(--t-acento-forte);font-size:14px;line-height:1;vertical-align:middle;cursor:pointer;position:relative}
 .midcx{position:relative;display:block}
 .midcx .mid.semthumb .midfb{padding-right:52px}
 .midcx .mid.semthumb .lupa{right:52px}
 .midbx{position:absolute;top:6px;right:6px;width:36px;height:36px;border:0;border-radius:50%;
-  background:rgba(10,24,16,.62);color:#fff;font-size:17px;line-height:1;cursor:pointer;z-index:2;
+  background:var(--t-veu-forte);color:var(--t-sobre-acento);font-size:17px;line-height:1;cursor:pointer;z-index:2;
   display:flex;align-items:center;justify-content:center;padding:0;text-decoration:none}
 .midcx .mid.semthumb + .midbx{top:50%;transform:translateY(-50%);margin-top:-3px}
-.midbx:active{background:rgba(10,24,16,.85)}
+.midbx:active{background:var(--t-escuro-fundo)}
 .midaudio.combx{display:flex;align-items:center;gap:6px}
 .midaudio.combx audio{flex:1 1 auto;min-width:0}
-.midaudio.combx .midbx{position:static;flex:0 0 auto;background:#dbe6dc;color:#1f7a47}
+.midaudio.combx .midbx{position:static;flex:0 0 auto;background:var(--t-superficie-3);color:var(--t-acento-forte)}
 .anx[data-estado="subindo"]::after{content:"";position:absolute;left:0;bottom:0;height:3px;z-index:3;
-  width:var(--pct,0%);background:#2f9e5e;border-radius:0 2px 2px 0;transition:width .3s}
+  width:var(--pct,0%);background:var(--t-acento);border-radius:0 2px 2px 0;transition:width .3s}
 
 /* ── Conversa vazia: o agente ainda está acordando ── */
 .vazio{max-width:26em;margin:28px auto;padding:22px 20px;border-radius:16px;text-align:center;
-  background:rgba(255,255,255,.92);box-shadow:0 1px 4px rgba(0,0,0,.12);color:#38523f}
+  background:var(--t-superficie);box-shadow:var(--t-sombra);color:var(--t-texto-botao)}
 .vazio .vz-ico{font-size:34px;line-height:1;margin-bottom:8px}
 .vazio b{display:block;font-size:16.5px;color:var(--txt);margin-bottom:6px}
 .vazio small{display:block;font-size:13.5px;line-height:1.45;color:var(--muted)}
@@ -455,33 +455,33 @@
 .lbcorpo img{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;will-change:transform}
 #lightbox .lbtopo a[hidden],#lightbox .lbtopo button[hidden]{display:none}
 #lbFechar{min-width:44px;justify-content:center;font-size:18px;padding:0 12px;flex:0 0 auto}
-.lbcorpo .vcard{background:#fff;color:#1d2a21;border-radius:16px;width:calc(100% - 32px);max-width:26em;
+.lbcorpo .vcard{background:var(--t-superficie);color:var(--t-texto);border-radius:16px;width:calc(100% - 32px);max-width:26em;
   padding:24px 20px;text-align:center;box-sizing:border-box;overflow-wrap:anywhere}
 .lbcorpo .vcard .ico{font-size:46px;line-height:1}
 .lbcorpo .vcard b{display:block;margin:12px 0 4px;font-size:16px}
-.lbcorpo .vcard small{display:block;color:#5d6b60;font-size:13px;line-height:1.45}
-.lbcorpo .vcard a{display:inline-block;margin-top:16px;border-radius:12px;background:#1f7a47;color:#fff;
+.lbcorpo .vcard small{display:block;color:var(--t-fraco);font-size:13px;line-height:1.45}
+.lbcorpo .vcard a{display:inline-block;margin-top:16px;border-radius:12px;background:var(--t-acento-forte);color:var(--t-sobre-acento);
   padding:12px 18px;font-weight:600;text-decoration:none;min-height:44px;box-sizing:border-box}
-.lbcorpo .vcard a.sec{background:#eef3ef;color:#1f7a47;margin-left:6px}
+.lbcorpo .vcard a.sec{background:var(--t-ok-fundo);color:var(--t-acento-forte);margin-left:6px}
 
 /* ── Menu do agente: o visual novo mora em menu-lado.css; aqui ficou só o botão Tutorial ── */
 .gm-tut{min-height:32px;padding:0 12px;border-radius:16px;border:1px solid var(--line);
-  background:#fff;color:#38523f;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit}
-.selo{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:9px;background:#e3ece5;
-  color:#38523f;font-size:10.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;
+  background:var(--t-superficie);color:var(--t-texto-botao);font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit}
+.selo{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:9px;background:var(--t-superficie-3);
+  color:var(--t-texto-botao);font-size:10.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;
   vertical-align:middle}
 .selo-canal{display:block;width:fit-content;max-width:100%;margin:0 0 3px;padding:1px 7px;border-radius:9px;
   font-size:10.5px;font-weight:700;letter-spacing:.3px;line-height:1.5;white-space:nowrap;overflow:hidden;
   text-overflow:ellipsis;cursor:help}
-.selo-canal.whatsapp{background:#dcf8e6;color:#0b6b35;box-shadow:inset 0 0 0 1px #25D366}
-.selo-canal.telegram{background:#dff1fb;color:#126a98;box-shadow:inset 0 0 0 1px #229ED9}
+.selo-canal.whatsapp{background:#dcf8e6;color:#0b6b35;box-shadow:inset 0 0 0 1px #25D366} /* cor-fixa: marca do provedor (verde do WhatsApp) */
+.selo-canal.telegram{background:#dff1fb;color:#126a98;box-shadow:inset 0 0 0 1px #229ED9} /* cor-fixa: marca do provedor (azul do Telegram) */
 .pe form{margin:0;margin-left:auto}
-.pe .sair{min-height:34px;padding:0 16px;font-size:13px;font-weight:600;color:#38523f;border:1px solid var(--line);background:#fff;border-radius:17px;cursor:pointer;font-family:inherit}
+.pe .sair{min-height:34px;padding:0 16px;font-size:13px;font-weight:600;color:var(--t-texto-botao);border:1px solid var(--line);background:var(--t-superficie);border-radius:17px;cursor:pointer;font-family:inherit}
 
 /* Aviso discreto do Admin, em cima do campo */
 #avisoAdmin{font-size:12px;line-height:1.3;color:var(--muted);padding:0 8px 2px}
 #avisoAdmin[hidden]{display:none}
-#avisoAdmin code{font-family:ui-monospace,Menlo,monospace;background:rgba(0,0,0,.06);border-radius:4px;padding:0 3px}
+#avisoAdmin code{font-family:ui-monospace,Menlo,monospace;background:var(--t-codigo-fundo);border-radius:4px;padding:0 3px}
 
 /* Os botões que dependem de microfone ou voz só aparecem quando o servidor libera */
 .sem-mic #btnMic,.sem-voz #btnLer,.sem-voz #btnContinua,.sem-mic #btnContinua{display:none}
@@ -491,19 +491,19 @@
 /* ── Visita guiada (tour.js) ── */
 #tourFundo{position:fixed;inset:0;z-index:90}
 #tourLuz{position:fixed;z-index:91;border-radius:10px;pointer-events:none;
-  box-shadow:0 0 0 9999px rgba(10,24,16,.66);outline:2px solid #fff}
-#tourCaixa{position:fixed;z-index:92;left:12px;right:12px;max-width:400px;margin:0 auto;background:#fff;
-  color:var(--txt);border-radius:14px;padding:14px 16px;box-shadow:0 6px 28px rgba(0,0,0,.35);
+  box-shadow:0 0 0 9999px var(--t-veu-forte);outline:2px solid var(--t-sobre-acento)}
+#tourCaixa{position:fixed;z-index:92;left:12px;right:12px;max-width:400px;margin:0 auto;background:var(--t-superficie);
+  color:var(--txt);border-radius:14px;padding:14px 16px;box-shadow:var(--t-sombra-forte);
   font-size:14px;line-height:1.45;max-height:70dvh;overflow-y:auto}
 #tourCaixa:focus{outline:none}
 #tourCaixa h4{margin:0 0 2px;font-size:15.5px}
 #tourCaixa .tour-n{font-size:11.5px;color:var(--muted);margin-bottom:6px}
 #tourCaixa p{margin:0 0 6px}
-#tourCaixa p b{color:#1f7a45}
-#tourCaixa .tour-acoes{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap;position:sticky;bottom:0;background:#fff;padding:8px 0 0}
+#tourCaixa p b{color:var(--t-acento-forte)}
+#tourCaixa .tour-acoes{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap;position:sticky;bottom:0;background:var(--t-superficie);padding:8px 0 0}
 #tourCaixa button{min-height:36px;padding:0 14px;border-radius:18px;border:1px solid var(--line);
-  background:#fff;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;color:#38523f}
-#tourCaixa button.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+  background:var(--t-superficie);font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--t-texto-botao)}
+#tourCaixa button.pri{background:var(--accent);border-color:var(--accent);color:var(--t-sobre-acento)}
 #tourCaixa button:disabled{opacity:.4;cursor:default}
 #tourCaixa .tour-x{margin-right:auto}
 
@@ -516,20 +516,13 @@
 #alertasPilha{display:flex;flex-direction:column;gap:6px;max-height:max(40px,calc(100dvh - 360px));overflow-y:auto;overscroll-behavior:contain}
 #alertasMensagem button{width:40px;height:40px;flex-shrink:0;border-radius:50%;border:1px solid var(--line);background:var(--header);color:var(--txt);font-size:18px;cursor:pointer}
 #alertasMensagem button:focus-visible{outline:3px solid var(--accent)}
-.row.alerta-entrega .bub{border:2px solid #218344;background:#eaf8ee}
-.row.alerta-pedido .bub{border:2px solid #aa7900;background:#fff8db}
-html[data-tema="escuro"] .row.alerta-entrega .bub{border-color:#63c883;background:#193a28;color:#e2f5e8}
-html[data-tema="escuro"] .row.alerta-pedido .bub{border-color:#e5bd4c;background:#3c341b;color:#fff3c8}
+.row.alerta-entrega .bub{border:2px solid var(--t-ok-borda);background:var(--t-ok-fundo)}
+.row.alerta-pedido .bub{border:2px solid var(--t-aviso-borda);background:var(--t-aviso-fundo)}
 .row.alerta-destaque .bub{outline:3px solid var(--accent);outline-offset:3px}
 @media(prefers-reduced-motion:reduce){.row.alerta-destaque .bub{animation:none!important;transition:none!important}#chat{scroll-behavior:auto!important}}
 
-@media(prefers-color-scheme:dark){
-  html:not([data-tema="claro"]) .row.alerta-entrega .bub{border-color:#63c883;background:#193a28;color:#e2f5e8}
-  html:not([data-tema="claro"]) .row.alerta-pedido .bub{border-color:#e5bd4c;background:#3c341b;color:#fff3c8}
-}
-
 /* Compartilhados: painel com rolagem própria e alvos de toque no celular. */
-#acervoPainel{position:fixed;inset:0 0 0 auto;width:min(100%,540px);z-index:90;background:var(--header);color:var(--txt);display:flex;flex-direction:column;box-shadow:0 0 0 100vw #0005}
+#acervoPainel{position:fixed;inset:0 0 0 auto;width:min(100%,540px);z-index:90;background:var(--header);color:var(--txt);display:flex;flex-direction:column;box-shadow:0 0 0 100vw var(--t-veu)}
 #acervoPainel[hidden]{display:none}#acervoPainel header{position:static;display:flex;gap:8px;padding:10px;border-bottom:1px solid var(--line)}
 #acervoPainel header b{flex:1}#acervoPainel button{min-height:44px;min-width:44px;font:inherit;color:inherit;background:transparent;border:1px solid var(--line);border-radius:8px;cursor:pointer}
 #acervoPainel nav{display:flex}#acervoPainel nav button{flex:1;border-radius:0}#acervoPainel [aria-selected="true"]{border-bottom:3px solid var(--accent)}
@@ -541,7 +534,7 @@ html[data-tema="escuro"] .row.alerta-pedido .bub{border-color:#e5bd4c;background
 
 /* ── Cartão "Conectar o seu Claude/Codex" (dentro da conversa, depois das mensagens) ── */
 .lc{position:relative;max-width:880px;margin:14px auto 4px;padding:14px;border:1px solid var(--accent);border-radius:16px;
-    background:#fff;color:var(--txt);box-shadow:0 2px 10px rgba(15,28,20,.10);box-sizing:border-box;
+    background:var(--t-superficie);color:var(--txt);box-shadow:var(--t-sombra);box-sizing:border-box;
     overflow-wrap:anywhere}
 .lc[hidden]{display:none}
 .lc:focus{outline:none}
@@ -553,40 +546,24 @@ html[data-tema="escuro"] .row.alerta-pedido .bub{border-color:#e5bd4c;background
 .lc-passos{margin:8px 0 10px;padding-left:20px;font-size:14px;line-height:1.45}
 .lc-passos li{margin:2px 0}
 .lc-btn{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:44px;
-        padding:0 16px;border-radius:22px;border:1px solid var(--line);background:#f2f6f2;color:#38523f;
+        padding:0 16px;border-radius:22px;border:1px solid var(--line);background:var(--t-superficie-2);color:var(--t-texto-botao);
         font:inherit;font-size:14px;font-weight:700;text-decoration:none;cursor:pointer;max-width:100%}
 .lc-btn:active{opacity:.7}
 .lc-btn:disabled{opacity:.5;cursor:default}
 .lc-btn:focus-visible,.lc-campo:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.lc-principal,.lc-link{background:var(--accent);border-color:transparent;color:#fff}
+.lc-principal,.lc-link{background:var(--accent);border-color:transparent;color:var(--t-sobre-acento)}
 .lc-link{margin:2px 0 10px}
 .lc-rotulo{display:block;margin:4px 0 6px;font-size:13px;font-weight:600;color:var(--muted)}
 .lc-linha{display:flex;gap:8px;flex-wrap:wrap}
 .lc-campo{flex:1 1 180px;min-width:0;box-sizing:border-box;min-height:44px;padding:0 14px;border:1px solid var(--line);
-          border-radius:22px;font:inherit;font-size:16px;background:#f4f8f4;color:var(--txt)}
+          border-radius:22px;font:inherit;font-size:16px;background:var(--t-superficie-2);color:var(--txt)}
 .lc-disp{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:4px 0 10px}
 .lc-disp-cod{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:26px;font-weight:700;
-             letter-spacing:.08em;padding:8px 14px;border-radius:12px;background:#eef6ef;
+             letter-spacing:.08em;padding:8px 14px;border-radius:12px;background:var(--t-ok-fundo);
              word-break:break-all;overflow-wrap:anywhere;max-width:100%;box-sizing:border-box}
-.lc-erro{margin:10px 0 0;padding:8px 12px;border-radius:10px;background:#fdecec;color:#8a1f17;font-size:13.5px;line-height:1.4}
+.lc-erro{margin:10px 0 0;padding:8px 12px;border-radius:10px;background:var(--t-erro-fundo);color:var(--t-erro);font-size:13.5px;line-height:1.4}
 .lc-pe{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .lc-vivo{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-html[data-tema="escuro"] .lc{background:#1d2a22;color:#e2f5e8;border-color:#63c883}
-html[data-tema="escuro"] .lc-texto,html[data-tema="escuro"] .lc-rotulo{color:#a9c4b2}
-html[data-tema="escuro"] .lc-btn{background:#2a3b30;color:#d6efdc;border-color:rgba(255,255,255,.14)}
-html[data-tema="escuro"] .lc-principal,html[data-tema="escuro"] .lc-link{background:#2f9e5e;color:#fff}
-html[data-tema="escuro"] .lc-campo{background:#14201a;color:#e2f5e8;border-color:rgba(255,255,255,.18)}
-html[data-tema="escuro"] .lc-disp-cod{background:#14201a}
-html[data-tema="escuro"] .lc-erro{background:#4a1f1b;color:#ffd9d4}
-@media(prefers-color-scheme:dark){
-  html:not([data-tema="claro"]) .lc{background:#1d2a22;color:#e2f5e8;border-color:#63c883}
-  html:not([data-tema="claro"]) .lc-texto,html:not([data-tema="claro"]) .lc-rotulo{color:#a9c4b2}
-  html:not([data-tema="claro"]) .lc-btn{background:#2a3b30;color:#d6efdc;border-color:rgba(255,255,255,.14)}
-  html:not([data-tema="claro"]) .lc-principal,html:not([data-tema="claro"]) .lc-link{background:#2f9e5e;color:#fff}
-  html:not([data-tema="claro"]) .lc-campo{background:#14201a;color:#e2f5e8;border-color:rgba(255,255,255,.18)}
-  html:not([data-tema="claro"]) .lc-disp-cod{background:#14201a}
-  html:not([data-tema="claro"]) .lc-erro{background:#4a1f1b;color:#ffd9d4}
-}
 
 /* ── Trilha de comandos: linha discreta e recolhível entre as mensagens ── */
 .row.trilha{display:block;max-width:880px;margin:2px auto;padding:0 12px;box-sizing:border-box}
@@ -596,80 +573,61 @@ html[data-tema="escuro"] .lc-erro{background:#4a1f1b;color:#ffd9d4}
 .row.trilha summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
 .tl-hora{margin-left:auto;font-size:11px;opacity:.7;flex:none}
 .tl-grupo>.tl-cmd{margin-left:14px}
-.tl-cmdtxt,.tl-saida{margin:4px 0;padding:8px 10px;border-radius:8px;background:rgba(127,127,127,.12);color:var(--txt);
+.tl-cmdtxt,.tl-saida{margin:4px 0;padding:8px 10px;border-radius:8px;background:var(--t-codigo-fundo);color:var(--txt);
   font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere;max-width:100%;
   box-sizing:border-box;overflow:hidden}
-.tl-saida.erro,.tl-cmd.erro>summary,.tl-grupo.erro>summary{color:#a8281c}
+.tl-saida.erro,.tl-cmd.erro>summary,.tl-grupo.erro>summary{color:var(--t-erro)}
 .tl-vazio{margin:4px 0;font-size:12px;opacity:.75}
-html[data-tema="escuro"] .tl-saida.erro,html[data-tema="escuro"] .tl-cmd.erro>summary,html[data-tema="escuro"] .tl-grupo.erro>summary{color:#ffb3aa}
-@media(prefers-color-scheme:dark){
-  html:not([data-tema="claro"]) .tl-saida.erro,html:not([data-tema="claro"]) .tl-cmd.erro>summary,html:not([data-tema="claro"]) .tl-grupo.erro>summary{color:#ffb3aa}
-}
 
 /* ── Cartão de permissão ── */
-.pc{position:relative;max-width:880px;margin:14px auto 4px;padding:14px;border:2px solid #aa7900;border-radius:16px;
-    background:#fff8db;color:#3b2f00;box-sizing:border-box;overflow-wrap:anywhere}
+.pc{position:relative;max-width:880px;margin:14px auto 4px;padding:14px;border:2px solid var(--t-aviso-borda);border-radius:16px;
+    background:var(--t-aviso-fundo);color:var(--t-aviso);box-sizing:border-box;overflow-wrap:anywhere}
 .pc[hidden]{display:none}
 .pc:focus{outline:none}
 .pc.entra{animation:lcEntra .22s ease-out}
 .pc-titulo{display:block;font-size:16px;line-height:1.3}
 .pc-texto{margin:6px 0 8px;font-size:14px;line-height:1.45}
-.pc-pedido{margin:0 0 10px;padding:10px 12px;max-height:200px;overflow:auto;border-radius:10px;background:rgba(0,0,0,.07);
+.pc-pedido{margin:0 0 10px;padding:10px 12px;max-height:200px;overflow:auto;border-radius:10px;background:var(--t-codigo-fundo);
   font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere;box-sizing:border-box}
 .pc-botoes{display:flex;gap:10px;flex-wrap:wrap}
 .pc-btn{flex:1 1 140px;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:48px;
   padding:0 16px;border-radius:24px;border:1px solid transparent;font:inherit;font-size:16px;font-weight:700;cursor:pointer}
-.pc-aprova{background:#218344;color:#fff}
-.pc-nega{background:#fff;color:#8a1f17;border-color:#8a1f17}
+.pc-aprova{background:var(--t-acento-forte);color:var(--t-sobre-acento)}
+.pc-nega{background:var(--t-superficie);color:var(--t-erro);border-color:var(--t-erro)}
 .pc-btn:active{opacity:.7}
 .pc-btn:disabled{opacity:.55;cursor:default}
 .pc-btn:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
-.pc-erro{margin:8px 0 0;padding:8px 12px;border-radius:10px;background:#fdecec;color:#8a1f17;font-size:13.5px;line-height:1.4}
+.pc-erro{margin:8px 0 0;padding:8px 12px;border-radius:10px;background:var(--t-erro-fundo);color:var(--t-erro);font-size:13.5px;line-height:1.4}
 .pc-status{margin:10px 0 0;min-height:1em;font-size:14px;font-weight:600}
-html[data-tema="escuro"] .pc{background:#3c341b;color:#fff3c8;border-color:#e5bd4c}
-html[data-tema="escuro"] .pc-nega{background:transparent;color:#ffd9d4;border-color:#ffd9d4}
-html[data-tema="escuro"] .pc-erro{background:#4a1f1b;color:#ffd9d4}
-@media(prefers-color-scheme:dark){
-  html:not([data-tema="claro"]) .pc{background:#3c341b;color:#fff3c8;border-color:#e5bd4c}
-  html:not([data-tema="claro"]) .pc-nega{background:transparent;color:#ffd9d4;border-color:#ffd9d4}
-  html:not([data-tema="claro"]) .pc-erro{background:#4a1f1b;color:#ffd9d4}
-}
 @media(prefers-reduced-motion:reduce){.pc.entra{animation:none}}
 .pq-bloco{margin:0 0 12px;padding:0;border:0;min-width:0}
 .pq-pergunta{display:block;width:100%;margin:0 0 6px;padding:0;font-size:15px;font-weight:700;line-height:1.4}
-.pq-cabecalho{display:inline-block;margin:0 8px 0 0;padding:1px 8px;border-radius:10px;background:rgba(0,0,0,.1);font-size:12px;font-weight:700}
+.pq-cabecalho{display:inline-block;margin:0 8px 0 0;padding:1px 8px;border-radius:10px;background:var(--t-codigo-fundo);font-size:12px;font-weight:700}
 .pq-opcao{display:flex;align-items:flex-start;gap:10px;min-height:44px;padding:6px 8px;box-sizing:border-box;border-radius:10px;cursor:pointer}
-.pq-opcao:active{background:rgba(0,0,0,.07)}
+.pq-opcao:active{background:var(--t-codigo-fundo)}
 .pq-opcao input{flex:none;width:22px;height:22px;margin:2px 0 0}
 .pq-rotulo{display:flex;flex-direction:column;min-width:0;font-size:14.5px;line-height:1.4}
 .pq-nome{font-weight:600}
 .pq-desc{font-size:13px;opacity:.85}
-.pq-texto{display:block;width:100%;min-height:40px;margin:4px 0 0;padding:0 12px;box-sizing:border-box;border:1px solid #aa7900;border-radius:10px;
-  background:#fff;color:#222;font:inherit;font-size:16px}
+.pq-texto{display:block;width:100%;min-height:40px;margin:4px 0 0;padding:0 12px;box-sizing:border-box;border:1px solid var(--t-aviso-borda);border-radius:10px;
+  background:var(--t-superficie);color:var(--t-texto);font:inherit;font-size:16px}
 .pq-link{text-decoration:none}
 .pq fieldset:disabled{opacity:.6}
-html[data-tema="escuro"] .pq-texto{background:#2a2412;color:#fff3c8;border-color:#e5bd4c}
-@media(prefers-color-scheme:dark){html:not([data-tema="claro"]) .pq-texto{background:#2a2412;color:#fff3c8;border-color:#e5bd4c}}
-.meta.fila{color:#8a5a00;font-weight:600}
+.meta.fila{color:var(--t-aviso);font-weight:600}
 
 /* Cartão de arquivo que não é mídia (zip, planilha, texto, código...). Usa as mesmas
    cores do .midoff e do botão de baixar, que já têm versão para o tema escuro. */
 .cartaoarq{display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;min-height:44px;
-  margin:0 0 6px;padding:8px 52px 8px 10px;background:#e8ebe8;border:1px solid var(--line);
-  border-radius:10px;color:#38523f;font:inherit;text-align:left;cursor:default}
+  margin:0 0 6px;padding:8px 52px 8px 10px;background:var(--t-superficie-3);border:1px solid var(--line);
+  border-radius:10px;color:var(--t-texto-botao);font:inherit;text-align:left;cursor:default}
 button.cartaoarq{cursor:pointer}
 .cartaoarq-ic{flex:0 0 auto;font-size:24px;line-height:1}
 .cartaoarq-txt{display:flex;flex-direction:column;min-width:0;flex:1 1 auto}
 .cartaoarq-nome{font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cartaoarq-info{font-size:11.5px;color:#6b7f70}
+.cartaoarq-info{font-size:11.5px;color:var(--t-fraco)}
 .cxarq .midbx{top:50%;transform:translateY(-50%);margin-top:-3px;width:36px;height:36px}
 .midgrade .cartaoarq{padding-right:10px}
-html[data-tema="escuro"] .cartaoarq{background:#26302a;color:#dbe6dc}
-html[data-tema="escuro"] .cartaoarq-info{color:#9bb0a0}
-@media (prefers-color-scheme: dark){
-  html:not([data-tema="claro"]) .cartaoarq{background:#26302a;color:#dbe6dc}
-  html:not([data-tema="claro"]) .cartaoarq-info{color:#9bb0a0}
-}
+
 
 /* fone: ouvir a fala de novo; só com o modo de ouvir ligado (body.ler-on). Alvo de toque de ~32px. */
 .fone{display:none;border:0;background:transparent;padding:0 4px;margin-right:4px;font-size:15px;line-height:1;

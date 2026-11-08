@@ -1,15 +1,15 @@
 /* Cartão "campo de senha na conversa" (campo-cofre.js). */
 .dgcofre{margin:8px 0 4px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;
-  background:rgba(0,0,0,.045);color:var(--txt);max-width:100%;box-sizing:border-box}
+  background:var(--t-codigo-fundo);color:var(--txt);max-width:100%;box-sizing:border-box}
 .dgc-tit{font-size:13px;font-weight:700;margin-bottom:4px;overflow-wrap:anywhere}
 .dgc-nome{display:inline-block;max-width:100%;font-family:ui-monospace,Menlo,monospace;font-size:13.5px;
-  overflow-wrap:anywhere;padding:2px 6px;border-radius:6px;background:rgba(0,0,0,.075)}
+  overflow-wrap:anywhere;padding:2px 6px;border-radius:6px;background:var(--t-codigo-fundo)}
 .dgc-linha{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
 .dgc-valor{flex:1 1 140px;min-width:0;min-height:44px;box-sizing:border-box;padding:0 10px;font-size:16px;
-  border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--txt);font-family:inherit}
+  border:1px solid var(--line);border-radius:8px;background:var(--t-superficie);color:var(--txt);font-family:inherit}
 .dgc-valor:focus{outline:none;border-color:var(--accent)}
 .dgc-salvar,.dgc-cancelar,.dgc-olho{flex:0 0 auto;min-height:44px;min-width:44px;padding:0 14px;border:0;border-radius:8px;
-  background:var(--accent);color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
+  background:var(--accent);color:var(--t-sobre-acento);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
 .dgc-cancelar,.dgc-olho{background:transparent;color:var(--txt);border:1px solid var(--line)!important;font-weight:500}
 .dgc-olho{padding:0 10px;font-size:18px}
 .dgc-olho[aria-pressed="true"]{border-color:var(--accent)!important}
@@ -19,9 +19,10 @@
 .dgc-garantia{margin-top:8px;font-size:12.5px;line-height:1.4;opacity:.75;overflow-wrap:anywhere}
 /* caixa aberta pela peça da lousa, abaixo do visual (ou na tela cheia) */
 .viscofre{margin:6px 0 2px;max-width:100%}
-.viscofre-cheia{position:relative;z-index:2;margin:0;padding:8px 10px;background:var(--bg,#fff);border-top:1px solid var(--line)}
+.viscofre-cheia{position:relative;z-index:2;margin:0;padding:8px 10px;background:var(--bg,var(--t-superficie));border-top:1px solid var(--line)}
 @media (max-width:360px){.dgc-linha>*{flex:1 1 100%}.dgc-olho{flex:0 0 44px}}
-.dgc-msg{margin-top:8px;font-size:13px;color:#b3261e;overflow-wrap:anywhere}
+.dgc-msg{margin-top:8px;font-size:13px;color:var(--t-erro);overflow-wrap:anywhere}
+
 .dgc-ok{font-size:14px;font-weight:600;color:var(--accent);overflow-wrap:anywhere}
 .dgc-ok code{font-family:ui-monospace,Menlo,monospace}
 .dgc-aviso{margin-top:6px;font-size:13px;overflow-wrap:anywhere}
