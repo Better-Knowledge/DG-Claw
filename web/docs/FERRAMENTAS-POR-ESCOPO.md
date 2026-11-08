@@ -94,17 +94,19 @@ printf %s "$CHAVE_COMPLETA"   | sudo dgclaw sistema credencial crm-escrita
 ```
 
 `credenciais` mapeia escopo → nome no cofre; `credencial` continua valendo como padrão para os escopos que não
-estão no mapa. Com o mapa e sem padrão, todo escopo usado por alguma operação precisa estar lá (o catálogo é
+estão no mapa (por isso o padrão deve ser a chave **mais fraca**: todo escopo fora do mapa a herda). A máscara
+da resposta cobre todas as credenciais da ferramenta, não só a usada na chamada. Com o mapa e sem padrão, todo escopo usado por alguma operação precisa estar lá (o catálogo é
 recusado se faltar), e um escopo no mapa que nenhuma operação usa também é recusado. Banco SQLite não usa
 credencial. No log de acesso cada chamada leva o **nome** da credencial usada (nunca o valor), e a tela
 Observabilidade mostra, por agente, qual sistema foi usado com qual escopo.
 
 ### O sistema de destino sabe qual agente chamou
 
-Opcional. Em `api`, `cabecalho_agente` é o nome de um cabeçalho HTTP próprio (ex.: `X-DGClaw-Agente`; não pode
-ser `Authorization` nem o cabeçalho da `auth`): o gateway manda nele o slug do agente que pediu (ou `dono`, se a
-pessoa pediu pelo painel), e nada mais. Em `mcp`, `env_agente` é o nome da variável de ambiente que recebe o
-slug. Com isso o CRM pode registrar no lado dele quem acessou o quê, e uma estratégia mais fina (uma chave por
+Opcional. Em `api`, `cabecalho_agente` é o nome de um cabeçalho HTTP próprio, começando por `X-` (ex.:
+`X-DGClaw-Agente`; não pode ser o cabeçalho da `auth`, nem de proxy como `X-Forwarded-*`, nem de troca de método
+como `X-HTTP-Method-Override`): o gateway manda nele o slug do agente que pediu (ou `dono`, se a
+pessoa pediu pelo painel), e nada mais. Em `mcp`, `env_agente` é o nome da variável de ambiente própria que recebe o
+slug (nunca `PATH`, `HOME`, `LD_*`, `NODE_OPTIONS` nem uma chave de `env`). Com isso o CRM pode registrar no lado dele quem acessou o quê, e uma estratégia mais fina (uma chave por
 agente, emitida pelo próprio sistema) pode vir depois sem mudar o catálogo.
 
 ### Esquema dos parâmetros
