@@ -71,42 +71,74 @@ pessoas_base_entrega() {
     printf '%s' "$base"
 }
 
-# pessoas_entregar_memoria <pessoa> [base]: copia a memoria dos agentes dela para a base (entrega-<pessoa>).
-# Imprime quantos arquivos copiou (so isso no stdout; avisos vao para o stderr). A base nasce no escopo do
-# primeiro grupo da pessoa (ou empresa). Base que JA ESTA no catalogo fica como esta: o dono pode ter
-# estreitado o escopo dela (para privada, por exemplo), e rodar o desligar de novo nao pode reabri-la.
-pessoas_entregar_memoria() {
-    local nome="$1" base grupo escopo destino slug casa arq n=0 rel
-    base="$(pessoas_base_entrega "$nome" "${2:-}")" || return 1
+# pessoas_escopo_entrega <pessoa> <base>: imprime o escopo em que a memoria vai ficar ("grupo:<g>", "empresa"
+# ou "privada:<pessoa>") e falha se nao da. A memoria de trabalho e "interno" e do grupo da pessoa; se a base ja
+# esta no catalogo (o dono escolheu --base, ou e a segunda rodada do desligar), o escopo dela e mantido, mas so
+# se nao abre a memoria para mais gente do que o padrao: grupo igual ao primeiro grupo da pessoa; empresa so
+# para quem nao tem grupo; privada so da propria pessoa. Publica ou qualquer outro caso e recusado. Tambem
+# confere que o catalogo atual e valido: um catalogo invalido faria a entrega falhar depois de a pessoa ja
+# estar desligada. Chamado ANTES de qualquer mudanca.
+pessoas_escopo_entrega() {
+    local nome="$1" base="$2" grupo atual escopo_atual grupo_atual pessoa_atual
     grupo="$(jq -r --arg n "$nome" '(.pessoas[$n].grupos // [])[0] // ""' "$DG_PAPEIS_JSON" 2>/dev/null)"
-    if [ -n "$grupo" ]; then escopo="grupo:$grupo"; else escopo=empresa; fi
-    if [ "$ENSAIO" = 1 ]; then info "[ensaio] copiaria a memoria dos agentes de $nome para a base $base (escopo $escopo)" >&2; return 0; fi
+    _bases_validar "$(bases_ler)"
+    atual="$(bases_obter "$base")"
+    if [ -z "$atual" ]; then
+        if [ -n "$grupo" ]; then printf 'grupo:%s' "$grupo"; else printf 'empresa'; fi
+        return 0
+    fi
+    escopo_atual="$(jq -r '.escopo // ""' <<<"$atual")"
+    grupo_atual="$(jq -r '.grupo // ""' <<<"$atual")"
+    pessoa_atual="$(jq -r '.pessoa // ""' <<<"$atual")"
+    case "$escopo_atual" in
+        grupo)   [ -n "$grupo" ] && [ "$grupo_atual" = "$grupo" ] || falha "a base '$base' ja existe no escopo grupo:$grupo_atual, e o grupo de $nome e '${grupo:-nenhum}'; a memoria dela nao pode ir para o grupo de outros." "use outro nome: dgclaw pessoa desligar $nome --base entrega-<nome-curto>"
+                 printf 'grupo:%s' "$grupo_atual" ;;
+        empresa) [ -z "$grupo" ] || falha "a base '$base' ja existe no escopo empresa, e $nome tem grupo ($grupo); a memoria dela so vai para o grupo dela." "use outro nome: dgclaw pessoa desligar $nome --base entrega-<nome-curto>"
+                 printf 'empresa' ;;
+        privada) [ "$pessoa_atual" = "$nome" ] || falha "a base '$base' ja existe como privada de '$pessoa_atual'; a memoria de $nome nao pode ir para la." "use outro nome: dgclaw pessoa desligar $nome --base entrega-<nome-curto>"
+                 printf 'privada:%s' "$nome" ;;
+        *)       falha "a base '$base' ja existe no escopo '$escopo_atual'; a memoria de trabalho de uma pessoa nunca vai para uma base publica." "use outro nome: dgclaw pessoa desligar $nome --base entrega-<nome-curto>" ;;
+    esac
+}
+
+# pessoas_entregar_memoria <pessoa> <base> <escopo>: copia a memoria dos agentes dela para a base (a pasta e
+# o escopo ja conferidos por pessoas_escopo_entrega). Imprime quantos arquivos copiou (so isso no stdout;
+# avisos vao para o stderr) e devolve 1 se qualquer passo falhou, para quem chama nao dizer "ok" a toa.
+# Base que JA ESTA no catalogo fica como esta (o escopo dela foi conferido antes).
+pessoas_entregar_memoria() {
+    local nome="$1" base="$2" escopo="$3" grupo="" destino slug casa arq n=0 rel ja_existe=""
+    [ -n "$base" ] && [ -n "$escopo" ] || return 1
+    case "$escopo" in grupo:*) grupo="${escopo#grupo:}" ;; esac
+    ja_existe="$(bases_obter "$base")"
+    if [ "$ENSAIO" = 1 ]; then info "[ensaio] copiaria a memoria dos agentes de $nome para a base $base (escopo $escopo${ja_existe:+, que ja esta no catalogo e fica como esta})" >&2; return 0; fi
+    [ -z "$ja_existe" ] || aviso "a base $base ja esta no catalogo; o escopo e os campos dela ficam como estao (so os arquivos entram)"
     destino="$DG_BASES_DIR/$base"
     for slug in $(pessoas_agentes "$nome"); do
         casa="$DG_CASAS/$slug/home"
         [ -d "$casa" ] || continue
-        mkdir -p "$destino/$slug" && chmod 700 "$destino" "$destino/$slug"
+        { mkdir -p "$destino/$slug" && chmod 700 "$destino" "$destino/$slug"; } || { aviso "nao consegui criar ${destino#"$R"}/$slug"; return 1; }
         for arq in MEMORY.md working-memory.md; do
             [ -f "$casa/$arq" ] && [ ! -L "$casa/$arq" ] || continue
-            cp -- "$casa/$arq" "$destino/$slug/$arq" && chmod 600 "$destino/$slug/$arq" && n=$((n + 1))
+            { cp -- "$casa/$arq" "$destino/$slug/$arq" && chmod 600 "$destino/$slug/$arq"; } || { aviso "nao consegui copiar $arq do agente $slug"; return 1; }
+            n=$((n + 1))
         done
         if [ -d "$casa/memory" ] && [ ! -L "$casa/memory" ]; then
-            mkdir -p "$destino/$slug/memory" && chmod 700 "$destino/$slug/memory"
+            { mkdir -p "$destino/$slug/memory" && chmod 700 "$destino/$slug/memory"; } || { aviso "nao consegui criar ${destino#"$R"}/$slug/memory"; return 1; }
             while IFS= read -r rel; do
                 [ -n "$rel" ] || continue
-                cp -- "$casa/memory/$rel" "$destino/$slug/memory/$rel" && chmod 600 "$destino/$slug/memory/$rel" && n=$((n + 1))
+                { cp -- "$casa/memory/$rel" "$destino/$slug/memory/$rel" && chmod 600 "$destino/$slug/memory/$rel"; } || { aviso "nao consegui copiar memory/$rel do agente $slug"; return 1; }
+                n=$((n + 1))
             done < <(find "$casa/memory" -maxdepth 1 -type f -name '*.md' -printf '%f\n' 2>/dev/null)
         fi
     done
     if [ "$n" -gt 0 ]; then
-        chown -R 0:0 "$destino"
+        chown -R 0:0 "$destino" || return 1
         bases_garantir_arquivo
-        local obj
-        obj="$(jq -nc --arg e "${escopo%%:*}" --arg g "${grupo}" --arg t "Entrega de $nome" '{escopo: $e, nome: $t, classificacao: "interno", finalidade: "memoria de trabalho dos agentes de uma pessoa desligada, para o sucessor"} + (if $g != "" then {grupo: $g} else {} end)')"
-        if [ -n "$(bases_obter "$base")" ]; then
-            aviso "a base $base ja estava no catalogo; mantive o escopo e os campos dela como estavam (so os arquivos foram copiados)"
-        else
-            bases_registrar "$base" "$obj"
+        if [ -z "$ja_existe" ]; then
+            local obj
+            obj="$(jq -nc --arg e "${escopo%%:*}" --arg g "${grupo}" --arg t "Entrega de $nome" '{escopo: $e, nome: $t, classificacao: "interno", finalidade: "memoria de trabalho dos agentes de uma pessoa desligada, para o sucessor"} + (if $g != "" then {grupo: $g} else {} end)')"
+            # com_trava roda num subshell: a falha de la nao derruba este processo, por isso o retorno e testado.
+            bases_registrar "$base" "$obj" || return 1
         fi
     fi
     printf '%s\n' "$n"

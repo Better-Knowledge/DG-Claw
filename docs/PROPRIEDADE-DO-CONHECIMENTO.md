@@ -53,7 +53,10 @@ sudo dgclaw pessoa desligar marta
    agente dele. A base `privada` da pessoa **não** é copiada nem exposta. Se o nome da pessoa é longo demais
    para o nome da base caber (40 caracteres), o comando recusa antes de mudar qualquer coisa e pede
    `--base <nome-curto>`. Se a base já estava no catálogo (por exemplo, o dono a estreitou para `privada`
-   depois de um primeiro desligamento), ela fica como o dono deixou: só os arquivos são copiados de novo.
+   depois de um primeiro desligamento), ela fica como o dono deixou e só os arquivos são copiados de novo,
+   mas apenas se o escopo dela não abre a memória para mais gente do que o padrão: o grupo da pessoa, a
+   empresa só para quem não tem grupo, ou a privada da própria pessoa. Base pública ou de outro grupo é
+   recusada antes de qualquer mudança.
 4. Para desfazer: `sudo dgclaw pessoa religar marta` e `sudo dgclaw agente iniciar <slug>` para cada agente.
 
 O que fica fora, de propósito: as conversas (transcrições) não são copiadas, porque podem ter dado pessoal
