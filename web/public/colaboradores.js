@@ -1,6 +1,7 @@
 'use strict';
-/* colaboradores.js: a tela /colaboradores, só do dono. Convida, reenvia e revoga o colaborador de um agente.
-   Consome só a API (GET/POST /api/v1/colaboradores, POST .../reenviar, DELETE .../<id>): contrato em
+/* colaboradores.js: a tela /colaboradores, só do dono. Convida pessoas para um ou mais agentes, edita os agentes de
+   cada uma, reenvia o convite e revoga. Consome só a API (GET/POST /api/v1/colaboradores, POST .../<id>,
+   POST .../reenviar, DELETE .../<id>): contrato em
    web/docs/COLABORADORES.md. Todo texto que vem do servidor entra com textContent. */
 (function () {
   const $ = id => document.getElementById(id);
@@ -74,21 +75,42 @@
   }
 
   /* ── Seção do agente escolhido ──────────────────────────────────────────── */
+  const trabalho = () => est.agentes.filter(a => a.tipo !== 'admin');
+  const fraseAgentes = slugs => slugs.map(nomeDoAgente).join(', ');
+
   function desenhaAgente() {
     const corpo = $('coCorpoAgente');
     $('coNomeAgente').textContent = est.agente ? nomeDoAgente(est.agente) : 'um agente';
     if (!est.agente) { corpo.replaceChildren(el('p', 'co-fraco', 'Ainda não há agente de trabalho para convidar alguém. Peça ao Admin para criar o primeiro.')); return; }
-    const atual = est.colabs.find(c => c.agente === est.agente && c.estado !== 'revogado');
-    if (!atual) { corpo.replaceChildren(formulario()); return; }
-    corpo.replaceChildren(cartaoAtual(atual));
+    const ativos = est.colabs.filter(c => c.agentes.includes(est.agente) && c.estado !== 'revogado');
+    const partes = [];
+    if (!ativos.length) partes.push(el('p', 'co-fraco', 'Este agente ainda não tem colaborador. A pessoa recebe um e-mail com o link, o login e uma senha temporária.'));
+    for (const c of ativos) partes.push(cartaoAtual(c));
+    partes.push(formulario(ativos.length ? 'Convidar outra pessoa' : 'Convidar'));
+    corpo.replaceChildren(...partes);
   }
 
-  function formulario() {
+  /* Caixas de marcar com os agentes de trabalho; `marcados` são os slugs já escolhidos. */
+  function caixasDeAgentes(marcados, prefixo) {
+    const grupo = el('fieldset', 'co-checks');
+    grupo.append(el('legend', '', 'Agentes que a pessoa pode usar'));
+    for (const a of trabalho()) {
+      const l = el('label', 'co-check');
+      const i = document.createElement('input');
+      i.type = 'checkbox'; i.value = a.id; i.name = prefixo + '-agentes'; i.checked = marcados.includes(a.id);
+      l.append(i, el('span', '', a.nome));
+      grupo.append(l);
+    }
+    return grupo;
+  }
+  const marcadosDe = grupo => Array.from(grupo.querySelectorAll('input[type=checkbox]:checked')).map(i => i.value);
+
+  function formulario(rotulo) {
     const f = el('form', 'co-form');
     f.setAttribute('data-tour', 'co-form');
     f.autocomplete = 'off';
-    const campo = (rotulo, id, tipo, extra) => {
-      const l = el('label', 'co-campo', rotulo);
+    const campo = (rot, id, tipo, extra) => {
+      const l = el('label', 'co-campo', rot);
       const i = document.createElement('input');
       i.id = id; i.type = tipo; Object.assign(i, extra || {});
       l.append(i);
@@ -97,19 +119,22 @@
     const [lMail, iMail] = campo('E-mail do colaborador', 'coEmail', 'email', { required: true, maxLength: 254, autocapitalize: 'none', spellcheck: false });
     iMail.setAttribute('inputmode', 'email');
     const [lNome, iNome] = campo('Nome (opcional)', 'coNome', 'text', { maxLength: 80 });
-    const b = el('button', 'co-btn co-pri', 'Convidar');
+    const caixas = caixasDeAgentes([est.agente], 'novo');
+    const b = el('button', 'co-btn co-pri', rotulo);
     b.type = 'submit';
-    f.append(el('p', 'co-fraco', 'Este agente ainda não tem colaborador. A pessoa recebe um e-mail com o link, o login e uma senha temporária.'), lMail, lNome, b);
+    f.append(el('h3', 'co-sub', rotulo), lMail, lNome, caixas, b);
     f.addEventListener('submit', async ev => {
       ev.preventDefault();
       mostraErro('');
+      const agentes = marcadosDe(caixas);
+      if (!agentes.length) { mostraErro('Marque ao menos um agente para a pessoa usar.'); return; }
       b.disabled = true; b.textContent = 'Convidando…';
       try {
-        const d = await chama('POST', '/api/v1/colaboradores', { agente: est.agente, email: iMail.value, nome: iNome.value });
+        const d = await chama('POST', '/api/v1/colaboradores', { agentes, email: iMail.value, nome: iNome.value });
         await carrega();
         mostraConvite(d.convite, d.colaborador);
       } catch (e) { mostraErro(e.message); }
-      finally { b.disabled = false; b.textContent = 'Convidar'; }
+      finally { b.disabled = false; b.textContent = rotulo; }
     });
     return f;
   }
@@ -129,20 +154,49 @@
     h.append(el('span', 'co-tag ' + cls, rot));
     const dl = el('dl', 'co-fatos');
     fato(dl, 'E-mail', c.email);
+    fato(dl, 'Agentes', fraseAgentes(c.agentes));
     fato(dl, 'Convidado em', quando(c.criado_em));
     fato(dl, 'Último acesso', c.ultimo_login ? quando(c.ultimo_login) : 'ainda não entrou');
     if (c.estado === 'aguardando_primeiro_acesso') fato(dl, 'Senha temporária', 'vale até ' + quando(c.temporaria_expira));
     if (c.estado === 'temporaria_vencida') fato(dl, 'Senha temporária', 'venceu em ' + quando(c.temporaria_expira) + '. Mande o convite de novo.');
     const acoes = el('div', 'co-acoes');
+    const editar = el('button', 'co-btn', 'Editar agentes');
+    editar.type = 'button';
+    editar.addEventListener('click', () => editaAgentes(c, box, editar));
     const reenviar = el('button', 'co-btn', 'Mandar convite de novo');
     reenviar.type = 'button';
     reenviar.addEventListener('click', () => reenvia(c, reenviar));
     const revogar = el('button', 'co-btn co-perigo', 'Revogar acesso');
     revogar.type = 'button';
     revogar.addEventListener('click', () => confirmaRevogar(c, acoes, revogar));
-    acoes.append(reenviar, revogar);
+    acoes.append(editar, reenviar, revogar);
     box.append(h, dl, acoes);
     return box;
+  }
+
+  /* Troca a lista de agentes da pessoa: caixas de marcar e Salvar. O acesso dela muda no clique seguinte, sem derrubar a sessão. */
+  function editaAgentes(c, box, btn) {
+    if (box.querySelector('.co-edita')) return;
+    btn.disabled = true;
+    const f = el('form', 'co-edita');
+    const caixas = caixasDeAgentes(c.agentes, 'edita-' + c.id);
+    const salvar = el('button', 'co-btn co-pri', 'Salvar agentes'); salvar.type = 'submit';
+    const cancela = el('button', 'co-btn', 'Cancelar'); cancela.type = 'button';
+    cancela.addEventListener('click', () => { f.remove(); btn.disabled = false; });
+    const acoes = el('div', 'co-acoes'); acoes.append(salvar, cancela);
+    f.append(caixas, acoes);
+    f.addEventListener('submit', async ev => {
+      ev.preventDefault();
+      mostraErro('');
+      const agentes = marcadosDe(caixas);
+      if (!agentes.length) { mostraErro('Marque ao menos um agente. Para tirar todo o acesso, use "Revogar acesso".'); return; }
+      salvar.disabled = true; cancela.disabled = true; salvar.textContent = 'Salvando…';
+      try {
+        await chama('POST', '/api/v1/colaboradores/' + encodeURIComponent(c.id), { agentes });
+        await carrega();
+      } catch (e) { mostraErro(e.message); salvar.disabled = false; cancela.disabled = false; salvar.textContent = 'Salvar agentes'; }
+    });
+    box.append(f);
   }
 
   async function reenvia(c, btn) {
@@ -184,7 +238,7 @@
       const h = el('h3', '', c.nome ? c.nome + ' (' + c.email + ')' : c.email);
       h.append(el('span', 'co-tag ' + cls, rot));
       const dl = el('dl', 'co-fatos');
-      fato(dl, 'Agente', nomeDoAgente(c.agente));
+      fato(dl, c.agentes.length > 1 ? 'Agentes' : 'Agente', fraseAgentes(c.agentes));
       fato(dl, 'Convidado em', quando(c.criado_em));
       fato(dl, 'Último acesso', c.ultimo_login ? quando(c.ultimo_login) : 'ainda não entrou');
       if (c.revogado_em) fato(dl, 'Revogado em', quando(c.revogado_em));
@@ -228,17 +282,17 @@
   /* ── Tutorial ───────────────────────────────────────────────────────────── */
   const PASSOS = {
     agente: [
-      { alvo: '#coAgente', titulo: 'O colaborador deste agente',
-        oque: 'Quem você convidou para usar este agente. Cada agente tem um colaborador por vez, e cada pessoa acessa um agente só.',
-        como: 'Sem ninguém convidado, a tela mostra o formulário. Com alguém convidado, mostra o estado dele (aguardando o primeiro acesso, ativo) e os botões para mandar o convite de novo ou revogar o acesso.',
+      { alvo: '#coAgente', titulo: 'Os colaboradores deste agente',
+        oque: 'Quem você convidou para usar este agente. Um agente pode ter várias pessoas, e uma pessoa pode usar vários agentes.',
+        como: 'Cada pessoa aparece num cartão com o estado dela (aguardando o primeiro acesso, ativo), os agentes que ela usa e os botões para editar os agentes, mandar o convite de novo ou revogar o acesso. Embaixo, o formulário convida mais alguém.',
         porque: 'A pessoa usa este agente por inteiro: a conversa, as sessões, as rotinas, a memória, os arquivos e a Tela. Não vê o Admin nem outros agentes, e o cofre, as chaves de API, a troca da conta de IA, as credenciais dos canais e a senha da Tela continuam com você.' },
       { alvo: '[data-tour="co-form"]', titulo: 'Convidar',
-        oque: 'O e-mail da pessoa (que será o login dela) e, se quiser, o nome.',
+        oque: 'O e-mail da pessoa (que será o login dela), se quiser o nome, e as caixas dos agentes que ela vai poder usar (este já vem marcado).',
         como: 'Ao tocar em Convidar, o DG Claw gera uma senha temporária que vale 7 dias e tenta mandar um e-mail com o link. No primeiro acesso a pessoa cria a senha dela.',
         porque: 'O e-mail só sai se o servidor de e-mail estiver configurado (opcional). Se não estiver, a tela mostra o texto pronto para você mandar por WhatsApp.' },
-      { alvo: '[data-tour="co-atual"]', titulo: 'Convite de novo e revogar',
-        oque: 'Os dois botões do colaborador atual.',
-        como: 'Mandar convite de novo gera outra senha temporária e derruba as sessões abertas dele. Revogar acesso encerra tudo na hora, e o registro continua na lista, com a data.',
+      { alvo: '[data-tour="co-atual"]', titulo: 'Editar agentes, convite de novo e revogar',
+        oque: 'Os três botões de cada colaborador.',
+        como: 'Editar agentes troca a lista de agentes que a pessoa usa; vale no clique seguinte dela, sem derrubar a sessão. Mandar convite de novo gera outra senha temporária e derruba as sessões abertas. Revogar acesso encerra tudo na hora, e o registro continua na lista, com a data.',
         porque: 'Serve para quando a pessoa perdeu a senha ou quando o acesso dela precisa acabar.' },
     ],
     convite: [
@@ -250,7 +304,7 @@
     lista: [
       { alvo: '#coLista', titulo: 'Todos os colaboradores',
         oque: 'Todo mundo que já foi convidado, de todos os agentes, inclusive os acessos revogados.',
-        como: 'Cada cartão mostra o agente, o estado, quando a pessoa foi convidada e entrou pela última vez, e a data da revogação, se houve.',
+        como: 'Cada cartão mostra os agentes, o estado, quando a pessoa foi convidada e entrou pela última vez, e a data da revogação, se houve.',
         porque: 'Fica o histórico de quem já teve acesso a quê, sem apagar nada.' },
     ],
   };

@@ -111,9 +111,10 @@ responderia a qualquer mensagem.
 
 ### Convidar um colaborador
 
-O dono convida uma pessoa para conversar com **um** agente de trabalho pela tela `/colaboradores?agente=<slug>`
-(item "Convidar colaborador" no menu do agente) ou pela API `POST /api/v1/colaboradores`. O Admin nunca é
-compartilhado. A pessoa conversa com o agente inteiro, lê sessões, rotinas, memória e arquivos, e organiza as sessões, e nada além dele; o cofre, as chaves de API, o login da conta de IA, as credenciais dos canais, a senha da Tela e toda gravação de memória, arquivos ou configuração pelo painel continuam do dono. O contrato completo está em
+O dono convida uma pessoa para conversar com **um ou mais** agentes de trabalho pela tela `/colaboradores?agente=<slug>`
+(item "Convidar colaborador" no menu do agente) ou pela API `POST /api/v1/colaboradores` com `"agentes": [...]`; a
+lista de agentes de quem já foi convidado muda com `POST /api/v1/colaboradores/<id>`. Um agente pode ter várias
+pessoas e uma pessoa pode usar vários agentes (ela troca de agente pelo menu). O Admin nunca é compartilhado. A pessoa conversa com o agente inteiro, lê sessões, rotinas, memória e arquivos, e organiza as sessões, e nada além dele; o cofre, as chaves de API, o login da conta de IA, as credenciais dos canais, a senha da Tela e toda gravação de memória, arquivos ou configuração pelo painel continuam do dono. O contrato completo está em
 `/opt/dgclaw/app/web/docs/COLABORADORES.md` (também em `GET /api/v1/colaboradores/docs.md`). O envio do e-mail é
 opcional e depende das variáveis `DGCLAW_SMTP_*` do `web.env`.
 

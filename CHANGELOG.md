@@ -7,6 +7,12 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Não lançado]
 
+**Colaboradores com vários agentes.** Uma pessoa convidada pode usar mais de um agente de trabalho, e um agente
+pode ter várias pessoas: no convite você marca os agentes que ela vai usar, e o botão **Editar agentes** (tela
+Colaboradores) muda a lista depois, sem derrubar a sessão dela. Com mais de um agente, ela troca de agente pelo menu,
+como você. O que ela não alcança continua igual: o Admin, os agentes que não foram marcados e as telas da caixa
+inteira. Quem já tinha convidado alguém não precisa fazer nada: o convite antigo continua valendo para o agente dele.
+
 **A Tela do agente (o navegador dele, onde você faz os logins) ficou sempre à mão e passou a explicar o que falta.**
 Alunos relataram que não tinham tela nenhuma. Havia quatro causas, e as quatro foram tratadas:
 

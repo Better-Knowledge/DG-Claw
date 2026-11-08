@@ -6,7 +6,7 @@
 //
 // avaliar(sessao, metodo, pathname, urlCrua) devolve { ok:true } ou { ok:false, status, motivo, redirecionar?, extra? }.
 //   - Dono e caixa do agente (sessao.via === 'caixa'): sempre liberado; o comportamento deles não muda.
-//   - Colaborador (sessao.papel === 'colaborador'): passa o agente dele inteiro e nada além disso.
+//   - Colaborador (sessao.papel === 'colaborador'): passa os agentes dele (sessao.agentes) inteiros e nada além disso.
 //
 // O que passa para o colaborador:
 //   - /a/<dele> e /p/<dele>/** (o painel do agente: sessões, rotinas, memória, arquivos...),
@@ -86,6 +86,9 @@ function decodifica(parte) {
   try { return decodeURIComponent(parte); } catch (_) { return null; }
 }
 
+/** Os agentes do colaborador (lista); sessão antiga com `agente` no singular também vale. */
+const agentesDe = (sessao) => (Array.isArray(sessao.agentes) ? sessao.agentes : (sessao.agente ? [sessao.agente] : []));
+
 const nega = (status, motivo, extra) => Object.assign({ ok: false, status, motivo }, extra || {});
 const LIBERA = { ok: true };
 
@@ -97,11 +100,11 @@ function avaliar(sessao, metodo, pathname, urlCrua) {
   const m = String(metodo || '').toUpperCase();
   const p = String(pathname || '');
   const bruto = String(urlCrua == null ? p : urlCrua).split('?')[0].split('#')[0];
-  const meu = sessao.agente;
-  const destino = `/a/${encodeURIComponent(meu)}`;
+  const meus = agentesDe(sessao);
+  const destino = `/a/${encodeURIComponent(meus[0] || '')}`;
   const ehApi = p.startsWith('/api/');
   const leitura = m === 'GET' || m === 'HEAD';
-  const meuSlug = (s) => { const d = decodifica(s); return d !== null && d === meu; };
+  const meuSlug = (s) => { const d = decodifica(s); return d !== null && meus.includes(d); };
 
   // Senha temporária pendente: só o que leva à troca.
   if (sessao.trocar_senha) {
@@ -218,8 +221,9 @@ function websocketLiberado(sessao, pathname, urlCrua) {
   const p = String(pathname == null ? '' : pathname);
   const bruto = String(urlCrua == null ? p : urlCrua).split('?')[0].split('#')[0];
   if (!(p.startsWith('/p/') || bruto.startsWith('/p/'))) return nega(403, 'Só o painel do seu agente aceita WebSocket.');
-  const meuSlug = (s) => { const d = decodifica(s); return d !== null && d === sessao.agente; };
+  const meus = agentesDe(sessao);
+  const meuSlug = (s) => { const d = decodifica(s); return d !== null && meus.includes(d); };
   return avaliaPainel('GET', p, bruto, meuSlug);
 }
 
-module.exports = { avaliar, websocketLiberado, TROCAR_SENHA_MOTIVO, MOTIVO_PAINEL, MOTIVO_COFRE };
+module.exports = { avaliar, websocketLiberado, agentesDe, TROCAR_SENHA_MOTIVO, MOTIVO_PAINEL, MOTIVO_COFRE };

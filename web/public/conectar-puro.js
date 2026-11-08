@@ -230,7 +230,7 @@
   function pronto(ctx) {
     ctx = ctx || {};
     const usuario = ctx.usuario ? String(ctx.usuario) : '';
-    // Colaborador conversa com um agente só: nada de Admin nem de "pedir ao Admin".
+    // Colaborador não alcança o Admin: nada de Admin nem de "pedir ao Admin".
     if (ctx.colaborador) {
       return {
         titulo: 'Tudo pronto! Agora é só usar',

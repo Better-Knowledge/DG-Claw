@@ -75,13 +75,26 @@ function criarAuth({ config, log, agora, colaboradores: colabsInicial }) {
   let colaboradores = colabsInicial || null; // ligado depois por ligarColaboradores (o módulo precisa do gerarHash, que é daqui)
   let instanciaAtual = null;
   const MOTIVO_INSTANCIA = 'Este convite era de um agente que foi removido. Peça um convite novo ao dono.';
-  /** O convite guarda a instância do agente; se o agente foi removido e recriado com o mesmo nome, ele não vale. */
-  // Sem exceção: convite sem instância, instância atual ilegível ou módulo não ligado também NEGAM.
-  const instanciaMudou = (c) => {
-    if (!c) return false;
-    const atual = instanciaAtual ? instanciaAtual(c.agente) : null;
-    return !c.instancia || !atual || c.instancia !== atual;
+  /**
+   * O convite guarda a instância de cada agente; um agente removido e recriado com o mesmo nome sai da lista do
+   * colaborador. Sem exceção: slug sem instância guardada, instância atual ilegível ou módulo não ligado também NEGAM.
+   * Devolve os agentes do registro que ainda valem, na ordem do registro.
+   */
+  // Registro no formato novo (agentes/instancias) ou antigo (agente/instancia no singular, inclusive os dos testes).
+  const registroAgentes = (c) => (Array.isArray(c.agentes) ? c.agentes : (typeof c.agente === 'string' && c.agente ? [c.agente] : []));
+  const registroInstancias = (c) => ((c.instancias && typeof c.instancias === 'object') ? c.instancias : (c.instancia && c.agente ? { [c.agente]: c.instancia } : {}));
+  const agentesValidos = (c) => {
+    if (!c || !instanciaAtual) return [];
+    const instancias = registroInstancias(c);
+    return registroAgentes(c).filter((slug) => {
+      const guardada = instancias[slug];
+      const atual = instanciaAtual(slug);
+      return !!guardada && !!atual && guardada === atual;
+    });
   };
+  /** Nenhum agente do convite vale mais (todos removidos e recriados, ou convite sem instância). */
+  const instanciaMudou = (c) => !!c && agentesValidos(c).length === 0;
+  const mesmaLista = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((x, i) => x === b[i]);
 
   const relogio = agora || (() => Date.now());
   const usuario = String(config.env.DGCLAW_PANEL_USER || '').trim();
@@ -261,8 +274,9 @@ function criarAuth({ config, log, agora, colaboradores: colabsInicial }) {
         // Conferência síncrona logo antes de emitir: se a senha, o convite ou o acesso mudou depois que a senha foi
         // verificada, a sessão não nasce. Enquanto a senha é a temporária, a sessão morre junto com ela.
         const atual = colaboradores ? colaboradores.obter(colaborador.id) : null;
+        const pedidos = registroAgentes(colaborador);
         if (instanciaMudou(atual)) { const e = new Error(MOTIVO_INSTANCIA); e.status = 401; throw e; }
-        if (!atual || atual.revogado_em || atual.agente !== colaborador.agente || (atual.senha_versao || 1) !== colaborador.senha_versao || (colaborador.hash && atual.hash !== colaborador.hash)) {
+        if (!atual || atual.revogado_em || !mesmaLista(agentesValidos(atual), pedidos) || (atual.senha_versao || 1) !== colaborador.senha_versao || (colaborador.hash && atual.hash !== colaborador.hash)) {
           const e = new Error('O seu acesso mudou (senha trocada, convite novo ou acesso revogado) enquanto você entrava. Entre de novo.');
           e.status = 401;
           throw e;
@@ -280,7 +294,7 @@ function criarAuth({ config, log, agora, colaboradores: colabsInicial }) {
         abreVagaParaODono();
       }
       const reg = { usuario: nomeUsuario || usuario, criada, expira: expiraFinal, marca: marcaAtual() };
-      if (colaborador) Object.assign(reg, { papel: 'colaborador', colaborador_id: colaborador.id, agente: colaborador.agente, senha_versao: colaborador.senha_versao });
+      if (colaborador) { const ags = registroAgentes(colaborador).slice(); Object.assign(reg, { papel: 'colaborador', colaborador_id: colaborador.id, agentes: ags, agente: ags[0], senha_versao: colaborador.senha_versao }); }
       sessoes.set(sha256hex(token), reg);
       limpaExpiradas();
       salva();
@@ -347,7 +361,7 @@ function criarAuth({ config, log, agora, colaboradores: colabsInicial }) {
     const c = colaboradores.porEmailAtivo(emailInformado);
     // O registro pode mudar DURANTE o scrypt (o dono reenvia o convite, o colaborador troca a senha) e os objetos
     // do registro são alterados no lugar. O que foi conferido fica em constantes aqui, antes do await.
-    const visto = c ? { id: c.id, email: c.email, agente: c.agente, hash: c.hash, versao: c.senha_versao || 1 } : null;
+    const visto = c ? { id: c.id, email: c.email, agentes: registroAgentes(c).slice(), hash: c.hash, versao: c.senha_versao || 1 } : null;
     let alvo = visto ? parseHash(visto.hash) : hashFicticio();
     if (alvo.erro) {
       log('erro', `O hash do colaborador ${visto.email} não vale (${alvo.erro}). Ele não consegue entrar; mande um convite novo (POST /api/v1/colaboradores/${visto.id}/reenviar).`);
@@ -370,12 +384,12 @@ function criarAuth({ config, log, agora, colaboradores: colabsInicial }) {
     }
     // Recarrega: só vale se o registro ainda é exatamente o que a senha conferiu e o acesso não foi revogado.
     const atual = colaboradores.obter(visto.id);
-    if (!atual || atual.revogado_em || atual.hash !== visto.hash || (atual.senha_versao || 1) !== visto.versao || atual.agente !== visto.agente) {
+    if (!atual || atual.revogado_em || atual.hash !== visto.hash || (atual.senha_versao || 1) !== visto.versao || !mesmaLista(registroAgentes(atual), visto.agentes)) {
       log('aviso', `Login de ${visto.email} (ip ${ip || '?'}) descartado: o convite, a senha ou o acesso mudou enquanto a senha era conferida.`);
       return { ok: false, erro: 'O seu acesso mudou (senha trocada, convite novo ou acesso revogado) enquanto você entrava. Entre de novo.' };
     }
     if (instanciaMudou(atual)) {
-      log('aviso', `Login de ${visto.email} (ip ${ip || '?'}) recusado: o convite era de uma instância antiga do agente ${atual.agente} (removido e recriado).`);
+      log('aviso', `Login de ${visto.email} (ip ${ip || '?'}) recusado: o convite era de uma instância antiga do(s) agente(s) ${registroAgentes(atual).join(', ')} (removido e recriado).`);
       return { ok: false, erro: MOTIVO_INSTANCIA };
     }
     if (ip) limpaFalhasDe(identidade, ip);
@@ -383,14 +397,16 @@ function criarAuth({ config, log, agora, colaboradores: colabsInicial }) {
       return { ok: false, vencida: true, erro: 'A senha temporária venceu. Peça ao dono do DG Claw um convite novo.' };
     }
     colaboradores.registrarLogin(visto.id);
-    return { ok: true, usuario: visto.email, papel: 'colaborador', colaborador: { id: visto.id, agente: visto.agente, senha_versao: visto.versao, hash: visto.hash } };
+    return { ok: true, usuario: visto.email, papel: 'colaborador', colaborador: { id: visto.id, agentes: agentesValidos(atual), agente: agentesValidos(atual)[0], senha_versao: visto.versao, hash: visto.hash } };
   }
 
   /** Confere a CADA pedido que o colaborador ainda vale: a revogação e a troca de senha derrubam a sessão no pedido seguinte. */
   function sessaoDeColaborador(token, s) {
     const c = colaboradores ? colaboradores.obter(s.colaborador_id) : null;
-    if (!c || c.revogado_em || c.agente !== s.agente || (c.senha_versao || 1) !== s.senha_versao || instanciaMudou(c)) {
-      if (c && instanciaMudou(c)) log('aviso', `Sessão do colaborador ${c.email} derrubada: o agente ${c.agente} foi removido e recriado, e o convite era da instância antiga.`);
+    // Os agentes vêm do registro a cada pedido: o dono alterar a lista vale no clique seguinte, sem derrubar a sessão;
+    // só a revogação, a troca de senha e o sumiço de todos os agentes derrubam.
+    if (!c || c.revogado_em || (c.senha_versao || 1) !== s.senha_versao || instanciaMudou(c)) {
+      if (c && !c.revogado_em && instanciaMudou(c)) log('aviso', `Sessão do colaborador ${c.email} derrubada: o(s) agente(s) ${registroAgentes(c).join(', ')} foi(ram) removido(s) e recriado(s), e o convite era da instância antiga.`);
       sessoes.delete(sha256hex(token));
       salva();
       return null;
@@ -400,7 +416,8 @@ function criarAuth({ config, log, agora, colaboradores: colabsInicial }) {
       salva();
       return null;
     }
-    return { usuario: s.usuario, expira: s.expira, papel: 'colaborador', agente: c.agente, colaborador_id: c.id, nome: c.nome || '', trocar_senha: !!c.trocar_senha, senha_versao: c.senha_versao || 1 };
+    const agentes = agentesValidos(c);
+    return { usuario: s.usuario, expira: s.expira, papel: 'colaborador', agentes, agente: agentes[0], colaborador_id: c.id, nome: c.nome || '', trocar_senha: !!c.trocar_senha, senha_versao: c.senha_versao || 1 };
   }
 
   function montaCookiePapel(papel, req) {

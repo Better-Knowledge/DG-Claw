@@ -3369,7 +3369,7 @@ if (btnNaoLida) btnNaoLida.onclick = () => {
     .finally(() => { btnNaoLida.disabled = false; });
 };
 function atualizaNaoLidas() {
-  if (COLAB) return Promise.resolve();   // /api/v1/estados é do dono; o colaborador tem só uma conversa
+  if (COLAB) return Promise.resolve();   // /api/v1/estados é do dono; o colaborador usa /api/v1/nao-lidas pelo menu
   if (naoLidasEmVoo) return naoLidasEmVoo;
   naoLidasEmVoo = api('/api/v1/estados', { timeoutMs: 15000 }).then(d => {
     if (!d || typeof d.agentes !== 'object' || !d.agentes) throw new Error('a resposta não trouxe o campo "agentes"');
@@ -4762,7 +4762,7 @@ function passosTutorial() {
   const abreM = () => abreMenu(true), fechaM = () => abreMenu(false);
   const nome = AGENTE.nome;
   const passos = [
-    ...window.DGMenuLado.passosMenu({ nome, abre: abreM, fecha: fechaM, comTroca: !COLAB && agentesMenu.length > 1, naConversa: true, colaborador: COLAB }),
+    ...window.DGMenuLado.passosMenu({ nome, abre: abreM, fecha: fechaM, comTroca: agentesMenu.length > 1, naConversa: true, colaborador: COLAB }),
     { alvo: '#chat', antes: fechaM, titulo: 'A conversa',
       oque: 'Aqui aparece tudo o que você e ' + nome + ' já escreveram, na ordem, como num aplicativo de mensagens.',
       como: 'As respostas chegam sozinhas, sem precisar atualizar a página. Role para cima para ver as mensagens mais antigas; a seta no canto leva de volta para a mais nova. Quando uma mensagem veio ou foi respondida pelo WhatsApp ou pelo Telegram, ela ganha um selinho com o nome do canal; passe o dedo ou o mouse nele para ver os detalhes.',

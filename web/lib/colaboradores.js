@@ -1,8 +1,11 @@
 'use strict';
-// Colaboradores: pessoas convidadas pelo dono para UM agente de trabalho (docs em web/docs/COLABORADORES.md).
-// Guardados em <dataDir>/colaboradores.json (modo 600, gravação atômica). O Web é o único escritor: as
-// gravações passam por uma fila em memória. Revogar é datar (revogado_em), nunca apagar o registro.
-// O hash da senha nunca sai daqui para a API: use publico().
+// Colaboradores: pessoas convidadas pelo dono para um ou mais agentes de trabalho (docs em web/docs/COLABORADORES.md).
+// Guardados em <dataDir>/colaboradores.json (modo 600, gravação atômica). Cada registro tem `agentes` (lista de slugs)
+// e `instancias` (slug -> instância do agente no convite); registros antigos, com `agente`/`instancia` no singular,
+// são lidos e convertidos em memória (os campos antigos continuam gravados, espelhando o primeiro agente).
+// Quem grava é o Web (fila em memória) ou a CLI (web/lib/colaboradores-cli.js), nunca os dois ao mesmo tempo: a
+// gravação toma a trava `colaboradores.json.trava` (mkdir), a mesma da CLI, e o Web relê o arquivo quando o mtime
+// muda. Revogar é datar (revogado_em), nunca apagar o registro. O hash da senha nunca sai daqui para a API: use publico().
 
 const crypto = require('node:crypto');
 const fs = require('node:fs');
@@ -41,6 +44,54 @@ function normalizaNome(bruto) {
   return n;
 }
 
+/** Lista de slugs válida (1 a 50, únicos, no formato de slug) ou erro 400 que diz o que está errado. */
+function normalizaAgentes(bruto) {
+  const lista = Array.isArray(bruto) ? bruto : (typeof bruto === 'string' && bruto ? [bruto] : []);
+  if (!lista.length) throw erroStatus(400, 'Diga para quais agentes é o acesso, no campo "agentes" (lista de slugs; veja GET /api/v1/agents).');
+  if (lista.length > 50) throw erroStatus(400, `São ${lista.length} agentes na lista e o limite é 50.`);
+  const vistos = [];
+  for (const a of lista) {
+    if (typeof a !== 'string' || !/^[a-z0-9][a-z0-9-]{0,31}$/.test(a)) throw erroStatus(400, `"${String(a).slice(0, 40)}" não é um slug de agente válido (letras minúsculas, números e hífen).`);
+    if (!vistos.includes(a)) vistos.push(a);
+  }
+  return vistos;
+}
+
+/** Registro antigo (agente/instancia no singular) vira o formato novo, em memória. */
+function normalizaRegistro(c) {
+  if (!Array.isArray(c.agentes) || !c.agentes.length) c.agentes = typeof c.agente === 'string' && c.agente ? [c.agente] : [];
+  c.agentes = c.agentes.filter((a) => typeof a === 'string' && a);
+  if (!c.instancias || typeof c.instancias !== 'object' || Array.isArray(c.instancias)) c.instancias = {};
+  if (typeof c.instancia === 'string' && c.instancia && c.agentes[0] && !c.instancias[c.agentes[0]]) c.instancias[c.agentes[0]] = c.instancia;
+  espelhaSingular(c);
+  return c;
+}
+/** Os campos antigos (`agente`, `instancia`) espelham o primeiro agente, para quem ainda lê o formato antigo. */
+function espelhaSingular(c) {
+  c.agente = c.agentes[0] || '';
+  c.instancia = c.agentes[0] ? (c.instancias[c.agentes[0]] || null) : null;
+}
+
+const TRAVA_ESPERA_MS = 2000;
+const TRAVA_VELHA_MS = 10000;
+/**
+ * Trava compartilhada com a CLI (mkdir é atômico no mesmo disco). Espera até 2 s; trava com mais de 10 s é considerada
+ * órfã (processo que morreu) e é removida. Síncrona porque grava() é síncrona e roda dentro da fila.
+ */
+function comTrava(arquivo, fn) {
+  const trava = `${arquivo}.trava`;
+  const inicio = Date.now();
+  for (;;) {
+    try { fs.mkdirSync(trava); break; } catch (e) {
+      if (e.code !== 'EEXIST') throw e;
+      try { if (Date.now() - fs.statSync(trava).mtimeMs > TRAVA_VELHA_MS) { fs.rmdirSync(trava); continue; } } catch (_) { /* sumiu entre o stat e o rmdir: tenta de novo */ }
+      if (Date.now() - inicio > TRAVA_ESPERA_MS) throw erroStatus(503, 'Outra gravação na lista de colaboradores está em andamento (a CLI, provavelmente). Tente de novo em alguns segundos.');
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25);
+    }
+  }
+  try { return fn(); } finally { try { fs.rmdirSync(trava); } catch (_) { /* já saiu */ } }
+}
+
 function geraSenhaTemporaria() {
   let s = '';
   for (let i = 0; i < TAMANHO_SENHA; i++) s += ALFABETO_SENHA[crypto.randomInt(ALFABETO_SENHA.length)];
@@ -72,7 +123,7 @@ function criarColaboradores({ config, log, agora, gerarHash }) {
     try {
       const j = JSON.parse(fs.readFileSync(arquivo, 'utf8'));
       if (!j || typeof j !== 'object' || !Array.isArray(j.colaboradores)) throw new Error('o conteúdo não tem a lista "colaboradores"');
-      lista = j.colaboradores.filter((c) => c && typeof c === 'object' && typeof c.id === 'string' && typeof c.email === 'string' && typeof c.agente === 'string');
+      lista = j.colaboradores.filter((c) => c && typeof c === 'object' && typeof c.id === 'string' && typeof c.email === 'string' && (typeof c.agente === 'string' || Array.isArray(c.agentes))).map(normalizaRegistro);
       if (lista.length !== j.colaboradores.length) log('aviso', `Em ${arquivo}, ${j.colaboradores.length - lista.length} registro(s) sem id, e-mail ou agente foram ignorados (o arquivo não foi alterado).`);
       ilegivel = null;
     } catch (e) {
@@ -87,12 +138,16 @@ function criarColaboradores({ config, log, agora, gerarHash }) {
     const tmp = `${arquivo}.${process.pid}.${crypto.randomBytes(4).toString('hex')}.tmp`;
     try {
       fs.mkdirSync(path.dirname(arquivo), { recursive: true, mode: 0o700 });
-      fs.writeFileSync(tmp, JSON.stringify({ versao: 1, colaboradores: lista }, null, 2) + '\n', { mode: 0o600 });
-      fs.chmodSync(tmp, 0o600);
-      fs.renameSync(tmp, arquivo);
+      for (const c of lista) espelhaSingular(c);
+      comTrava(arquivo, () => {
+        fs.writeFileSync(tmp, JSON.stringify({ versao: 1, colaboradores: lista }, null, 2) + '\n', { mode: 0o600 });
+        fs.chmodSync(tmp, 0o600);
+        fs.renameSync(tmp, arquivo);
+      });
       mtimeVisto = fs.statSync(arquivo).mtimeMs;
     } catch (e) {
       try { fs.unlinkSync(tmp); } catch (_) { /* o temporário nem chegou a existir */ }
+      if (e && e.status === 503) throw e;
       log('erro', `Não consegui gravar ${arquivo} (${e.code || e.message}). Confira o espaço em disco e a permissão de ${config.dataDir}.`);
       throw erroStatus(500, `Não consegui gravar a lista de colaboradores (${e.code || e.message}). Confira o espaço em disco e a permissão da pasta de dados do Web.`);
     }
@@ -118,7 +173,7 @@ function criarColaboradores({ config, log, agora, gerarHash }) {
   /** O registro sem o hash, com o estado calculado. */
   function publico(c) {
     return {
-      id: c.id, email: c.email, nome: c.nome || '', agente: c.agente, estado: estadoDe(c),
+      id: c.id, email: c.email, nome: c.nome || '', agentes: c.agentes.slice(), agente: c.agentes[0] || '', estado: estadoDe(c),
       trocar_senha: !!c.trocar_senha, temporaria_expira: c.trocar_senha ? c.temporaria_expira : null,
       criado_em: c.criado_em, criado_por: c.criado_por, revogado_em: c.revogado_em || null, ultimo_login: c.ultimo_login || null,
     };
@@ -132,40 +187,77 @@ function criarColaboradores({ config, log, agora, gerarHash }) {
     publico,
     estadoDe,
     normalizaEmail,
+    normalizaAgentes,
 
-    /** Todos (inclusive os revogados), do mais novo para o mais antigo; `agente` filtra. */
+    /** Todos (inclusive os revogados), do mais novo para o mais antigo; `agente` filtra pelos que o têm na lista. */
     lista(agente) {
       carrega();
-      return lista.filter((c) => !agente || c.agente === agente).slice().sort((a, b) => b.criado_em - a.criado_em).map(publico);
+      return lista.filter((c) => !agente || c.agentes.includes(agente)).slice().sort((a, b) => b.criado_em - a.criado_em).map(publico);
     },
     obter(id) { carrega(); return lista.find((c) => c.id === id) || null; },
     porEmailAtivo(email) {
       const e = String(email || '').trim().toLowerCase();
       return e ? ativos().find((c) => c.email === e) || null : null;
     },
-    ativoDoAgente(slug) { return ativos().find((c) => c.agente === slug) || null; },
+    /** O primeiro colaborador ativo do agente (compatibilidade); prefira ativosDoAgente. */
+    ativoDoAgente(slug) { return ativos().find((c) => c.agentes.includes(slug)) || null; },
+    /** Todos os colaboradores ativos que alcançam o agente. */
+    ativosDoAgente(slug) { return ativos().filter((c) => c.agentes.includes(slug)); },
 
-    /** Cria o convite. As regras que dependem do registro de agentes (existe? é o Admin?) ficam na rota. */
-    criar({ agente, email, nome, criadoPor, instancia }) {
+    /**
+     * Cria o convite para um ou mais agentes. As regras que dependem do registro de agentes (existe? é o Admin?) ficam
+     * na rota; `instancias` é { slug: instância } e precisa cobrir todos os agentes.
+     */
+    criar({ agentes, agente, email, nome, criadoPor, instancias }) {
       return transacao(async () => {
-        if (!instancia) throw erroStatus(500, `Não consegui identificar esta instância do agente ${agente} (casa ausente ou ilegível), e o convite precisa dela para não valer num agente recriado com o mesmo nome. Rode "dgclaw agente reparar ${agente}" e convide de novo.`);
+        const slugs = normalizaAgentes(agentes || agente);
+        const inst = instancias && typeof instancias === 'object' ? instancias : {};
+        for (const slug of slugs) if (!inst[slug]) throw erroStatus(500, `Não consegui identificar esta instância do agente ${slug} (casa ausente ou ilegível), e o convite precisa dela para não valer num agente recriado com o mesmo nome. Rode "dgclaw agente reparar ${slug}" e confira o log do Web.`);
         const mail = normalizaEmail(email);
         const nomeOk = normalizaNome(nome);
-        const doAgente = lista.find((c) => !c.revogado_em && c.agente === agente);
-        if (doAgente) throw erroStatus(409, `O agente ${agente} já tem um colaborador ativo (${doAgente.email}). Hoje cada agente tem um colaborador só: revogue o acesso atual antes de convidar outra pessoa.`);
         const doEmail = lista.find((c) => !c.revogado_em && c.email === mail);
-        if (doEmail) throw erroStatus(409, `O e-mail ${mail} já é colaborador do agente ${doEmail.agente}. Hoje cada pessoa acessa um agente só: revogue o acesso dela lá antes de convidar para este.`);
+        if (doEmail) throw erroStatus(409, `O e-mail ${mail} já é colaborador (agente${doEmail.agentes.length > 1 ? 's' : ''} ${doEmail.agentes.join(', ')}). Para dar acesso a mais um agente, altere os agentes dele em vez de convidar de novo.`);
         const senha = geraSenhaTemporaria();
         const hash = await gerarHash(senha);
         const t = relogio();
-        const registro = {
-          id: crypto.randomBytes(16).toString('base64url'), email: mail, nome: nomeOk, agente, instancia, hash,
+        const registro = normalizaRegistro({
+          id: crypto.randomBytes(16).toString('base64url'), email: mail, nome: nomeOk, agentes: slugs, instancias: Object.fromEntries(slugs.map((x) => [x, inst[x]])), hash,
           trocar_senha: true, temporaria_expira: t + VALIDADE_TEMPORARIA_MS, senha_versao: 1,
           criado_em: t, criado_por: criadoPor || null, revogado_em: null, ultimo_login: null,
-        };
+        });
         lista.push(registro);
         try { grava(); } catch (e) { lista.pop(); throw e; }
         return { registro: publico(registro), senha };
+      });
+    },
+
+    /**
+     * Muda os agentes (lista completa, substitui a anterior) e/ou o nome de um colaborador ativo. A sessão dele não cai:
+     * o pedido seguinte já enxerga a lista nova (ver auth.sessaoDeColaborador). `instancias` cobre os agentes novos.
+     */
+    alterar(id, campos, instancias) {
+      return transacao(async () => {
+        const c = lista.find((x) => x.id === id);
+        if (!c) throw erroStatus(404, `Não existe colaborador com o id "${String(id).slice(0, 40)}". Veja GET /api/v1/colaboradores.`);
+        if (c.revogado_em) throw erroStatus(409, `O acesso de ${c.email} já foi revogado. Convide a pessoa de novo para ela voltar a entrar.`);
+        const f = campos && typeof campos === 'object' ? campos : {};
+        if (f.agentes === undefined && f.nome === undefined) throw erroStatus(400, 'Mande ao menos um de: "agentes" (lista de slugs) ou "nome".');
+        const antes = Object.assign({}, c, { agentes: c.agentes.slice(), instancias: Object.assign({}, c.instancias) });
+        if (f.agentes !== undefined) {
+          const slugs = normalizaAgentes(f.agentes);
+          const inst = instancias && typeof instancias === 'object' ? instancias : {};
+          const novas = {};
+          for (const slug of slugs) {
+            const i = inst[slug] || c.instancias[slug];
+            if (!i) throw erroStatus(500, `Não consegui identificar esta instância do agente ${slug} (casa ausente ou ilegível). Rode "dgclaw agente reparar ${slug}" e confira o log do Web.`);
+            novas[slug] = i;
+          }
+          c.agentes = slugs; c.instancias = novas;
+        }
+        if (f.nome !== undefined) c.nome = normalizaNome(f.nome);
+        espelhaSingular(c);
+        try { grava(); } catch (e) { Object.assign(c, antes); throw e; }
+        return publico(c);
       });
     },
 
@@ -185,18 +277,26 @@ function criarColaboradores({ config, log, agora, gerarHash }) {
     },
 
     /**
-     * Revoga os convites ativos do agente `slug` que foram feitos para outra instância dele (o agente foi removido e
-     * recriado com o mesmo nome). Devolve quantos. Chamado antes de convidar de novo e quando o Web nota a troca.
+     * Tira o agente `slug` dos convites ativos que o guardaram com outra instância (o agente foi removido e recriado
+     * com o mesmo nome); um registro que fica sem agente é revogado. Devolve quantos registros mudaram. Chamado antes
+     * de convidar de novo e quando o Web nota a troca.
      */
     revogarDeOutraInstancia(slug, instanciaAtual) {
       return transacao(async () => {
         let n = 0;
         const t = relogio();
+        const desfazer = [];
         for (const c of lista) {
-          if (c.agente === slug && !c.revogado_em && (!c.instancia || c.instancia !== instanciaAtual)) { c.revogado_em = t; n += 1; }
+          if (c.revogado_em || !c.agentes.includes(slug)) continue;
+          if (c.instancias[slug] && c.instancias[slug] === instanciaAtual) continue;
+          desfazer.push([c, c.agentes.slice(), Object.assign({}, c.instancias)]);
+          c.agentes = c.agentes.filter((a) => a !== slug); delete c.instancias[slug];
+          if (!c.agentes.length) c.revogado_em = t;
+          espelhaSingular(c);
+          n += 1;
         }
         if (n) {
-          try { grava(); } catch (e) { for (const c of lista) if (c.revogado_em === t) c.revogado_em = null; throw e; }
+          try { grava(); } catch (e) { for (const [c, ags, inst] of desfazer) { c.agentes = ags; c.instancias = inst; if (c.revogado_em === t) c.revogado_em = null; espelhaSingular(c); } throw e; }
         }
         return n;
       });
@@ -242,4 +342,4 @@ function criarColaboradores({ config, log, agora, gerarHash }) {
   };
 }
 
-module.exports = { criarColaboradores, normalizaEmail, normalizaNome, geraSenhaTemporaria, VALIDADE_TEMPORARIA_MS };
+module.exports = { criarColaboradores, normalizaEmail, normalizaNome, normalizaAgentes, geraSenhaTemporaria, VALIDADE_TEMPORARIA_MS };

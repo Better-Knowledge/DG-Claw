@@ -242,6 +242,16 @@ function criarServidor(opcoes) {
 
   /* A rota "/" abre o último agente usado (cookie dgclaw_agente, gravado pela casca), se ele ainda existe no registro;
      senão o primeiro que não é o Admin (é com ele que a pessoa trabalha); senão o Admin. */
+  /** O agente em que o colaborador cai: o do cookie dgclaw_agente, se for dele, senão o primeiro da lista dele. */
+  function agenteInicialDoColaborador(req, sessao) {
+    const meus = Array.isArray(sessao.agentes) ? sessao.agentes : (sessao.agente ? [sessao.agente] : []);
+    if (req) {
+      let guardado = H.parseCookies(req.headers.cookie).dgclaw_agente;
+      try { guardado = guardado && decodeURIComponent(guardado); } catch (_) { guardado = null; }
+      if (guardado && meus.includes(guardado)) return guardado;
+    }
+    return meus[0] || '';
+  }
   function agenteInicial(req) {
     const agentes = registro.estado().agentes;
     let guardado = H.parseCookies(req.headers.cookie).dgclaw_agente;
@@ -260,10 +270,10 @@ function criarServidor(opcoes) {
   }
 
   /** Para onde a pessoa vai depois de entrar. Colaborador: troca de senha pendente, senão o agente dele (ignora `next` fora do escopo). */
-  function destinoDaSessao(sessao, next) {
+  function destinoDaSessao(sessao, next, req) {
     if (!sessao || sessao.papel !== 'colaborador') return next;
     if (sessao.trocar_senha) return '/trocar-senha';
-    const padrao = `/a/${encodeURIComponent(sessao.agente)}`;
+    const padrao = `/a/${encodeURIComponent(agenteInicialDoColaborador(req, sessao))}`;
     let alvo;
     try { alvo = new URL(next || '/', 'http://local').pathname; } catch (_) { return padrao; }
     return alvo !== '/' && escopo.avaliar(sessao, 'GET', alvo).ok ? next : padrao;
@@ -275,7 +285,7 @@ function criarServidor(opcoes) {
       return res.end();
     }
     const status = v.status === 302 ? 403 : v.status;
-    log('aviso', `Colaborador ${sessao.usuario} (agente ${sessao.agente}) barrado em ${req.method} ${p.slice(0, 120)}: ${v.motivo}`);
+    log('aviso', `Colaborador ${sessao.usuario} (agentes ${(sessao.agentes || []).join(', ')}) barrado em ${req.method} ${p.slice(0, 120)}: ${v.motivo}`);
     if (p.startsWith('/api/') || !querHtml(req)) return H.erroJson(res, status, v.motivo, v.extra);
     return H.paginaErro(res, status, 'Acesso não liberado', v.motivo);
   }
@@ -316,10 +326,10 @@ function criarServidor(opcoes) {
         log('aviso', `Login de ${r.usuario} (ip ${ip}) não emitiu sessão: ${e.message}`);
         return json ? H.erroJson(res, e.status || 500, e.message) : voltaAoLogin(res, 'credenciais', next, usuarioDigitado);
       }
-      log('info', `Login de ${r.usuario}${r.colaborador ? ` (colaborador do agente ${r.colaborador.agente})` : ''} (ip ${ip}).`);
+      log('info', `Login de ${r.usuario}${r.colaborador ? ` (colaborador dos agentes ${r.colaborador.agentes.join(', ')})` : ''} (ip ${ip}).`);
       const cab = { 'Set-Cookie': s.cookies, 'Cache-Control': 'no-store' };
       const destino = r.colaborador
-        ? destinoDaSessao({ papel: 'colaborador', agente: r.colaborador.agente, trocar_senha: !!(colaboradores.obter(r.colaborador.id) || {}).trocar_senha }, next)
+        ? destinoDaSessao({ papel: 'colaborador', agentes: r.colaborador.agentes, agente: r.colaborador.agentes[0], trocar_senha: !!(colaboradores.obter(r.colaborador.id) || {}).trocar_senha }, next, req)
         : next;
       if (json) return H.enviaJson(res, 200, { ok: true, destino }, cab);
       res.writeHead(303, Object.assign({ Location: destino }, cab));
@@ -456,8 +466,8 @@ function criarServidor(opcoes) {
 
     if (p === '/api/v1/agents' && m === 'GET') {
       if (falhaDoRegistro(req, res, true)) return undefined;
-      // Colaborador enxerga só o agente dele (o escopo já deixou passar a rota; o filtro é aqui, no handler).
-      const visiveis = registro.estado().agentes.filter((a) => sessao.papel !== 'colaborador' || a.slug === sessao.agente);
+      // Colaborador enxerga só os agentes dele (o escopo já deixou passar a rota; o filtro é aqui, no handler).
+      const visiveis = registro.estado().agentes.filter((a) => sessao.papel !== 'colaborador' || sessao.agentes.includes(a.slug));
       const lista = await Promise.all(visiveis.map(async (a) => Object.assign(await agentePublico(a), { ultima_ts: await conversa.ultimaMensagemTs(a) })));
       return H.enviaJson(res, 200, { ok: true, agentes: lista, voz: lista.some((a) => a.voz), microfone: voz.microfone, limite_upload_bytes: config.maxUploadBytes, usuario: sessao.usuario });
     }
@@ -467,7 +477,7 @@ function criarServidor(opcoes) {
       if (m !== 'GET') return H.erroJson(res, 405, 'Use GET para ver quantas mensagens não lidas cada agente tem.');
       try {
         let contagem = await naoLidas.contar(sessao.usuario);
-        if (sessao.papel === 'colaborador') contagem = Object.fromEntries(Object.entries(contagem).filter(([slug]) => slug === sessao.agente));
+        if (sessao.papel === 'colaborador') contagem = Object.fromEntries(Object.entries(contagem).filter(([slug]) => sessao.agentes.includes(slug)));
         return H.enviaJson(res, 200, { ok: true, agentes: contagem });
       } catch (e) {
         return H.erroJson(res, e.status || 500, e.status ? e.message : `Não consegui contar as mensagens não lidas (${e.message}).`);
@@ -689,7 +699,7 @@ function criarServidor(opcoes) {
     }
 
     mm = /^\/api\/v1\/media\/([0-9a-f]{16})\/visual$/.exec(p);
-    const slugDaMidia = sessao.papel === 'colaborador' ? sessao.agente : null;
+    const slugDaMidia = sessao.papel === 'colaborador' ? sessao.agentes : null;
     if (mm && (m === 'GET' || m === 'HEAD')) return midia.servirVisual(req, res, mm[1], url.searchParams.get('tema'), slugDaMidia);
 
     mm = /^\/api\/v1\/media\/([0-9a-f]{16})(?:\/(thumb))?$/.exec(p);
@@ -818,7 +828,7 @@ function criarServidor(opcoes) {
     if (!ehColab(sessao)) return true;
     const s2 = auth.sessaoDoPedido(req);
     return !!s2 && s2.papel === 'colaborador' && s2.colaborador_id === sessao.colaborador_id
-      && s2.senha_versao === sessao.senha_versao && s2.agente === sessao.agente;
+      && s2.senha_versao === sessao.senha_versao && s2.agentes.length === sessao.agentes.length && s2.agentes.every((a, i) => a === sessao.agentes[i]);
   }
   function recusaSessaoVelha(res, sessao) {
     log('aviso', `Pedido do colaborador ${sessao.usuario} recusado: a sessão deixou de valer enquanto o corpo chegava (acesso revogado ou convite reenviado).`);
@@ -991,8 +1001,8 @@ function criarServidor(opcoes) {
   async function falar(req, res, sessao) {
     const corpo = await lerEnvio(req, res);
     if (!corpo) return undefined;
-    // Colaborador só fala com a voz do agente dele, qualquer que seja o agent_id pedido.
-    const slug = sessao && sessao.papel === 'colaborador' ? sessao.agente
+    // Colaborador só fala com a voz de um agente dele: agent_id fora da lista cai no primeiro deles.
+    const slug = sessao && sessao.papel === 'colaborador' ? (sessao.agentes.includes(corpo.agent_id) ? corpo.agent_id : sessao.agentes[0])
       : (typeof corpo.agent_id === 'string' ? corpo.agent_id : (registro.estado().agentes[0] || {}).slug);
     const agente = registro.obter(slug);
     if (!agente) return H.erroJson(res, 404, `Não existe agente com o id "${String(slug).slice(0, 40)}".`);
@@ -1115,7 +1125,7 @@ function criarServidor(opcoes) {
     if (p === '/' && (m === 'GET' || m === 'HEAD')) {
       if (!sessao) return semSessaoPagina(req, res, url);
       if (falhaDoRegistro(req, res, false)) return undefined;
-      res.writeHead(302, { Location: `/a/${sessao.papel === 'colaborador' ? encodeURIComponent(sessao.agente) : agenteInicial(req)}`, 'Cache-Control': 'no-store' });
+      res.writeHead(302, { Location: `/a/${sessao.papel === 'colaborador' ? encodeURIComponent(agenteInicialDoColaborador(req, sessao)) : agenteInicial(req)}`, 'Cache-Control': 'no-store' });
       return res.end();
     }
 

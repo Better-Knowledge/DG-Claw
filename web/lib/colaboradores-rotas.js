@@ -1,6 +1,7 @@
 'use strict';
-// Rotas do colaborador: a API do dono (/api/v1/colaboradores...) e a troca de senha do próprio
-// colaborador (/api/v1/eu/senha). Referência completa em web/docs/COLABORADORES.md.
+// Rotas do colaborador: a API do dono (/api/v1/colaboradores...: convidar para um ou mais agentes, alterar os agentes
+// ou o nome, reenviar, revogar) e a troca de senha do próprio colaborador (/api/v1/eu/senha). Referência completa em
+// web/docs/COLABORADORES.md.
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -34,11 +35,17 @@ function criarColaboradoresRotas({ colaboradores, auth, registro, email, config,
 
   const fmtData = (ms) => new Intl.DateTimeFormat('pt-BR', { timeZone: config.tz, day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(ms));
 
+  /** "o agente Ana" ou "os agentes Ana e Bob". */
+  function fraseAgentes(nomes) {
+    if (nomes.length === 1) return `o agente ${nomes[0]}`;
+    return `os agentes ${nomes.slice(0, -1).join(', ')} e ${nomes[nomes.length - 1]}`;
+  }
+
   function textoDoConvite({ quem, nomeAgente, nomePessoa, link, usuario, senha, expira }) {
     return [
       `Olá${nomePessoa ? ', ' + nomePessoa : ''}!`,
       '',
-      `${quem} convidou você para conversar com o agente ${nomeAgente} no DG Claw.`,
+      `${quem} convidou você para conversar com ${nomeAgente} no DG Claw.`,
       '',
       `Endereço: ${link}`,
       `Login: ${usuario}`,
@@ -50,13 +57,13 @@ function criarColaboradoresRotas({ colaboradores, auth, registro, email, config,
 
   /** Monta o convite, tenta o e-mail e devolve o objeto "convite" da resposta. A senha só existe aqui. */
   async function convite(req, sessao, registroColab, senha) {
-    const ag = registro.obter(registroColab.agente);
-    const nomeAgente = ag ? ag.nome : registroColab.agente;
+    const nomes = registroColab.agentes.map((slug) => { const ag = registro.obter(slug); return ag ? ag.nome : slug; });
+    const nomeAgente = fraseAgentes(nomes);
     const link = `${H.origemPropria(req, config.proxiesConfiaveis)}/login?usuario=${encodeURIComponent(registroColab.email)}`;
     const texto = textoDoConvite({
       quem: sessao.usuario, nomeAgente, nomePessoa: registroColab.nome, link, usuario: registroColab.email, senha, expira: registroColab.temporaria_expira,
     });
-    const envio = await email.enviar({ para: registroColab.email, assunto: `Convite para conversar com o agente ${nomeAgente} no DG Claw`, texto });
+    const envio = await email.enviar({ para: registroColab.email, assunto: `Convite para conversar com ${nomeAgente} no DG Claw`, texto });
     return {
       link, usuario: registroColab.email, senha_temporaria: senha, expira: registroColab.temporaria_expira,
       email_enviado: envio.enviado === true, email_motivo: envio.enviado ? null : envio.motivo, texto,
@@ -71,6 +78,34 @@ function criarColaboradoresRotas({ colaboradores, auth, registro, email, config,
   }
 
   const ehDono = (sessao) => sessao && sessao.via !== 'caixa' && sessao.papel !== 'colaborador';
+
+  /**
+   * Valida a lista de agentes de um convite ou de uma alteração: cada um existe, não é o Admin e tem instância. Tira
+   * dos convites antigos a instância recriada. Devolve { slugs, instancias } ou null (já respondeu).
+   */
+  async function agentesDoPedido(res, bruto) {
+    let slugs;
+    try { slugs = colaboradores.normalizaAgentes(bruto); } catch (e) { H.erroJson(res, e.status || 400, e.message); return null; }
+    const instancias = {};
+    for (const slug of slugs) {
+      const ag = registro.obter(slug);
+      if (!ag) { H.erroJson(res, 404, `Não existe agente com o id "${slug.slice(0, 40)}". Veja GET /api/v1/agents.`); return null; }
+      if (ag.tipo === 'admin') { H.erroJson(res, 400, 'O Admin nunca pode ser compartilhado: ele mexe no servidor inteiro. Convide para um agente de trabalho.'); return null; }
+      const instancia = instanciaDe(ag);
+      if (!instancia) {
+        log('erro', `Convite para ${slug} recusado: não consegui identificar a instância do agente (sem "instancia" no registro e a casa ${ag.home_host || '(sem home_host)'} não pôde ser lida).`);
+        H.erroJson(res, 500, `Não consegui identificar esta instância do agente ${slug} (casa ausente ou ilegível), e o convite precisa dela para não valer num agente recriado com o mesmo nome. Rode "dgclaw agente reparar ${slug}" e confira o log do Web.`);
+        return null;
+      }
+      instancias[slug] = instancia;
+    }
+    // Convite de um agente que foi removido e recriado com o mesmo nome não vale e não pode barrar o novo.
+    for (const slug of slugs) {
+      const velhos = await colaboradores.revogarDeOutraInstancia(slug, instancias[slug]);
+      if (velhos) log('aviso', `${velhos} convite(s) perderam o agente ${slug} (instância antiga): o agente foi removido e criado de novo.`);
+    }
+    return { slugs, instancias };
+  }
 
   /** Devolve true quando respondeu. */
   async function tratar(req, res, url, sessao) {
@@ -98,27 +133,16 @@ function criarColaboradoresRotas({ colaboradores, auth, registro, email, config,
         try {
           const est = registro.estado();
           if (!est.ok) { H.erroJson(res, 503, est.erro); return true; }
-          const slug = typeof corpo.agente === 'string' ? corpo.agente : '';
-          if (!slug) { H.erroJson(res, 400, 'Diga para qual agente é o convite, no campo "agente" (o slug; veja GET /api/v1/agents).'); return true; }
-          const ag = registro.obter(slug);
-          if (!ag) { H.erroJson(res, 404, `Não existe agente com o id "${slug.slice(0, 40)}". Veja GET /api/v1/agents.`); return true; }
-          if (ag.tipo === 'admin') { H.erroJson(res, 400, 'O Admin nunca pode ser compartilhado: ele mexe no servidor inteiro. Convide para um agente de trabalho.'); return true; }
+          if (corpo.agentes === undefined && typeof corpo.agente !== 'string') { H.erroJson(res, 400, 'Diga para quais agentes é o convite, no campo "agentes" (lista de slugs; veja GET /api/v1/agents).'); return true; }
           const mail = colaboradores.normalizaEmail(corpo.email);
           if (mail === String(auth.usuario || '').trim().toLowerCase()) {
             H.erroJson(res, 400, 'Esse e-mail é o do próprio dono do DG Claw (o usuário do login). Informe o e-mail do colaborador.');
             return true;
           }
-          const instancia = instanciaDe(ag);
-          if (!instancia) {
-            log('erro', `Convite para ${slug} recusado: não consegui identificar a instância do agente (sem "instancia" no registro e a casa ${ag.home_host || '(sem home_host)'} não pôde ser lida).`);
-            H.erroJson(res, 500, `Não consegui identificar esta instância do agente ${slug} (casa ausente ou ilegível), e o convite precisa dela para não valer num agente recriado com o mesmo nome. Rode "dgclaw agente reparar ${slug}" e convide de novo.`);
-            return true;
-          }
-          // Convite de um agente que foi removido e recriado com o mesmo nome não vale e não pode barrar o novo.
-          const velhos = await colaboradores.revogarDeOutraInstancia(slug, instancia);
-          if (velhos) log('aviso', `Convite(s) de uma instância antiga do agente ${slug} revogado(s) (${velhos}): o agente foi removido e criado de novo.`);
-          const r = await colaboradores.criar({ agente: slug, email: mail, nome: corpo.nome, criadoPor: sessao.usuario, instancia });
-          log('info', `Colaborador convidado: ${r.registro.email} para o agente ${slug} (por ${sessao.usuario}).`);
+          const alvo = await agentesDoPedido(res, corpo.agentes !== undefined ? corpo.agentes : corpo.agente);
+          if (!alvo) return true;
+          const r = await colaboradores.criar({ agentes: alvo.slugs, email: mail, nome: corpo.nome, criadoPor: sessao.usuario, instancias: alvo.instancias });
+          log('info', `Colaborador convidado: ${r.registro.email} para ${alvo.slugs.length} agente(s): ${alvo.slugs.join(', ')} (por ${sessao.usuario}).`);
           const c = await convite(req, sessao, r.registro, r.senha);
           H.enviaJson(res, 201, { ok: true, colaborador: r.registro, convite: c });
         } catch (e) { falha(res, e, 'Não consegui criar o convite'); }
@@ -137,19 +161,38 @@ function criarColaboradoresRotas({ colaboradores, auth, registro, email, config,
           if (m !== 'POST') { H.erroJson(res, 405, 'Use POST para mandar o convite de novo.'); return true; }
           const r = await colaboradores.reenviar(id);
           derruba(id);
-          log('info', `Convite reenviado a ${r.registro.email} (agente ${r.registro.agente}); sessões dele derrubadas (por ${sessao.usuario}).`);
+          log('info', `Convite reenviado a ${r.registro.email} (agentes ${r.registro.agentes.join(', ')}); sessões dele derrubadas (por ${sessao.usuario}).`);
           const c = await convite(req, sessao, r.registro, r.senha);
           H.enviaJson(res, 200, { ok: true, colaborador: r.registro, convite: c });
+          return true;
+        }
+        if (m === 'POST') {
+          // Altera os agentes (lista completa) e/ou o nome. A sessão da pessoa não cai: o clique seguinte já vê a lista nova.
+          let corpo;
+          try { corpo = await H.lerJson(req, 8 * 1024); } catch (e) { H.erroJson(res, e.status || 400, e.message); return true; }
+          const c = corpo && typeof corpo === 'object' ? corpo : {};
+          let instancias = {};
+          if (c.agentes !== undefined) {
+            const alvo = await agentesDoPedido(res, c.agentes);
+            if (!alvo) return true;
+            instancias = alvo.instancias;
+          }
+          const campos = {};
+          if (c.agentes !== undefined) campos.agentes = c.agentes;
+          if (c.nome !== undefined) campos.nome = c.nome;
+          const r = await colaboradores.alterar(id, campos, instancias);
+          log('info', `Colaborador ${r.email} alterado por ${sessao.usuario}: ${Object.keys(campos).join(', ')} (agentes agora: ${r.agentes.join(', ')}).`);
+          H.enviaJson(res, 200, { ok: true, colaborador: r });
           return true;
         }
         if (m === 'DELETE') {
           const r = await colaboradores.revogar(id);
           derruba(id);
-          log('info', `Acesso de ${r.email} ao agente ${r.agente} revogado (por ${sessao.usuario}).`);
+          log('info', `Acesso de ${r.email} (agentes ${r.agentes.join(', ')}) revogado (por ${sessao.usuario}).`);
           H.enviaJson(res, 200, { ok: true, colaborador: r });
           return true;
         }
-        H.erroJson(res, 405, 'Use DELETE para revogar o acesso, ou POST em /reenviar.');
+        H.erroJson(res, 405, 'Use POST para alterar agentes ou nome, DELETE para revogar o acesso, ou POST em /reenviar.');
       } catch (e) { falha(res, e, 'Não consegui atualizar o colaborador'); }
       return true;
     }
@@ -161,7 +204,8 @@ function criarColaboradoresRotas({ colaboradores, auth, registro, email, config,
   function eu(res, sessao) {
     H.enviaJson(res, 200, {
       ok: true, usuario: sessao.usuario, papel: sessao.papel === 'colaborador' ? 'colaborador' : 'dono',
-      agente: sessao.papel === 'colaborador' ? sessao.agente : null, nome: sessao.papel === 'colaborador' ? (sessao.nome || '') : '',
+      agente: sessao.papel === 'colaborador' ? (sessao.agentes[0] || null) : null, agentes: sessao.papel === 'colaborador' ? sessao.agentes.slice() : null,
+      nome: sessao.papel === 'colaborador' ? (sessao.nome || '') : '',
       trocar_senha: sessao.papel === 'colaborador' ? !!sessao.trocar_senha : false,
     });
   }
@@ -216,9 +260,9 @@ function criarColaboradoresRotas({ colaboradores, auth, registro, email, config,
       const hash = await auth.gerarHash(nova);
       const r = await colaboradores.definirSenha(c.id, hash, esperado);
       derruba(c.id);
-      const s = auth.criaSessao(c.email, req, { id: c.id, agente: c.agente, senha_versao: r.senha_versao });
-      log('info', `${c.email} trocou a senha (agente ${c.agente}); as outras sessões dele foram derrubadas.`);
-      H.enviaJson(res, 200, { ok: true, destino: `/a/${encodeURIComponent(c.agente)}` }, { 'Set-Cookie': s.cookies });
+      const s = auth.criaSessao(c.email, req, { id: c.id, agentes: sessao.agentes.slice(), senha_versao: r.senha_versao });
+      log('info', `${c.email} trocou a senha (agentes ${c.agentes.join(', ')}); as outras sessões dele foram derrubadas.`);
+      H.enviaJson(res, 200, { ok: true, destino: `/a/${encodeURIComponent(sessao.agentes[0])}` }, { 'Set-Cookie': s.cookies });
     } catch (e) { falha(res, e, 'Não consegui trocar a senha'); }
   }
 

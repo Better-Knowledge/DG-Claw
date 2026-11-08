@@ -160,6 +160,11 @@ function criarMidia({ dataDir, log, registro, publicDir }) {
     enviaPagina(req, res, status, paginaVisual(corpo, tema));
   }
 
+  /** `permitido` é null (dono), um slug ou a lista de slugs do colaborador. */
+  function slugLiberado(slug, permitido) {
+    if (!permitido) return true;
+    return Array.isArray(permitido) ? permitido.includes(slug) : slug === permitido;
+  }
   function raizesDe(slug) {
     const raizes = [];
     const ag = slug ? registro.obter(slug) : null;
@@ -233,8 +238,9 @@ function criarMidia({ dataDir, log, registro, publicDir }) {
     servirVisual(req, res, id, temaPedido, slugPermitido) {
       const tema = temaPedido === 'escuro' ? 'escuro' : 'claro';
       const e = reg.get(id);
-      // slugPermitido (colaborador): mídia de outro agente responde igual a mídia que não existe, para não revelar o id
-      if (!e || (slugPermitido && e.slug !== slugPermitido)) {
+      // slugPermitido (colaborador; um slug ou a lista dos agentes dele): mídia de outro agente responde igual a mídia
+      // que não existe, para não revelar o id
+      if (!e || !slugLiberado(e.slug, slugPermitido)) {
         erroVisual(req, res, 404, 'Não conheço esta mídia. Ela pode ter sido registrada antes de o servidor reiniciar: recarregue a conversa para ela voltar.', tema);
         return;
       }
@@ -276,7 +282,7 @@ function criarMidia({ dataDir, log, registro, publicDir }) {
     /** Serve o arquivo. `modo` é 'arquivo' ou 'thumb'. */
     async servir(req, res, id, modo, baixar, slugPermitido) {
       const e = reg.get(id);
-      if (!e || (slugPermitido && e.slug !== slugPermitido)) {
+      if (!e || !slugLiberado(e.slug, slugPermitido)) {
         erroJson(res, 404, 'Não conheço esta mídia. Ela pode ter sido registrada antes de o servidor reiniciar: recarregue a conversa para ela voltar.');
         return;
       }

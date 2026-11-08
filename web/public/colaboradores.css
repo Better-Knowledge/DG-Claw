@@ -40,3 +40,11 @@ body.co *{box-sizing:border-box}
 .co-fato dt{font-weight:700;color:#4a5968}
 .co-fato dd{margin:0;overflow-wrap:anywhere;word-break:break-word}
 @media (max-width:420px){.co-fato{grid-template-columns:1fr;gap:0}.co-acoes .co-btn{flex:1 1 auto}}
+.co-sub{font-size:15.5px;margin:14px 0 8px}
+.co-atual{border:1px solid var(--co-linha);border-radius:12px;padding:12px;margin-bottom:10px;min-width:0}
+.co-atual h3{font-size:15.5px;margin:0 0 6px;display:flex;flex-wrap:wrap;align-items:center;gap:6px;overflow-wrap:anywhere}
+.co-checks{border:1px solid var(--co-linha);border-radius:12px;padding:8px 12px 4px;margin:0 0 10px;min-width:0}
+.co-checks legend{font-size:13.5px;font-weight:600;color:#38523f;padding:0 4px}
+.co-check{display:flex;align-items:center;gap:10px;min-height:40px;font-size:15px;cursor:pointer}
+.co-check input{width:20px;height:20px;margin:0;accent-color:var(--co-acento)}
+.co-edita{margin-top:10px;padding-top:10px;border-top:1px dashed var(--co-linha)}
