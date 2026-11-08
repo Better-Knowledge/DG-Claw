@@ -12,8 +12,9 @@ const { ErroFonte, soChaves, limiteDe, semInvisivel } = require('./json');
 const { fontePasta, MAX_ARQUIVO } = require('./pasta');
 
 const MAX_TRECHO = 240;
-const MAX_ARQUIVOS_BUSCA = 500;
-const MAX_CONTEUDO = MAX_ARQUIVO;
+const MAX_ARQUIVOS_BUSCA = 500;              // arquivos lidos por busca
+const MAX_BYTES_BUSCA = 8 * 1024 * 1024;     // bytes lidos por busca
+const MAX_CONTEUDO = 60 * 1024;              // o corpo do pedido tem teto de 64 KB (dados.js): a proposta cabe nele
 const EXTENSOES_ESCRITA = new Set(['.md', '.txt']);
 
 function tokens(termo) {
@@ -56,21 +57,22 @@ function fonteBase({ dir, nome, base, log, catalogo }) {
         const toks = tokens(q.termo);
         if (!toks.length) throw new ErroFonte(400, '"termo" precisa ter ao menos uma palavra com 2 ou mais letras.');
         const lim = limiteDe(q);
-        const todos = pasta.operacoes.listar({ limit: 200 }).itens;   // até 200 arquivos listados por vez
         const base = raizReal();
-        if (!base) return { itens: [], total: 0 };
+        if (!base) return { itens: [], total: 0, arquivos_lidos: 0, truncado: false };
+        const todos = pasta.listarTodos(MAX_ARQUIVOS_BUSCA + 1);
         const achados = [];
-        let lidos = 0;
-        for (const it of todos) {
-          if (lidos >= MAX_ARQUIVOS_BUSCA) break;
-          lidos++;
+        let lidos = 0; let bytes = 0; let truncado = todos.length > MAX_ARQUIVOS_BUSCA;
+        for (const it of todos.slice(0, MAX_ARQUIVOS_BUSCA)) {
+          if (bytes + it.tamanho > MAX_BYTES_BUSCA) { truncado = true; break; }
+          lidos++; bytes += it.tamanho;
           let texto = '';
           try { texto = pasta.operacoes.ler({ caminho: it.caminho }).item.conteudo; } catch (_) { continue; }   // arquivo que não dá para ler não entra
           const alvo = (it.caminho + '\n' + texto).toLowerCase();
           if (!toks.every((t) => alvo.includes(t))) continue;
           achados.push({ caminho: it.caminho, tamanho: it.tamanho, modificado_em: it.modificado_em, trecho: trechoDe(texto, toks) || trechoDe(it.caminho, toks) });
         }
-        return { itens: achados.slice(0, lim), total: achados.length };
+        // `truncado` avisa que a base é maior do que uma busca lê: "não achei" não quer dizer "não existe".
+        return { itens: achados.slice(0, lim), total: achados.length, arquivos_lidos: lidos, truncado };
       },
     },
     acoes: {

@@ -186,10 +186,12 @@ test('rota: cada agente vê e lê só as bases do seu escopo; o conteúdo volta 
     assert.equal(b.json.confianca, 'nao_confiavel'); assert.equal(b.json.origem, 'fonte:base-manual-rh');
     assert.deepEqual(Object.keys(b.json.itens[0]).sort(), ['caminho', 'modificado_em', 'tamanho', 'trecho']);
 
+    // fora do escopo: para o agente a base parece não existir (404, sem dizer de quem é nem de que grupo)
     let r = await s.pedir('POST', '/api/v1/dados/fontes/base-fechamento-fin/ler', { caminho: 'caixa.md' }, CAIXA('bia'));
-    assert.equal(r.status, 403); assert.match(r.json.erro, /caio não está nele/); assert.ok(!r.texto.includes('SECRETO'));
+    assert.equal(r.status, 404); assert.ok(!r.texto.includes('SECRETO')); assert.ok(!r.texto.includes('financeiro') && !r.texto.includes('caio'));
     r = await s.pedir('POST', '/api/v1/dados/fontes/base-notas-marta/listar', {}, CAIXA('bia'));
-    assert.equal(r.status, 403); assert.ok(!r.texto.includes('pessoal.md'));
+    assert.equal(r.status, 404); assert.ok(!r.texto.includes('pessoal.md') && !r.texto.includes('privada') && !r.texto.includes('pessoa'));
+    assert.equal((await s.pedir('POST', '/api/v1/dados/fontes/base-nada/listar', {}, CAIXA('bia'))).texto.replace('base-nada', 'X'), r.texto.replace('base-notas-marta', 'X'), 'mesma resposta para base inexistente e base fora do alcance');
     r = await s.pedir('POST', '/api/v1/dados/fontes/base-manual-rh/listar', {}, CAIXA('duda'));
     assert.equal(r.status, 403); assert.match(r.json.erro, /desligada/);
     r = await s.pedir('POST', '/api/v1/dados/fontes/base-nada/listar', {}, CAIXA('ana'));
@@ -198,7 +200,7 @@ test('rota: cada agente vê e lê só as bases do seu escopo; o conteúdo volta 
     assert.equal((await s.pedir('POST', '/api/v1/dados/fontes/base-fechamento-fin/ler', { caminho: 'caixa.md' }, DONO)).json.item.conteudo, 'SALDO SECRETO 123');
     const linhas = s.dados.acessos.ultimas(100);
     const neg = linhas.find((l) => l.agente === 'bia' && l.fonte === 'base-fechamento-fin');
-    assert.equal(neg.decisao, 'negado'); assert.equal(neg.pessoa, 'caio');
+    assert.equal(neg.decisao, 'negado'); assert.equal(neg.pessoa, 'caio'); assert.match(neg.motivo, /caio não está nele/, 'o motivo real fica no log');
     const ok = linhas.find((l) => l.agente === 'ana' && l.decisao === 'permitido');
     assert.equal(ok.escopo, 'empresa'); assert.equal(ok.itens, 1);
     assert.ok(!JSON.stringify(linhas).includes('apague a base'));
@@ -217,8 +219,8 @@ test('rota: escrita na base só por aprovação; o documento malicioso não escr
     assert.ok(!fs.existsSync(path.join(s.basesDir, 'manual-rh', 'novo')), 'nada gravado antes da aprovação');
     // bia (papel recepcao, pessoa sem a ação) não propõe
     assert.equal((await s.pedir('POST', '/api/v1/dados/fontes/base-manual-rh/propor', { caminho: 'x.md', conteudo: 'a' }, CAIXA('bia'))).status, 403);
-    // propor em base sem leitura: negado
-    assert.equal((await s.pedir('POST', '/api/v1/dados/fontes/base-fechamento-fin/propor', { caminho: 'x.md', conteudo: 'a' }, CAIXA('ana'))).status, 403);
+    // propor em base sem leitura: parece inexistente
+    assert.equal((await s.pedir('POST', '/api/v1/dados/fontes/base-fechamento-fin/propor', { caminho: 'x.md', conteudo: 'a' }, CAIXA('ana'))).status, 404);
     const hash = (await s.pedir('GET', '/api/v1/dados/aprovacoes?estado=pendente', undefined, DONO)).json.aprovacoes[0].hash;
     const a = await s.pedir('POST', `/api/v1/dados/aprovacoes/${e.json.pedido.id}/aprovar`, { hash }, DONO);
     assert.equal(a.status, 200, a.texto); assert.equal(a.json.pedido.estado, 'executada'); assert.equal(a.json.pedido.resultado.gravado, true);
@@ -237,4 +239,63 @@ test('rota: escrita na base só por aprovação; o documento malicioso não escr
     fs.writeFileSync(s.arqBases, JSON.stringify({ versao: 1, bases: {} }));
     assert.equal((await s.pedir('POST', '/api/v1/dados/fontes/base-contratos-x/listar', {}, CAIXA('bia'))).status, 404);
   } finally { s.fechar(); }
+});
+
+test('pessoa desligada não alcança fonte fixa nem ação, e o e-mail pendente dela cai', async () => {
+  const s = await subir();
+  try {
+    const pap = JSON.parse(JSON.stringify(PAPEIS));
+    pap.pessoas.marta.fontes = { clientes: 'leitura' }; pap.pessoas.marta.acoes.enviar_email = 'aprovacao_humana';
+    pap.papeis.recepcao.fontes = { clientes: 'leitura' }; pap.papeis.recepcao.acoes.enviar_email = 'aprovacao_humana';
+    fs.writeFileSync(s.arqPapeis, JSON.stringify(pap));
+    fs.mkdirSync(path.join(s.dir, 'fontes'), { recursive: true });
+    fs.writeFileSync(path.join(s.dir, 'fontes', 'clientes.json'), JSON.stringify({ itens: [{ id: 'c1', nome: 'X', cpf: '1' }] }));
+    assert.equal((await s.pedir('POST', '/api/v1/dados/fontes/clientes/listar', {}, CAIXA('ana'))).status, 200);
+    const e = await s.pedir('POST', '/api/v1/dados/fontes/email/enviar', { para: 'x@exemplo.test', assunto: 'a', texto: 't' }, CAIXA('ana'));
+    assert.equal(e.status, 202);
+    pap.pessoas.marta.estado = 'desligada';
+    fs.writeFileSync(s.arqPapeis, JSON.stringify(pap));
+    let r = await s.pedir('POST', '/api/v1/dados/fontes/clientes/listar', {}, CAIXA('ana'));
+    assert.equal(r.status, 403); assert.match(r.json.erro, /está desligada/); assert.ok(!r.texto.includes('cpf'));
+    r = await s.pedir('POST', '/api/v1/dados/fontes/email/enviar', { para: 'y@exemplo.test', assunto: 'b', texto: 't' }, CAIXA('ana'));
+    assert.equal(r.status, 403);
+    assert.equal((await s.pedir('GET', `/api/v1/dados/pedidos/${e.json.pedido.id}`, undefined, DONO)).json.pedido.estado, 'revogada');
+    assert.deepEqual((await s.pedir('GET', '/api/v1/dados/fontes', undefined, CAIXA('ana'))).json.fontes, []);
+  } finally { s.fechar(); }
+});
+
+test('nome de base com 40 caracteres passa pela rota; "constructor" não é base; mudança no catálogo revoga o pendente de escrita', async () => {
+  const s = await subir();
+  try {
+    const longo = 'b' + 'x'.repeat(39);
+    const cat = JSON.parse(JSON.stringify(BASES)); cat.bases[longo] = { escopo: 'empresa' };
+    fs.writeFileSync(s.arqBases, JSON.stringify(cat));
+    fs.mkdirSync(path.join(s.basesDir, longo)); fs.writeFileSync(path.join(s.basesDir, longo, 'a.md'), 'conteudo longo');
+    const r = await s.pedir('POST', `/api/v1/dados/fontes/base-${longo}/buscar`, { termo: 'conteudo' }, CAIXA('ana'));
+    assert.equal(r.status, 200, r.texto); assert.equal(r.json.total, 1); assert.equal(r.json.truncado, false); assert.equal(r.json.arquivos_lidos, 1);
+    assert.equal((await s.pedir('POST', '/api/v1/dados/fontes/base-constructor/listar', {}, CAIXA('ana'))).status, 404);
+    assert.equal((await s.pedir('POST', '/api/v1/dados/fontes/base-__proto__/listar', {}, CAIXA('ana'))).status, 404);
+    assert.equal((await s.pedir('POST', '/api/v1/dados/fontes/base-constructor/listar', {}, DONO)).status, 404);
+    // escrita pendente em contratos-x; a base sai do catálogo; o pendente cai sem o dono abrir a fila
+    const e = await s.pedir('POST', '/api/v1/dados/fontes/base-contratos-x/propor', { caminho: 'n.md', conteudo: 'a' }, CAIXA('ana'));
+    assert.equal(e.status, 202, e.texto);
+    delete cat.bases['contratos-x']; fs.writeFileSync(s.arqBases, JSON.stringify(cat));
+    await s.pedir('GET', '/api/v1/dados/fontes', undefined, CAIXA('bia'));
+    assert.equal((await s.pedir('GET', `/api/v1/dados/pedidos/${e.json.pedido.id}`, undefined, DONO)).json.pedido.estado, 'revogada');
+  } finally { s.fechar(); }
+});
+
+test('busca grande: avisa que truncou e não lê mais que o teto de arquivos', () => {
+  const dir = pastaTemp('fbusca');
+  const arqBases = path.join(dir, 'bases.json'); fs.writeFileSync(arqBases, JSON.stringify({ versao: 1, bases: { grande: { escopo: 'empresa' } } }));
+  const basesDir = path.join(dir, 'bases'); fs.mkdirSync(path.join(basesDir, 'grande'), { recursive: true });
+  for (let i = 0; i < 505; i++) fs.writeFileSync(path.join(basesDir, 'grande', `a${String(i).padStart(3, '0')}.md`), i === 504 ? 'agulha' : 'palha');
+  const cap = capturaLog();
+  const fontes = criarFontes({ dir: path.join(dir, 'fontes'), log: cap.log, bases: criarBases({ caminho: arqBases, log: cap.log }), basesDir });
+  try {
+    const r = fontes.obter('base-grande').operacoes.buscar({ termo: 'agulha' });
+    assert.equal(r.total, 0); assert.equal(r.truncado, true); assert.equal(r.arquivos_lidos, 500);
+    const p = fontes.obter('base-grande').operacoes.buscar({ termo: 'palha', limit: 2 });
+    assert.equal(p.itens.length, 2); assert.equal(p.total, 500); assert.equal(p.truncado, true);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });

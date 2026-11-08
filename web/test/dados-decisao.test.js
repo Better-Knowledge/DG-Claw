@@ -90,3 +90,18 @@ test('o slug que decide é o recebido, nunca algo dentro da entrada que pareça 
   const r = decidir({ estado: ESTADO, slug: 'bia', agente: 'ana', dono: 'marta', fonte: 'clientes', operacao: 'listar' });
   assert.equal(r.pessoa, 'caio'); assert.deepEqual(r.campos, ['email']);
 });
+
+test('pessoa desligada é negada em fonte e em ação; nomes do protótipo não viram agente, fonte nem ação', () => {
+  const pol = JSON.parse(JSON.stringify(POLITICA));
+  pol.pessoas.marta.estado = 'desligada';
+  const est = { ok: true, politica: pol };
+  let r = decidir({ estado: est, slug: 'ana', fonte: 'agenda', operacao: 'listar' });
+  assert.equal(r.decisao, 'negado'); assert.match(r.motivo, /marta está desligada/);
+  r = decidir({ estado: est, slug: 'ana', fonte: 'email', operacao: 'enviar', acao: 'enviar_email' });
+  assert.equal(r.decisao, 'negado'); assert.match(r.motivo, /desligada/);
+  for (const nome of ['constructor', '__proto__', 'toString', 'hasOwnProperty']) {
+    assert.equal(decidir({ estado: ESTADO, slug: nome, fonte: 'agenda', operacao: 'listar' }).decisao, 'negado', `agente ${nome}`);
+    assert.equal(decidir({ estado: ESTADO, slug: 'ana', fonte: nome, operacao: 'listar' }).decisao, 'negado', `fonte ${nome}`);
+    assert.equal(decidir({ estado: ESTADO, slug: 'ana', fonte: 'email', operacao: 'x', acao: nome }).decisao, 'negado', `ação ${nome}`);
+  }
+});

@@ -1936,12 +1936,20 @@ base_criar() {
         case "$classif" in publico|interno|pessoal|sensivel) ;; *) falha "a classificacao '$classif' nao existe." "use publico, interno, pessoal ou sensivel" ;; esac
     fi
     if [ -n "$retencao" ]; then
-        [[ "$retencao" =~ ^[0-9]{1,5}$ ]] || falha "a retencao precisa ser um numero de dias (0 = sem prazo)." "exemplo: --retencao 365"
+        [[ "$retencao" =~ ^[0-9]{1,5}$ ]] && [ "$retencao" -le 36500 ] || falha "a retencao precisa ser um numero de dias de 0 (sem prazo) a 36500." "exemplo: --retencao 365"
     fi
-    [ "${#titulo}" -le 120 ] || falha "o titulo (--nome) passa de 120 caracteres." "encurte o titulo"
-    [ "${#dono}" -le 80 ] || falha "o dono passa de 80 caracteres." "encurte o texto de --dono"
-    [ "${#finalidade}" -le 300 ] || falha "a finalidade passa de 300 caracteres." "encurte o texto de --finalidade"
-    exigir_ferramentas jq
+    # Mesmas regras do Web (web/lib/bases.js): sem caractere de controle, sem texto so de espacos, teto em bytes.
+    local campo valor
+    for campo in titulo dono finalidade; do
+        valor="${!campo}"
+        [ -z "$valor" ] && continue
+        [[ "$valor" =~ [[:cntrl:]] ]] && falha "o texto de --${campo/titulo/nome} tem caractere de controle (tab, por exemplo), que o catalogo recusa." "escreva o texto numa linha so, sem tab"
+        [[ "$valor" =~ [^[:space:]] ]] || falha "o texto de --${campo/titulo/nome} esta vazio (so espacos)." "escreva um texto ou tire a opcao"
+    done
+    [ "$(printf '%s' "$titulo" | wc -c)" -le 120 ] || falha "o titulo (--nome) passa de 120 bytes." "encurte o titulo"
+    [ "$(printf '%s' "$dono" | wc -c)" -le 80 ] || falha "o dono passa de 80 bytes." "encurte o texto de --dono"
+    [ "$(printf '%s' "$finalidade" | wc -c)" -le 300 ] || falha "a finalidade passa de 300 bytes." "encurte o texto de --finalidade"
+    exigir_ferramentas jq node
     local obj
     obj="$(jq -nc --arg e "$escopo" --arg g "$grupo" --arg p "$pessoa" --arg t "$titulo" --arg d "$dono" --arg c "$classif" --arg f "$finalidade" --arg r "$retencao" '
         {escopo: $e}
@@ -1959,6 +1967,15 @@ base_criar() {
     bases_garantir_arquivo
     local existia=0
     [ -z "$(bases_obter "$nome")" ] || existia=1
+    # Ultima defesa: o catalogo que resultaria e validado pelo MESMO codigo que o Web usa. Um catalogo
+    # invalido fecha todas as bases, entao nada e gravado se ele nao passar.
+    local novo erro_val
+    novo="$(bases_ler | jq -c --arg n "$nome" --argjson o "$obj" '.bases[$n] = $o')"
+    erro_val="$(printf '%s' "$novo" | node -e '
+        const { validaBases } = require(process.argv[1]);
+        let t = ""; process.stdin.on("data", (c) => { t += c; }).on("end", () => {
+          const r = validaBases(JSON.parse(t)); if (!r.ok) { process.stdout.write(r.erros.join(" ")); process.exit(1); } });' "$APP_DIR/web/lib/bases.js" 2>&1)" \
+        || falha "o catalogo recusou a base $nome: $erro_val" "corrija a opcao citada e rode de novo; nada foi gravado"
     bases_registrar "$nome" "$obj"
     mkdir -p "$DG_BASES_DIR/$nome" && chmod 700 "$DG_BASES_DIR/$nome"
     if [ "$existia" = 1 ]; then ok "base $nome atualizada no catalogo (a pasta e os arquivos ficaram como estavam)"

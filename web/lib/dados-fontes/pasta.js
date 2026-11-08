@@ -64,8 +64,17 @@ function fontePasta({ dir, nome, log, catalogo }) {
     }
   }
 
+  /** Para quem compõe esta fonte (a base): até `max` arquivos, sem passar pelo teto de `limit` da operação. */
+  function listarTodos(max) {
+    const base = raizReal();
+    if (!base) return [];
+    const todos = [];
+    listaRecursiva(base, '', todos);
+    return todos.slice(0, max);
+  }
+
   return {
-    nome, catalogo,
+    nome, catalogo, listarTodos,
     campos: ['caminho', 'tamanho', 'modificado_em', 'conteudo'],
     operacoes: {
       listar(q) {

@@ -39,9 +39,17 @@ nega "grupo invalido recusado" dgclaw base criar x --escopo "grupo:Projeto X"
 nega "classificacao invalida recusada" dgclaw base criar x --escopo empresa --classificacao ultra
 nega "retencao nao numerica recusada" dgclaw base criar x --escopo empresa --retencao muito
 nega "opcao desconhecida recusada" dgclaw base criar x --escopo empresa --cor azul
+nega "retencao acima de 36500 recusada (o Web recusaria o catalogo inteiro)" dgclaw base criar x --escopo empresa --retencao 99999
+nega "titulo com tab recusado" dgclaw base criar x --escopo empresa --nome $'a\tb'
+nega "titulo so de espacos recusado" dgclaw base criar x --escopo empresa --nome "   "
+nega "titulo de 121 bytes recusado" dgclaw base criar x --escopo empresa --nome "$(printf 'a%.0s' $(seq 1 121))"
+nega "finalidade com caractere de controle recusada" dgclaw base criar x --escopo empresa --finalidade $'ok\x01'
 igual "nada disso entrou no catalogo" "3" "$(jq '.bases | length' "$CAT")"
 dgclaw base criar "a;b" --escopo empresa >"$TMP/o.txt" 2>&1
 afirma "a recusa diz o que fazer" grep -q "exemplo: manual-rh" "$TMP/o.txt"
+
+echo "o catalogo gravado passa no validador do Web"
+afirma "validaBases aceita o catalogo da CLI" node -e "const {validaBases}=require('$REPO/web/lib/bases.js'); const r=validaBases(JSON.parse(require('fs').readFileSync('$CAT','utf8'))); if(!r.ok){console.error(r.erros);process.exit(1)}"
 
 echo "listar"
 igual "listar --json devolve 3" "3" "$(dgclaw base listar --json | jq length)"

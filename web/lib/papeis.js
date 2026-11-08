@@ -250,7 +250,7 @@ function criarPapeis({ caminho, log }) {
   return {
     estado() { recarrega(); return estado; },
     /** { pessoa, papel } do agente, ou null se não está no arquivo (ou se o arquivo está inválido). */
-    deAgente(slug) { recarrega(); return estado.ok ? estado.politica.agentes[slug] || null : null; },
+    deAgente(slug) { recarrega(); return estado.ok && Object.prototype.hasOwnProperty.call(estado.politica.agentes, slug) ? estado.politica.agentes[slug] : null; },
   };
 }
 

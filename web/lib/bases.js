@@ -117,7 +117,7 @@ function criarBases({ caminho, log }) {
 
   return {
     estado() { recarrega(); return estado; },
-    obter(nome) { recarrega(); return estado.ok ? estado.bases[nome] || null : null; },
+    obter(nome) { recarrega(); return estado.ok && Object.prototype.hasOwnProperty.call(estado.bases, nome) ? estado.bases[nome] : null; },
   };
 }
 

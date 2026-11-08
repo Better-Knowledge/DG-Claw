@@ -230,7 +230,7 @@ test('critério 7: agente revogado deixa de acessar na hora, os pendentes dele c
     const r = await s.pedir('POST', '/api/v1/dados/fontes/agenda/listar', {}, CAIXA('ana'));
     assert.equal(r.status, 403); assert.match(r.json.erro, /não está no arquivo de papéis/);
     // a mudança dos papéis já revogou os pendentes dela no primeiro pedido que chegou, antes de o dono abrir a fila
-    assert.match(s.cap.texto(), /os papéis mudaram e 2 pedido\(s\) de aprovação pendente\(s\) foram revogados/);
+    assert.match(s.cap.texto(), /mudaram e 2 pedido\(s\) de aprovação pendente\(s\) foram revogados/);
     assert.equal((await s.pedir('GET', `/api/v1/dados/pedidos/${id}`, undefined, DONO)).json.pedido.estado, 'revogada');
     assert.equal((await s.pedir('GET', `/api/v1/dados/pedidos/${e2.json.pedido.id}`, undefined, DONO)).json.pedido.estado, 'revogada');
     // aprovar o pendente antigo é recusado
