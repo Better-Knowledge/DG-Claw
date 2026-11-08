@@ -1,10 +1,10 @@
 /* dados.css: a tela /dados (aprovações de ações, papéis e log de acesso). Reaproveita a base lp- de lembretes.css. */
 .dp-pedido{border:1px solid var(--lp-linha);border-radius:12px;padding:12px;margin-bottom:10px;background:#fffdf5}
-.dp-pedido h3{font-size:15.5px;margin:0 0 6px;overflow-wrap:anywhere}
-.dp-pedido .dp-meta{color:var(--lp-fraco);font-size:13px;margin:0 0 8px;overflow-wrap:anywhere}
+.dp-pedido h3{font-size:15.5px;margin:0 0 6px;overflow-wrap:anywhere;unicode-bidi:plaintext}
+.dp-pedido .dp-meta{color:var(--lp-fraco);font-size:13px;margin:0 0 8px;overflow-wrap:anywhere;unicode-bidi:plaintext}
 .dp-pedido dl{margin:0 0 10px;display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:14px}
 .dp-pedido dt{color:var(--lp-fraco)}
-.dp-pedido dd{margin:0;overflow-wrap:anywhere;white-space:pre-wrap;max-height:260px;overflow:auto}
+.dp-pedido dd{margin:0;overflow-wrap:anywhere;white-space:pre-wrap;max-height:260px;overflow:auto;unicode-bidi:plaintext}
 .dp-pedido .dp-hash{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--lp-fraco);overflow-wrap:anywhere}
 .dp-acoes{display:flex;gap:8px;flex-wrap:wrap}
 .dp-aprovar{background:var(--lp-acento)!important;border-color:var(--lp-acento)!important;color:#fff!important}

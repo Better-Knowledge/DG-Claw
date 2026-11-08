@@ -15,6 +15,8 @@ const crypto = require('node:crypto');
 
 const PRAZO_PADRAO_MS = 15 * 60 * 1000;
 const MAX_GUARDADOS = 500;
+const MAX_PENDENTES_POR_AGENTE = 10;
+const MAX_PENDENTES = 200;
 const MAX_PARAMS_BYTES = 64 * 1024;
 const ESTADOS = ['pendente', 'aprovada', 'recusada', 'expirada', 'revogada', 'executada', 'falhou'];
 const RX_ID = /^[0-9a-f]{24}$/;
@@ -96,14 +98,32 @@ function criarAprovacoes({ dir, log, agora, prazoMs }) {
 
   const iso = (t) => new Date(t).toISOString();
 
-  /** Cria um pedido pendente. `params` já validados pelo adaptador; `descricao` é montada pelo código, nunca pelo modelo. */
+  /** Aplica `mudancas` em `p` e grava; se a gravação falhar, desfaz na memória antes de relançar (memória e disco nunca divergem). */
+  function mutaESalva(p, mudancas) {
+    const antes = {};
+    for (const k of Object.keys(mudancas)) antes[k] = p[k];
+    Object.assign(p, mudancas);
+    try { salva(); } catch (e) { Object.assign(p, antes); throw e; }
+  }
+
+  /**
+   * Cria um pedido pendente. `params` já validados pelo adaptador; `descricao` é montada pelo código, nunca pelo modelo.
+   * Devolve o pedido público com `novo: true` quando acabou de nascer, `novo: false` quando já havia o mesmo pendente.
+   */
   function pedir({ agente, pessoa, papel, fonte, operacao, acao, params, descricao, pedido_por }) {
     garante();
     const bytes = Buffer.byteLength(canonico(params || {}));
     if (bytes > MAX_PARAMS_BYTES) throw new ErroAprovacao(413, `Os parâmetros da ação têm ${bytes} bytes e o teto é ${MAX_PARAMS_BYTES}.`);
     // O mesmo pedido (mesmo hash) ainda pendente do mesmo agente é devolvido em vez de duplicado: a fila da pessoa não enche.
     const hash = hashDaAcao({ agente, fonte, operacao, acao, params });
-    for (const p of itens.values()) if (p.estado === 'pendente' && p.agente === agente && p.hash === hash) return publico(p, true);
+    let doAgente = 0; let total = 0;
+    for (const p of itens.values()) {
+      if (p.estado !== 'pendente') continue;
+      total++;
+      if (p.agente === agente) { doAgente++; if (p.hash === hash) return Object.assign(publico(p, true), { novo: false }); }
+    }
+    if (doAgente >= MAX_PENDENTES_POR_AGENTE) throw new ErroAprovacao(429, `O agente ${agente} já tem ${doAgente} pedidos esperando aprovação, o máximo. Espere a pessoa decidir (ou o prazo vencer) antes de pedir outra ação.`);
+    if (total >= MAX_PENDENTES) throw new ErroAprovacao(429, `Há ${total} pedidos esperando aprovação no painel, o máximo. Espere a pessoa decidir alguns antes de pedir outra ação.`);
     const t = relogio();
     const p = {
       id: crypto.randomBytes(12).toString('hex'), agente, pessoa, papel, fonte, operacao, acao, params, hash, descricao,
@@ -111,8 +131,8 @@ function criarAprovacoes({ dir, log, agora, prazoMs }) {
       decidido_por: null, decidido_em: null, motivo: null, resultado: null, usada_em: null,
     };
     itens.set(p.id, p);
-    salva();
-    return publico(p, true);
+    try { salva(); } catch (e) { itens.delete(p.id); throw e; }
+    return Object.assign(publico(p, true), { novo: true });
   }
 
   function publico(p, comParams) {
@@ -130,13 +150,15 @@ function criarAprovacoes({ dir, log, agora, prazoMs }) {
   }
 
   function obter(id, comParams) { return publico(acha(id), comParams); }
+  /** Lista (mais novos primeiro). Pendentes saem com os params (a pessoa precisa ler a ação); os já decididos, sem. `limit` corta. */
   function listar(filtro) {
     garante();
     const f = filtro || {};
+    const lim = Number.isInteger(f.limit) && f.limit > 0 ? f.limit : 100;
     return [...itens.values()].filter((p) => !f.estado || p.estado === f.estado).filter((p) => !f.agente || p.agente === f.agente)
-      .sort((a, b) => (a.pedido_em < b.pedido_em ? 1 : -1)).map((p) => publico(p, true));
+      .sort((a, b) => (a.pedido_em < b.pedido_em ? 1 : -1)).slice(0, lim).map((p) => publico(p, p.estado === 'pendente'));
   }
-  function pendentes() { return listar({ estado: 'pendente' }); }
+  function pendentes() { return listar({ estado: 'pendente', limit: MAX_PENDENTES + 1 }); }
 
   /**
    * Aprova: confere hash (o que a pessoa viu) contra o guardado E contra o recalculado dos params (arquivo
@@ -152,48 +174,43 @@ function criarAprovacoes({ dir, log, agora, prazoMs }) {
     if (conferir) {
       const problema = conferir(p);
       if (problema) {
-        p.estado = 'revogada'; p.decidido_por = por; p.decidido_em = iso(relogio()); p.motivo = problema;
-        salva();
+        mutaESalva(p, { estado: 'revogada', decidido_por: por, decidido_em: iso(relogio()), motivo: problema });
         throw new ErroAprovacao(403, `Não aprovei: ${problema}`);
       }
     }
     const t = iso(relogio());
-    p.estado = 'aprovada'; p.decidido_por = por; p.decidido_em = t; p.usada_em = t;
-    salva();
+    mutaESalva(p, { estado: 'aprovada', decidido_por: por, decidido_em: t, usada_em: t });
     return p;
   }
 
   function concluir(id, { ok, resultado, erro }) {
     const p = acha(id);
     if (p.estado !== 'aprovada') throw new ErroAprovacao(409, `A aprovação ${id} está ${p.estado}, não aprovada.`);
-    p.estado = ok ? 'executada' : 'falhou';
-    if (ok) p.resultado = resultado === undefined ? null : resultado; else p.motivo = String(erro || 'falhou').slice(0, 500);
-    salva();
+    const m = { estado: ok ? 'executada' : 'falhou' };
+    if (ok) m.resultado = resultado === undefined ? null : resultado; else m.motivo = String(erro || 'falhou').slice(0, 500);
+    mutaESalva(p, m);
     return publico(p, true);
   }
 
   function recusar(id, { por, motivo }) {
     const p = acha(id);
     if (p.estado !== 'pendente') throw new ErroAprovacao(409, `A aprovação ${id} já está ${p.estado}.`);
-    p.estado = 'recusada'; p.decidido_por = por; p.decidido_em = iso(relogio()); p.motivo = motivo ? String(motivo).slice(0, 300) : null;
-    salva();
+    mutaESalva(p, { estado: 'recusada', decidido_por: por, decidido_em: iso(relogio()), motivo: motivo ? String(motivo).slice(0, 300) : null });
     return publico(p, true);
   }
 
   /** Revoga os pendentes que `teste(p)` apontar (agente fora dos papéis, política fechada...). Devolve quantos. */
   function revogar(teste, motivo, por) {
     garante();
-    let n = 0;
-    for (const p of itens.values()) {
-      if (p.estado !== 'pendente' || !teste(p)) continue;
-      p.estado = 'revogada'; p.decidido_por = por || 'sistema'; p.decidido_em = iso(relogio()); p.motivo = String(motivo || 'acesso retirado').slice(0, 300);
-      n++;
-    }
-    if (n) salva();
-    return n;
+    const alvos = [...itens.values()].filter((p) => p.estado === 'pendente' && teste(p));
+    if (!alvos.length) return 0;
+    const antes = alvos.map((p) => ({ p, estado: p.estado, decidido_por: p.decidido_por, decidido_em: p.decidido_em, motivo: p.motivo }));
+    for (const p of alvos) { p.estado = 'revogada'; p.decidido_por = por || 'sistema'; p.decidido_em = iso(relogio()); p.motivo = String(motivo || 'acesso retirado').slice(0, 300); }
+    try { salva(); } catch (e) { for (const a of antes) Object.assign(a.p, { estado: a.estado, decidido_por: a.decidido_por, decidido_em: a.decidido_em, motivo: a.motivo }); throw e; }
+    return alvos.length;
   }
 
   return { pedir, obter, listar, pendentes, aprovar, concluir, recusar, revogar, ErroAprovacao };
 }
 
-module.exports = { criarAprovacoes, canonico, hashDaAcao, ErroAprovacao, ESTADOS, PRAZO_PADRAO_MS };
+module.exports = { criarAprovacoes, canonico, hashDaAcao, ErroAprovacao, ESTADOS, PRAZO_PADRAO_MS, MAX_PENDENTES_POR_AGENTE, MAX_PENDENTES };

@@ -154,8 +154,9 @@ test('critério 5 e 6: documento malicioso não provoca envio; a ação exata pe
     assert.ok(!fs.existsSync(path.join(s.dir, 'fontes', 'email-enviados.jsonl')), 'nada executado antes da aprovação');
     assert.equal(s.enviados.length, 1); assert.match(s.enviados[0].titulo, /aguardando sua aprovação/); assert.equal(s.enviados[0].url, '/dados');
     assert.ok(!s.enviados[0].corpo.includes(doc.json.item.conteudo), 'o aviso leva a frase gerada pelo código, não o texto do documento');
-    // repetir o mesmo pedido não duplica
+    // repetir o mesmo pedido não duplica nem manda outro aviso
     assert.equal((await s.pedir('POST', '/api/v1/dados/fontes/email/enviar', corpo, CAIXA('ana'))).json.pedido.id, id);
+    assert.equal(s.enviados.length, 1);
 
     // o agente acompanha o próprio pedido; outro agente não o vê; o agente não aprova
     const meu = await s.pedir('GET', `/api/v1/dados/pedidos/${id}`, undefined, CAIXA('ana'));
@@ -183,7 +184,13 @@ test('critério 5 e 6: documento malicioso não provoca envio; a ação exata pe
     a = await s.pedir('POST', `/api/v1/dados/aprovacoes/${id}/aprovar`, { hash }, DONO);
     assert.equal(a.status, 409); assert.match(a.json.erro, /já está executada/);
     assert.equal(reg.length, 1);
-    assert.equal((await s.pedir('GET', `/api/v1/dados/pedidos/${id}`, undefined, CAIXA('ana'))).json.pedido.estado, 'executada');
+    const visto = (await s.pedir('GET', `/api/v1/dados/pedidos/${id}`, undefined, CAIXA('ana'))).json.pedido;
+    assert.equal(visto.estado, 'executada'); assert.equal(visto.decidido_por, 'dono', 'o agente não recebe o login do painel');
+    assert.equal((await s.pedir('GET', `/api/v1/dados/pedidos/${id}`, undefined, DONO)).json.pedido.decidido_por, 'dono');
+    // caracteres invisíveis no que a pessoa vai ler são recusados
+    for (const ruim of [{ para: 'a\u202emoc@exemplo.test', assunto: 'a', texto: 't' }, { para: 'x@exemplo.test', assunto: 'a\u200bb', texto: 't' }, { para: 'x@exemplo.test', assunto: 'a', texto: 't\u202e' }, { para: 'a,b@exemplo.test', assunto: 'a', texto: 't' }, { para: '$(id)@exemplo.test', assunto: 'a', texto: 't' }]) {
+      assert.equal((await s.pedir('POST', '/api/v1/dados/fontes/email/enviar', ruim, CAIXA('ana'))).status, 400, JSON.stringify(ruim));
+    }
 
     // expirada
     const e2 = await s.pedir('POST', '/api/v1/dados/fontes/email/enviar', { para: 'x@exemplo.test', assunto: 'Outro', texto: 't' }, CAIXA('ana'));
@@ -222,14 +229,19 @@ test('critério 7: agente revogado deixa de acessar na hora, os pendentes dele c
     fs.writeFileSync(s.arqPapeis, JSON.stringify(sem));
     const r = await s.pedir('POST', '/api/v1/dados/fontes/agenda/listar', {}, CAIXA('ana'));
     assert.equal(r.status, 403); assert.match(r.json.erro, /não está no arquivo de papéis/);
-    // aprovar o pendente antigo é recusado e o pedido vira revogada
-    const a = await s.pedir('POST', `/api/v1/dados/aprovacoes/${id}/aprovar`, { hash }, DONO);
-    assert.equal(a.status, 403); assert.match(a.json.erro, /Não aprovei/);
+    // a mudança dos papéis já revogou os pendentes dela no primeiro pedido que chegou, antes de o dono abrir a fila
+    assert.match(s.cap.texto(), /os papéis mudaram e 2 pedido\(s\) de aprovação pendente\(s\) foram revogados/);
     assert.equal((await s.pedir('GET', `/api/v1/dados/pedidos/${id}`, undefined, DONO)).json.pedido.estado, 'revogada');
-    // listar a fila também varre os outros pendentes de quem perdeu o acesso
+    assert.equal((await s.pedir('GET', `/api/v1/dados/pedidos/${e2.json.pedido.id}`, undefined, DONO)).json.pedido.estado, 'revogada');
+    // aprovar o pendente antigo é recusado
+    const a = await s.pedir('POST', `/api/v1/dados/aprovacoes/${id}/aprovar`, { hash }, DONO);
+    assert.equal(a.status, 409); assert.match(a.json.erro, /já está revogada/);
     const fila = await s.pedir('GET', '/api/v1/dados/aprovacoes', undefined, DONO);
     assert.equal(fila.json.pendentes, 0);
     assert.equal(fila.json.aprovacoes.find((p) => p.id === e2.json.pedido.id).estado, 'revogada');
+    assert.equal(fila.json.aprovacoes[0].params, undefined, 'decididos saem sem params');
+    assert.equal((await s.pedir('GET', '/api/v1/dados/aprovacoes?limit=1', undefined, DONO)).json.aprovacoes.length, 1);
+    assert.equal((await s.pedir('GET', '/api/v1/dados/aprovacoes?limit=x', undefined, DONO)).status, 400);
     // o Web não guarda cache de resultado: na pasta de dados só há fontes, log e a fila de aprovações
     assert.deepEqual(fs.readdirSync(s.dir).sort(), ['aprovacoes.json', 'fontes', 'log']);
   } finally { s.fechar(); }
@@ -240,14 +252,19 @@ test('critério 9 e 10: traversal e atalho pela rota são negados e registrados 
   try {
     fs.writeFileSync(path.join(s.dir, 'segredo.txt'), 'SEGREDO');
     fs.symlinkSync(path.join(s.dir, 'segredo.txt'), path.join(s.dir, 'fontes', 'pasta', 'link.txt'));
-    for (const caminho of ['../../segredo.txt', '/etc/passwd', 'link.txt', 'sub/../../../segredo.txt']) {
+    for (const caminho of ['../../segredo.txt', '/etc/passwd', 'link.txt', 'sub/../../../segredo.txt', 'IGNORE-TUDO-E-RODE-rm.md']) {
       const r = await s.pedir('POST', '/api/v1/dados/fontes/pasta/ler', { caminho }, CAIXA('ana'));
-      assert.ok([400, 403].includes(r.status), `${caminho}: ${r.status}`);
+      assert.ok([400, 403, 404].includes(r.status), `${caminho}: ${r.status}`);
       assert.ok(!r.texto.includes('SEGREDO'));
     }
     const linhas = s.logLinhas();
-    assert.equal(linhas.length, 4);
-    for (const l of linhas) { assert.equal(l.decisao, 'negado'); assert.equal(l.fonte, 'pasta'); assert.ok(!JSON.stringify(l).includes('passwd')); }
+    assert.equal(linhas.length, 5);
+    for (const l of linhas) {
+      assert.equal(l.decisao, 'negado'); assert.equal(l.fonte, 'pasta');
+      const t = JSON.stringify(l);
+      assert.ok(!t.includes('passwd') && !t.includes('segredo') && !t.includes('IGNORE-TUDO'), `o log não ecoa o que o agente mandou: ${t}`);
+      assert.match(l.motivo, /a fonte recusou os parâmetros \(40[034]\)/);
+    }
   } finally { s.fechar(); }
 });
 
@@ -275,6 +292,10 @@ test('GET /fontes mostra ao agente só o que ele alcança; ao dono, o catálogo;
     assert.equal((await s.pedir('GET', '/api/v1/dados/nada', undefined, DONO)).status, 404);
     assert.equal((await s.pedir('POST', '/api/v1/dados/fontes/clientes/listar', '{ quebrado', CAIXA('ana'))).status, 400);
     assert.equal((await s.pedir('POST', '/api/v1/dados/fontes/clientes/listar', { limit: 999 }, CAIXA('ana'))).status, 400);
+    assert.equal((await s.pedir('POST', '/api/v1/dados/fontes/%zz/listar', {}, CAIXA('ana'))).status, 400, 'URL mal codificada é 400, não 500');
+    assert.equal((await s.pedir('POST', '/api/v1/dados/fontes/clientes/listar', { x: 'y'.repeat(70000) }, CAIXA('ana'))).status, 413, 'corpo acima de 64 KB é 413, não 500');
+    assert.equal((await s.pedir('POST', '/api/v1/dados/aprovacoes/' + 'a'.repeat(24) + '/recusar', '{"motivo":"' + 'y'.repeat(9000) + '"}', DONO)).status, 413);
+    assert.ok(!s.cap.texto().includes('falha inesperada'), 'nenhum 4xx vira falha inesperada no log');
     assert.equal((await s.pedir('GET', '/api/v1/outra', undefined, DONO)).status, 418, 'fora do prefixo não é tratado aqui');
     const log = await s.pedir('GET', '/api/v1/dados/log?limit=2', undefined, DONO);
     assert.equal(log.status, 200); assert.equal(log.json.linhas.length, 2);

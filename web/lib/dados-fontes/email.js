@@ -5,9 +5,9 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { ErroFonte, soChaves } = require('./json');
+const { ErroFonte, soChaves, semInvisivel } = require('./json');
 
-const RX_EMAIL = /^[^\s@<>"']{1,100}@[A-Za-z0-9.-]{1,150}\.[A-Za-z]{2,24}$/;
+const RX_EMAIL = /^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*\.[A-Za-z]{2,24}$/;
 const MAX_ASSUNTO = 200;
 const MAX_TEXTO = 10000;
 
@@ -23,9 +23,10 @@ function fonteEmail({ dir, nome, agora, catalogo }) {
         /** Valida e devolve só os campos aceitos, limpos. É isto que vai para a aprovação e para o hash. */
         validar(p) {
           soChaves(p || {}, ['para', 'assunto', 'texto'], `enviar em ${nome}`);
-          if (typeof p.para !== 'string' || !RX_EMAIL.test(p.para)) throw new ErroFonte(400, '"para" é obrigatório: um endereço de e-mail válido.');
+          if (typeof p.para !== 'string' || !RX_EMAIL.test(p.para)) throw new ErroFonte(400, '"para" é obrigatório: um único endereço de e-mail simples (letras, números, . _ % + - antes do @, domínio depois), sem vírgula, ponto e vírgula ou outro caractere.');
           if (typeof p.assunto !== 'string' || !p.assunto.trim() || p.assunto.length > MAX_ASSUNTO || /[\r\n]/.test(p.assunto)) throw new ErroFonte(400, `"assunto" é obrigatório: uma linha de até ${MAX_ASSUNTO} caracteres.`);
           if (typeof p.texto !== 'string' || !p.texto.trim() || p.texto.length > MAX_TEXTO) throw new ErroFonte(400, `"texto" é obrigatório, com até ${MAX_TEXTO} caracteres.`);
+          semInvisivel(p.assunto, '"assunto"'); semInvisivel(p.texto, '"texto"');
           return { para: p.para, assunto: p.assunto.trim(), texto: p.texto };
         },
         executar(p, contexto) {

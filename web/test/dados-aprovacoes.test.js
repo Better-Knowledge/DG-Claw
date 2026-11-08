@@ -118,7 +118,43 @@ test('prazo configurável e a lista guarda só os 500 últimos decididos', () =>
       const x = c.a.pedir(Object.assign({}, PEDIDO, { params: { para: 'x@exemplo.test', assunto: 'n' + i, texto: 't' } }));
       c.a.recusar(x.id, { por: 'dono' });
     }
-    assert.equal(c.a.listar({ estado: 'recusada' }).length, 500);
+    assert.equal(c.a.listar({ estado: 'recusada', limit: 500 }).length, 500);
+    assert.equal(c.a.listar({ estado: 'recusada' }).length, 100, 'sem limit, 100');
+    assert.equal(c.a.listar({ estado: 'recusada' })[0].params, undefined, 'decidido sai sem params');
     assert.equal(c.a.obter(p.id).estado, 'pendente', 'pendente nunca é descartado');
+  } finally { c.fim(); }
+});
+
+test('teto de pendentes por agente e global; `novo` diz se o pedido acabou de nascer', () => {
+  const c = cenario();
+  try {
+    assert.equal(c.a.pedir(PEDIDO).novo, true);
+    assert.equal(c.a.pedir(PEDIDO).novo, false);
+    for (let i = 1; i < 10; i++) c.a.pedir(Object.assign({}, PEDIDO, { params: { para: 'x@exemplo.test', assunto: 'n' + i, texto: 't' } }));
+    lanca(() => c.a.pedir(Object.assign({}, PEDIDO, { params: { para: 'x@exemplo.test', assunto: 'n11', texto: 't' } })), 429, /já tem 10 pedidos esperando/);
+    assert.equal(c.a.pedir(PEDIDO).novo, false, 'repetir um pendente ainda funciona com a fila cheia');
+    // global: 20 agentes com 10 cada = 200
+    for (let a = 0; a < 19; a++) for (let i = 0; i < 10; i++) c.a.pedir(Object.assign({}, PEDIDO, { agente: 'ag' + a, params: { para: 'x@exemplo.test', assunto: 'g' + i, texto: 't' } }));
+    assert.equal(c.a.pendentes().length, 200);
+    lanca(() => c.a.pedir(Object.assign({}, PEDIDO, { agente: 'novo', params: { para: 'x@exemplo.test', assunto: 'z', texto: 't' } })), 429, /200 pedidos esperando aprovação no painel/);
+  } finally { c.fim(); }
+});
+
+test('gravação que falha não deixa a memória diferente do disco', () => {
+  const c = cenario();
+  try {
+    const p = c.a.pedir(PEDIDO);
+    // simula disco cheio na troca do temporário pelo arquivo final
+    const original = fs.renameSync;
+    fs.renameSync = () => { throw Object.assign(new Error('no space left on device'), { code: 'ENOSPC' }); };
+    try {
+      lanca(() => c.a.aprovar(p.id, { hash: p.hash, por: 'dono' }), 503, /Não consegui gravar/);
+      lanca(() => c.a.pedir(Object.assign({}, PEDIDO, { params: { para: 'x@exemplo.test', assunto: 'outro', texto: 't' } })), 503);
+    } finally { fs.renameSync = original; }
+    assert.deepEqual(fs.readdirSync(c.dir).filter((n) => n.endsWith('.tmp')), [], 'temporário apagado');
+    // o pedido continua pendente (nem "aprovada" presa, nem o segundo pedido fantasma) e a aprovação funciona agora
+    assert.equal(c.a.obter(p.id).estado, 'pendente');
+    assert.equal(c.a.pendentes().length, 1);
+    assert.equal(c.a.aprovar(p.id, { hash: p.hash, por: 'dono' }).estado, 'aprovada');
   } finally { c.fim(); }
 });
