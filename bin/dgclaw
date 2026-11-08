@@ -25,6 +25,8 @@ APP_DIR="$(cd "$(dirname "$DGCLAW_BIN_REAL")/.." && pwd)"
 . "$APP_DIR/lib/bases.sh"
 # shellcheck source=lib/sistemas.sh
 . "$APP_DIR/lib/sistemas.sh"
+# shellcheck source=lib/skills.sh
+. "$APP_DIR/lib/skills.sh"
 # shellcheck source=lib/backup.sh
 . "$APP_DIR/lib/backup.sh"
 # shellcheck source=lib/atualizar.sh
@@ -124,6 +126,16 @@ Bases de conhecimento (o que os agentes podem ler, por escopo)
   dgclaw base listar [--json]           lista as bases, o escopo e quantos arquivos ha em cada pasta
   dgclaw base remover <nome> [--sim]    tira a base do catalogo; a pasta NAO e apagada: vai para
       /var/lib/dgclaw/bases-aposentadas/<nome>-<data>. Pede confirmacao quando ha terminal.
+
+Skills compartilhadas (por escopo: global, grupo ou agente)
+  dgclaw skill publicar <pasta> --escopo global|grupo:<grupo>|agente:<slug> [--nome <nome>]
+      Copia a pasta da skill (a que tem o SKILL.md) para /var/lib/dgclaw/skills, de onde os agentes a
+      recebem conforme o papel (bloco "skills" em /etc/dgclaw/papeis.json). Recusa atalho, binario e segredo.
+      Exemplo:  sudo dgclaw skill publicar ./fechamento-mensal --escopo grupo:financeiro
+  dgclaw skill listar                   as skills do catalogo, por escopo
+  dgclaw skill remover <nome> --escopo <escopo>   tira do catalogo (a pasta vai para skills-aposentadas)
+  dgclaw skill aplicar [<slug>]         refaz os links em ~/.claude/skills de um agente (ou de todos) pela politica atual
+      Rode depois de publicar, remover ou mudar o bloco "skills" de um papel; vale na proxima sessao do agente.
 
 Sistemas (ferramentas por escopo: API, MCP e banco)
   dgclaw sistema credencial <nome>      guarda a credencial de um sistema (o valor vem SEMPRE pelo STDIN)
@@ -846,6 +858,7 @@ criar_container() {
             --volume "$casa/segredos:/run/dgclaw/segredos:ro"
             --volume "$casa/cofre:/run/dgclaw/cofre:ro"
             --volume "$casa/config:/run/dgclaw/config:ro"
+            --volume "$DG_SKILLS_DIR:/run/dgclaw/skills:ro"
             --network "dgclaw-$C_SLUG"
             --publish "127.0.0.1:$C_PORTA_RUNNER:4300"
             --publish "127.0.0.1:$C_PORTA_PAINEL:8300"
@@ -1013,6 +1026,45 @@ echo "plugin do Telegram instalado"
 DENTRO
 }
 
+# ligar_skills_script <slug>: o trecho que roda dentro do container e deixa em ~/.claude/skills exatamente os
+# links das skills compartilhadas que a politica libera (lib/skills.sh, skills_permitidas). Links antigos para
+# /run/dgclaw/skills que nao estao mais na lista sao removidos; links para a imagem e pastas do proprio agente ficam.
+ligar_skills_script() {
+    local slug="$1" rel lista=""
+    while IFS= read -r rel; do
+        [ -n "$rel" ] || continue
+        [[ "$rel" =~ ^(globais|grupos/[a-z][a-z0-9_-]{0,39}|agentes/[a-z0-9][a-z0-9-]{1,30})/[a-z][a-z0-9-]{0,39}$ ]] || continue
+        lista="$lista $rel"
+    done < <(skills_permitidas "$slug")
+    printf 'set -euo pipefail\nCASA=/home/agente\nmkdir -p "$CASA/.claude/skills"\nPERMITIDAS="%s"\n' "$lista"
+    cat <<'DENTRO'
+for alvo in "$CASA"/.claude/skills/*; do
+    [ -L "$alvo" ] || continue
+    dest="$(readlink "$alvo")"
+    case "$dest" in /run/dgclaw/skills/*) ;; *) continue ;; esac
+    rel="${dest#/run/dgclaw/skills/}"
+    case " $PERMITIDAS " in *" $rel "*) ;; *) rm -f "$alvo"; echo "skill compartilhada retirada: $(basename "$alvo")" ;; esac
+done
+for rel in $PERMITIDAS; do
+    nome="${rel##*/}"
+    alvo="$CASA/.claude/skills/$nome"
+    [ -f "/run/dgclaw/skills/$rel/SKILL.md" ] || { echo "aviso: a skill $rel nao esta montada; sigo sem ela." >&2; continue; }
+    if [ -e "$alvo" ] && [ ! -L "$alvo" ]; then echo "aviso: $alvo ja existe e nao e link; a skill compartilhada $rel nao entra." >&2; continue; fi
+    ln -sfn "/run/dgclaw/skills/$rel" "$alvo"
+    chown -h agente:agente "$alvo"
+done
+echo "skills compartilhadas: $(printf '%s' "$PERMITIDAS" | wc -w | tr -d ' ') ligada(s)"
+DENTRO
+}
+
+# ligar_skills <slug>: roda o trecho acima no container ligado.
+ligar_skills() {
+    local slug="$1" c="dgclaw-$1" rc=0
+    if [ "$ENSAIO" = 1 ]; then info "[ensaio] ligaria em $c as skills compartilhadas: $(skills_permitidas "$slug" | tr '\n' ' ')"; return 0; fi
+    ligar_skills_script "$slug" | podman exec -i "$c" bash -s || rc=$?
+    return "$rc"
+}
+
 instalar_vida() {
     local c="dgclaw-$1"
     if [ "$ENSAIO" = 1 ]; then
@@ -1021,6 +1073,7 @@ instalar_vida() {
     fi
     local rc=0
     vida_script | podman exec -i "$c" bash -s || rc=$?
+    [ "$rc" != 0 ] || ligar_skills "$1" || rc=$?
     if [ "$rc" -ne 0 ]; then
         aviso "a parte de dentro do agente (rotinas, runner, painel) nao terminou (codigo $rc). O agente continua criado. Para refazer so isso: dgclaw agente reparar $1"
         return 1
@@ -2104,6 +2157,76 @@ garantir_mcp_dados() {
     fi
 }
 
+# --- skills compartilhadas ------------------------------------------------------------------
+
+skill_publicar() {
+    [ $# -ge 1 ] || falha "faltou a pasta da skill." "exemplo: sudo dgclaw skill publicar ./fechamento-mensal --escopo grupo:financeiro"
+    local origem="$1"; shift
+    local escopo="" nome=""
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --escopo) [ $# -ge 2 ] || falha "a opcao --escopo precisa de um valor." "use --escopo global, grupo:<grupo> ou agente:<slug>"; escopo="$2"; shift 2 ;;
+            --nome) [ $# -ge 2 ] || falha "a opcao --nome precisa de um valor." "exemplo: --nome fechamento-mensal"; nome="$2"; shift 2 ;;
+            *) falha "opcao desconhecida: $1" "veja as opcoes de 'skill publicar' com: dgclaw --ajuda" ;;
+        esac
+    done
+    [ -n "$escopo" ] || falha "faltou o escopo (--escopo)." "use --escopo global, --escopo grupo:<grupo> ou --escopo agente:<slug>"
+    skills_publicar "$origem" "$escopo" "${nome:-$(basename "$origem")}"
+    [ "$ENSAIO" = 1 ] || ok "skill ${nome:-$(basename "$origem")} publicada no escopo $escopo. Para ela entrar nos agentes: sudo dgclaw skill aplicar"
+}
+
+skill_listar() {
+    [ $# -eq 0 ] || falha "opcao desconhecida: $1" "use: dgclaw skill listar"
+    local tsv
+    tsv="$(skills_listar_tsv)"
+    if [ -z "$tsv" ]; then echo "nenhuma skill compartilhada. Publique com: sudo dgclaw skill publicar <pasta> --escopo global"; return 0; fi
+    printf '%-24s %-28s %s\n' ESCOPO NOME PASTA
+    printf '%s\n' "$tsv" | awk -F'\t' '{printf "%-24s %-28s %s\n", $1, $2, $3}'
+}
+
+skill_remover() {
+    [ $# -ge 1 ] || falha "faltou o nome da skill." "exemplo: sudo dgclaw skill remover fechamento-mensal --escopo grupo:financeiro"
+    local nome="$1"; shift
+    local escopo=""
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --escopo) [ $# -ge 2 ] || falha "a opcao --escopo precisa de um valor." "use --escopo global, grupo:<grupo> ou agente:<slug>"; escopo="$2"; shift 2 ;;
+            *) falha "opcao desconhecida: $1" "use: dgclaw skill remover <nome> --escopo <escopo>" ;;
+        esac
+    done
+    [ -n "$escopo" ] || falha "faltou o escopo (--escopo)." "diga de qual escopo tirar: --escopo global, grupo:<grupo> ou agente:<slug>"
+    skills_remover "$nome" "$escopo"
+    [ "$ENSAIO" = 1 ] || ok "skill $nome fora do escopo $escopo. Para ela sair dos agentes: sudo dgclaw skill aplicar"
+}
+
+skill_aplicar() {
+    exigir_ferramentas jq podman
+    local slug="${1:-}" slugs ruins=0 s c
+    if [ -n "$slug" ]; then exigir_slug "$slug" "skill aplicar"; slugs="$slug"
+    else slugs="$(agentes_ler | jq -r '.agentes[] | select(.tipo != "admin") | .slug')"; fi
+    for s in $slugs; do
+        c="dgclaw-$s"
+        if [ "$ENSAIO" != 1 ] && [ "$(podman inspect -f '{{.State.Status}}' "$c" 2>/dev/null)" != running ]; then
+            info "agente $s: container nao esta ligado; as skills entram no proximo iniciar/reparar."; continue
+        fi
+        if ligar_skills "$s"; then ok "agente $s: skills compartilhadas aplicadas (valem na proxima sessao dele)"
+        else aviso "agente $s: nao consegui aplicar as skills (veja acima)"; ruins=1; fi
+    done
+    [ "$ruins" = 0 ] || falha "alguma aplicacao falhou." "leia os avisos acima e rode de novo para o agente citado"
+}
+
+skill_main() {
+    local sub="${1:-}"; shift || true
+    case "$sub" in
+        publicar) skill_publicar "$@" ;;
+        listar) skill_listar "$@" ;;
+        remover) skill_remover "$@" ;;
+        aplicar) skill_aplicar "$@" ;;
+        "") falha "faltou dizer o que fazer com as skills." "use: publicar, listar, remover ou aplicar (veja dgclaw --ajuda)." ;;
+        *) falha "'skill $sub' nao existe." "use: publicar, listar, remover ou aplicar (veja dgclaw --ajuda)." ;;
+    esac
+}
+
 # --- sistemas: cofre de credenciais e catalogo de ferramentas ------------------------------
 
 sistema_credencial() {
@@ -2575,6 +2698,7 @@ main() {
         agente) agente_main "$@" ;;
         base) base_main "$@" ;;
         sistema) sistema_main "$@" ;;
+        skill) skill_main "$@" ;;
         imagem) imagem_main "$@" ;;
         senha) senha_main "$@" ;;
         seguranca) seguranca_main "$@" ;;

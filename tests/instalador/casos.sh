@@ -45,6 +45,7 @@ caso_instalacao_cria_arquivos_com_os_modos_certos() {
     afirma "pasta das bases 700" modo_e "$RAIZ/var/lib/dgclaw/bases" 700
     afirma "ferramentas.json 600 e vazio" bash -c "[ \"\$(stat -c %a '$e/ferramentas.json')\" = 600 ] && jq -e '.versao == 1 and (.ferramentas | length) == 0' '$e/ferramentas.json'"
     afirma "cofre de sistemas 700" modo_e "$e/cofre-sistemas" 700
+    afirma "catalogo de skills com as tres pastas (755)" bash -c "for d in '' /globais /grupos /agentes; do [ \"\$(stat -c %a '$RAIZ/var/lib/dgclaw/skills'\$d)\" = 755 ] || exit 1; done"
     # O Admin roda no host e nao usa a caixa: o MCP de dados (dgclaw-dados-mcp) e so dos agentes de trabalho.
     nega "dgchat.mcp.json do admin NAO aponta o MCP de dados" jq -e '.mcpServers.dgclaw' "$a/admin/.plataforma/dgchat.mcp.json"
     afirma "papeis.json vem do modelo e nega tudo (sem agente ligado)" jq -e '.versao == 1 and (.agentes | length) == 0 and (.papeis | length) >= 1' "$e/papeis.json"

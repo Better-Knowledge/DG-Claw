@@ -1204,6 +1204,8 @@ FIM
     bases_garantir_arquivo
     # Catalogo de ferramentas (API, MCP, banco) vazio e o cofre de sistemas; o que o dono cadastrou fica (web/docs/FERRAMENTAS-POR-ESCOPO.md).
     sistemas_garantir_arquivos
+    # Catalogo de skills compartilhadas (globais, por grupo, por agente); so cria as pastas (web/docs/SKILLS-POR-ESCOPO.md).
+    skills_garantir_pastas
     if tem_jq; then
         agentes_garantir_arquivo
         jq -n --arg prov "$PROVEDOR" --arg transcripts "$transcripts" --arg admin "$p_admin" --arg etc "$p_etc" '
@@ -1786,6 +1788,8 @@ main() {
     . "$SCRIPT_DIR/lib/bases.sh"
     # shellcheck source=lib/sistemas.sh
     . "$SCRIPT_DIR/lib/sistemas.sh"
+    # shellcheck source=lib/skills.sh
+    . "$SCRIPT_DIR/lib/skills.sh"
     ENSAIO="$ARG_ENSAIO"
     LOG_INSTALAR="$DG_LOG/instalar.log"
     validar_args

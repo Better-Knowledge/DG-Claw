@@ -32,8 +32,9 @@ const RX_NOME = /^[a-z][a-z0-9_-]{0,39}$/;      // pessoas, papéis, fontes, aç
 const NIVEIS_FONTE = ['negado', 'leitura'];
 const NIVEIS_ACAO = ['negado', 'aprovacao_humana'];
 const CAMPOS_RAIZ = ['versao', 'pessoas', 'papeis', 'agentes', 'grupos', 'comentario'];
-const CAMPOS_PESSOA = ['nome', 'fontes', 'acoes', 'grupos', 'estado', 'bases', 'ferramentas', 'comentario'];
-const CAMPOS_PAPEL = ['fontes', 'acoes', 'bases', 'ferramentas', 'comentario'];
+const CAMPOS_PESSOA = ['nome', 'fontes', 'acoes', 'grupos', 'estado', 'bases', 'ferramentas', 'skills', 'comentario'];
+const CAMPOS_PAPEL = ['fontes', 'acoes', 'bases', 'ferramentas', 'skills', 'comentario'];
+const RX_SKILL = /^[a-z][a-z0-9-]{0,39}$/;
 const RX_ESCOPO = /^[a-z][a-z0-9_-]{0,39}:[a-z][a-z0-9_-]{0,39}$/;
 const CAMPOS_GRUPO = ['nome', 'tipo', 'comentario'];
 const TIPOS_GRUPO = ['departamento', 'projeto', 'equipe'];
@@ -106,6 +107,27 @@ function normalizaFerramentas(bruto, onde, erros) {
   return [...new Set(bruto)];
 }
 
+/** Papel: "skills" é lista de nomes (ou "*"). Pessoa: "skills" é { "<nome>": "negado" } (restrição). */
+function normalizaSkillsPapel(bruto, onde, erros) {
+  if (bruto === undefined) return [];
+  if (!Array.isArray(bruto) || bruto.length > MAX_CAMPOS || bruto.some((e) => typeof e !== 'string' || (e !== '*' && !RX_SKILL.test(e)))) {
+    erros.push(`${onde}.skills precisa ser uma lista de nomes de skill (minúsculas, números e hífen) ou "*".`);
+    return [];
+  }
+  return [...new Set(bruto)];
+}
+function normalizaSkillsPessoa(bruto, onde, erros) {
+  if (bruto === undefined) return {};
+  if (!ehObjeto(bruto)) { erros.push(`${onde}.skills precisa ser um objeto { "<skill>": "negado" }.`); return {}; }
+  const saida = {};
+  for (const [nome, v] of Object.entries(bruto)) {
+    if (!RX_SKILL.test(nome)) { erros.push(`${onde}.skills: o nome "${String(nome).slice(0, 40)}" não vale.`); continue; }
+    if (v !== 'negado') { erros.push(`${onde}.skills.${nome}: na pessoa só vale "negado" (quem libera é o papel).`); continue; }
+    saida[nome] = v;
+  }
+  return saida;
+}
+
 function normalizaAcoes(bruto, onde, erros) {
   if (bruto === undefined) return {};
   if (!ehObjeto(bruto)) { erros.push(`${onde}.acoes precisa ser um objeto { "<acao>": "aprovacao_humana" | "negado" }.`); return {}; }
@@ -163,7 +185,7 @@ function validaPapeis(bruto) {
           gruposDaPessoa = [...new Set(p.grupos)];
         }
       }
-      pessoas[nome] = { nome: typeof p.nome === 'string' ? p.nome : nome, estado: p.estado || 'ativa', grupos: gruposDaPessoa, fontes: normalizaFontes(p.fontes, onde, erros), acoes: normalizaAcoes(p.acoes, onde, erros), bases: normalizaBases(p.bases, onde, erros), ferramentas: normalizaFerramentas(p.ferramentas, onde, erros) };
+      pessoas[nome] = { nome: typeof p.nome === 'string' ? p.nome : nome, estado: p.estado || 'ativa', grupos: gruposDaPessoa, fontes: normalizaFontes(p.fontes, onde, erros), acoes: normalizaAcoes(p.acoes, onde, erros), bases: normalizaBases(p.bases, onde, erros), ferramentas: normalizaFerramentas(p.ferramentas, onde, erros), skills: normalizaSkillsPessoa(p.skills, onde, erros) };
     }
   }
 
@@ -176,7 +198,7 @@ function validaPapeis(bruto) {
       if (!nomeValido(nome, 'papeis', erros)) continue;
       if (!ehObjeto(p)) { erros.push(`${onde} precisa ser um objeto.`); continue; }
       soChaves(p, CAMPOS_PAPEL, onde, erros);
-      papeis[nome] = { fontes: normalizaFontes(p.fontes, onde, erros), acoes: normalizaAcoes(p.acoes, onde, erros), bases: normalizaBases(p.bases, onde, erros), ferramentas: normalizaFerramentas(p.ferramentas, onde, erros) };
+      papeis[nome] = { fontes: normalizaFontes(p.fontes, onde, erros), acoes: normalizaAcoes(p.acoes, onde, erros), bases: normalizaBases(p.bases, onde, erros), ferramentas: normalizaFerramentas(p.ferramentas, onde, erros), skills: normalizaSkillsPapel(p.skills, onde, erros) };
     }
   }
 
