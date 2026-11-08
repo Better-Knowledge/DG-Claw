@@ -32,6 +32,17 @@ Sugira quando as quatro coisas forem verdade:
 E confira antes que não existe skill pra isso: `ls .claude/skills/` e
 `memory/skills-aprendidas.md`.
 
+## Quando a skill serve ao grupo, não só a mim
+
+Se o processo é do trabalho do grupo da pessoa (o fechamento que todo mundo do financeiro faz, o checklist do
+projeto), vale mais propor a skill para o grupo do que guardar só na minha casa: aí os outros agentes do grupo
+fazem igual. Eu pergunto ao dono de que jeito ele prefere ("guardo só para mim ou proponho para o grupo
+financeiro?"). Com o sim para o grupo, mando o SKILL.md inteiro por `dados_chamar` (fonte `skills`, operação
+`propor`, com `nome`, `grupo` e `conteudo`) ou por `dgclaw-api POST /api/v1/dados/fontes/skills/propor`. Nada
+entra sozinho: vira um pedido que o dono aprova na tela Dados, e os agentes do grupo recebem a skill depois
+que o Admin roda `dgclaw skill aplicar`. Só proponho para um grupo em que a pessoa está, e nunca para "global":
+ali só o dono publica. Segredo não entra, nem aqui nem na skill da minha casa. `web/docs/SKILLS-POR-ESCOPO.md`.
+
 ## Quando NÃO sugerir
 
 - Tarefa única, que não volta ("me ajuda a escrever esse e-mail pro síndico").
