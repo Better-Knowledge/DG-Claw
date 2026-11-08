@@ -46,7 +46,7 @@ case "${1:-}" in
         nome="${*: -1}"; forca=0
         for a in "$@"; do [ "$a" = -f ] && forca=1; done
         # Como o podman de verdade: sem -f, nao remove container ligado ou parando.
-        if [ -f "$est/c-$nome" ] && [ "$forca" = 0 ] && grep -qx 'running\|stopping' "$est/c-$nome"; then
+        if [ -f "$est/c-$nome" ] && [ "$forca" = 0 ] && grep -qx 'running\|stopping\|paused' "$est/c-$nome"; then
             echo "Error: cannot remove container $nome as it is $(cat "$est/c-$nome") - running or paused containers cannot be removed without force: container state improper" >&2
             exit 2
         fi

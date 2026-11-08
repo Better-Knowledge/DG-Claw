@@ -2274,7 +2274,8 @@ pessoa_desligar() {
                         # (a casa, o cofre e os segredos sao pastas do host) e o que resolve, e deixa o agente parado
                         # de verdade; mandar a pessoa ao "agente recriar" religaria o agente de quem acabou de sair.
                         aviso "o agente $slug ficou preso em 'stopping' (defeito conhecido do podman); removo so o container para a entrega seguir. Para o sucessor usar esse agente depois: dgclaw agente recriar $slug --forcar"
-                        if _recriar_remover_container "$slug" && [ "$(_pessoa_estado_agente "$slug")" = ausente ]; then ok "container do agente $slug removido (a casa dele fica inteira)"
+                        # Em subshell: o falha de dentro do helper derruba so ele, e a mensagem final do desligar (como completar) aparece.
+                        if ( _recriar_remover_container "$slug" ) && [ "$(_pessoa_estado_agente "$slug")" = ausente ]; then ok "container do agente $slug removido (a casa dele fica inteira)"
                         else aviso "nao consegui remover o container do agente $slug"; parou_tudo=0; fi ;;
                     erro:*) aviso "o podman deixou de responder enquanto o agente $slug parava ($est)"; parou_tudo=0 ;;
                     *) aviso "o agente $slug continua em '$est' depois de ${tempo}s"; parou_tudo=0 ;;
