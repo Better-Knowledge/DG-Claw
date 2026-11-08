@@ -130,4 +130,40 @@ function decidirBase(entrada) {
   }
 }
 
-module.exports = { decidir, decidirBase, intersecao, foraDoEscopo, nivelDaBase, OPERACOES_LEITURA };
+const temEscopo = (lista, escopo) => Array.isArray(lista) && (lista.includes('*') || lista.includes(escopo));
+
+/**
+ * decidirFerramenta({ estado, slug, ferramenta, nomeFerramenta, operacao })
+ *   ferramenta: a entrada normalizada do catálogo (web/lib/ferramentas.js) ou null
+ * A operação tem um escopo ("crm:ler"); a pessoa E o papel precisam tê-lo (ou "*"). Operação marcada como
+ * ação devolve "aprovacao" (executa só depois de uma pessoa aprovar); as outras, "permitido". Pessoa desligada,
+ * agente fora do arquivo, ferramenta ou operação inexistente: negado.
+ */
+function decidirFerramenta(entrada) {
+  try {
+    const { estado, slug, ferramenta, nomeFerramenta, operacao } = entrada || {};
+    const negado = (motivo, extra) => Object.assign({ decisao: 'negado', campos: null, motivo, pessoa: null, papel: null }, extra || {});
+    if (!estado || !estado.ok) return negado(estado && estado.erro ? estado.erro : 'A política de dados não está carregada; todo acesso está negado.');
+    if (typeof slug !== 'string' || !slug) return negado('Pedido sem identidade de agente.');
+    if (!ferramenta || typeof nomeFerramenta !== 'string') return negado(`A ferramenta "${String(nomeFerramenta).slice(0, 40)}" não está no catálogo.`);
+    const op = de(ferramenta.operacoes, operacao);
+    if (!op) return negado(`A ferramenta "${nomeFerramenta}" não tem a operação "${String(operacao).slice(0, 40)}".`);
+    const pol = estado.politica;
+    const ag = de(pol.agentes, slug);
+    if (!ag) return negado(`O agente ${slug} não está no arquivo de papéis; nenhuma ferramenta é liberada.`);
+    const pessoa = de(pol.pessoas, ag.pessoa);
+    const papel = de(pol.papeis, ag.papel);
+    const ids = { pessoa: ag.pessoa, papel: ag.papel, escopo: op.escopo };
+    if (!pessoa) return negado(`A pessoa "${ag.pessoa}" do agente ${slug} não existe mais nos papéis; acesso retirado.`, ids);
+    if (!papel) return negado(`O papel "${ag.papel}" do agente ${slug} não existe mais nos papéis; acesso retirado.`, ids);
+    if (pessoa.estado === 'desligada') return negado(`A pessoa ${ag.pessoa} está desligada; o agente ${slug} não alcança ferramenta nenhuma.`, ids);
+    if (!temEscopo(pessoa.ferramentas, op.escopo)) return negado(`A pessoa ${ag.pessoa} não tem o escopo "${op.escopo}" (ferramenta ${nomeFerramenta}, operação ${operacao}); o agente ${slug} não o alcança, qualquer que seja o papel.`, ids);
+    if (!temEscopo(papel.ferramentas, op.escopo)) return negado(`O papel ${ag.papel} não tem o escopo "${op.escopo}" (ferramenta ${nomeFerramenta}, operação ${operacao}).`, ids);
+    if (op.acao) return Object.assign({ decisao: 'aprovacao', campos: null, motivo: `a operação ${operacao} de ${nomeFerramenta} escreve no sistema e precisa da aprovação de uma pessoa no painel` }, ids);
+    return Object.assign({ decisao: 'permitido', campos: null, motivo: `escopo ${op.escopo} liberado para a pessoa ${ag.pessoa} e para o papel ${ag.papel}` }, ids);
+  } catch (e) {
+    return { decisao: 'negado', campos: null, motivo: `Falha interna na decisão de acesso (${e && e.message}); por segurança o pedido foi negado.`, pessoa: null, papel: null };
+  }
+}
+
+module.exports = { decidir, decidirBase, decidirFerramenta, intersecao, foraDoEscopo, nivelDaBase, temEscopo, OPERACOES_LEITURA };

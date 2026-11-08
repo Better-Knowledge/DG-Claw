@@ -52,6 +52,8 @@ const { criarEmail } = require('./lib/email');
 const escopo = require('./lib/escopo');
 const { criarPapeis } = require('./lib/papeis');
 const { criarBases } = require('./lib/bases');
+const { criarFerramentas } = require('./lib/ferramentas');
+const { criarCofreSistemas } = require('./lib/cofre-sistemas');
 const { criarDados } = require('./lib/dados');
 
 const METODOS_QUE_ESCREVEM = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
@@ -142,7 +144,10 @@ function criarServidor(opcoes) {
   const papeis = opcoes.papeis || criarPapeis({ caminho: config.papeisPath, log });
   // Bases de conhecimento: catálogo em /etc/dgclaw/bases.json, pastas em /var/lib/dgclaw/bases/<nome> (web/docs/BASES-DE-CONHECIMENTO.md).
   const bases = opcoes.bases || criarBases({ caminho: config.basesPath, log });
-  const dados = criarDados({ dir: path.join(config.dataDir, 'dados'), papeis, bases, basesDir: config.basesDir, push: opcoes.push || push, log, agora: opcoes.agora, retencaoDias: config.dadosLogDias, prazoAprovacaoMs: opcoes.prazoAprovacaoMs });
+  // Ferramentas (API, MCP, banco): catálogo em /etc/dgclaw/ferramentas.json; credenciais só em /etc/dgclaw/cofre-sistemas (web/docs/FERRAMENTAS-POR-ESCOPO.md).
+  const ferramentas = opcoes.ferramentas || criarFerramentas({ caminho: config.ferramentasPath, log });
+  const cofreSistemas = opcoes.cofreSistemas || criarCofreSistemas({ dir: config.cofreSistemasDir });
+  const dados = criarDados({ dir: path.join(config.dataDir, 'dados'), papeis, bases, basesDir: config.basesDir, ferramentas, cofreSistemas, push: opcoes.push || push, log, agora: opcoes.agora, retencaoDias: config.dadosLogDias, prazoAprovacaoMs: opcoes.prazoAprovacaoMs });
   caixa.permitir('/api/v1/dados/fontes');
   caixa.permitir('/api/v1/dados/pedidos');
   caixa.permitir('/api/v1/dados/docs.md');
@@ -1255,7 +1260,7 @@ function criarServidor(opcoes) {
   });
 
   return {
-    servidor, config, registro, auth, colaboradores, proxy, midia, conversa, log, caixa, push, lembretes, avisos, estados, vigiaAtencao, prefsAtencao, dados, papeis, bases,
+    servidor, config, registro, auth, colaboradores, proxy, midia, conversa, log, caixa, push, lembretes, avisos, estados, vigiaAtencao, prefsAtencao, dados, papeis, bases, ferramentas,
     ouvir(porta, host) {
       return new Promise((resolve, reject) => {
         servidor.once('error', reject);

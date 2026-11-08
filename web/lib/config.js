@@ -54,6 +54,8 @@ function carregaConfig(opcoes, log) {
     papeisPath: opcoes.papeisPath || env.DGCLAW_PAPEIS || '/etc/dgclaw/papeis.json',
     basesPath: opcoes.basesPath || env.DGCLAW_BASES || '/etc/dgclaw/bases.json',
     basesDir: opcoes.basesDir || env.DGCLAW_BASES_DIR || '/var/lib/dgclaw/bases',
+    ferramentasPath: opcoes.ferramentasPath || env.DGCLAW_FERRAMENTAS || '/etc/dgclaw/ferramentas.json',
+    cofreSistemasDir: opcoes.cofreSistemasDir || env.DGCLAW_COFRE_SISTEMAS || '/etc/dgclaw/cofre-sistemas',
     dadosLogDias: Math.round(num(env.DGCLAW_DADOS_LOG_DIAS, 90)),
     dataDir: opcoes.dataDir || env.DGCLAW_WEB_DATA || '/var/lib/dgclaw/web',
     publicDir: opcoes.publicDir || path.join(__dirname, '..', 'public'),

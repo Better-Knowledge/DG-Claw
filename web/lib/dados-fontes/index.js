@@ -18,14 +18,16 @@ const { fonteJson, ErroFonte } = require('./json');
 const { fontePasta } = require('./pasta');
 const { fonteEmail } = require('./email');
 const { fonteBase } = require('./base');
+const { fonteFerramenta } = require('./ferramenta');
 
 const RX_BASE = /^base-([a-z][a-z0-9_-]{0,39})$/;
+const RX_FERRAMENTA = /^ferramenta-([a-z][a-z0-9_-]{0,39})$/;
 
 /**
  * `bases` (opcional): o leitor de web/lib/bases.js e a pasta das bases. Cada base do catálogo vira a fonte
  * dinâmica "base-<nome>", lida da pasta <basesDir>/<nome>/. Base fora do catálogo não é fonte.
  */
-function criarFontes({ dir, log, agora, bases, basesDir }) {
+function criarFontes({ dir, log, agora, bases, basesDir, ferramentas, cofreSistemas }) {
   const lista = [
     fonteJson({ dir, nome: 'agenda', campos: ['id', 'data', 'hora', 'titulo', 'com', 'local'], busca: ['titulo', 'com', 'local'],
       catalogo: { dono: 'secretaria', classificacao: 'interno', finalidade: 'marcar e consultar compromissos', retencao_dias: 365 } }),
@@ -41,6 +43,13 @@ function criarFontes({ dir, log, agora, bases, basesDir }) {
   const mapa = new Map(lista.map((f) => [f.nome, f]));
   const descreve = (f) => ({ nome: f.nome, base: f.base || null, campos: f.campos, operacoes: Object.keys(f.operacoes), acoes: Object.fromEntries(Object.entries(f.acoes || {}).map(([op, a]) => [op, a.acao])), catalogo: f.catalogo });
 
+  function daFerramenta(nomeF) {
+    if (!ferramentas) return null;
+    const f = ferramentas.obter(nomeF);
+    if (!f) return null;
+    return fonteFerramenta({ nome: nomeF, ferramenta: f, cofre: cofreSistemas, log });
+  }
+
   function daBase(nomeBase) {
     if (!bases || !basesDir) return null;
     const b = bases.obter(nomeBase);
@@ -53,15 +62,23 @@ function criarFontes({ dir, log, agora, bases, basesDir }) {
       const fixa = mapa.get(nome);
       if (fixa) return fixa;
       const m = RX_BASE.exec(String(nome));
-      return m ? daBase(m[1]) : null;
+      if (m) return daBase(m[1]);
+      const t = RX_FERRAMENTA.exec(String(nome));
+      return t ? daFerramenta(t[1]) : null;
     },
-    nomes() { return [...mapa.keys(), ...(bases && bases.estado().ok ? Object.keys(bases.estado().bases).map((n) => `base-${n}`) : [])]; },
-    /** Para o dono e para a documentação: o catálogo de cada fonte (fixas e bases), sem dado nenhum. */
+    nomes() {
+      const b = bases && bases.estado().ok ? Object.keys(bases.estado().bases).map((n) => `base-${n}`) : [];
+      const f = ferramentas && ferramentas.estado().ok ? Object.keys(ferramentas.estado().ferramentas).map((n) => `ferramenta-${n}`) : [];
+      return [...mapa.keys(), ...b, ...f];
+    },
+    /** Para o dono e para a documentação: o catálogo de cada fonte (fixas, bases e ferramentas), sem dado nenhum. */
     catalogo() {
       const fixas = lista.map(descreve);
       const est = bases ? bases.estado() : null;
       const dinamicas = est && est.ok ? Object.keys(est.bases).sort().map((n) => descreve(daBase(n))) : [];
-      return fixas.concat(dinamicas);
+      const ef = ferramentas ? ferramentas.estado() : null;
+      const ferr = ef && ef.ok ? Object.keys(ef.ferramentas).sort().map((n) => { const f = daFerramenta(n); return Object.assign(descreve(f), { ferramenta: n, tipo: f.tipo, operacoes_detalhe: f.descricaoOps() }); }) : [];
+      return fixas.concat(dinamicas, ferr);
     },
   };
 }

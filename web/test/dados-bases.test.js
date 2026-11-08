@@ -312,9 +312,12 @@ test('busca grande: avisa que truncou e não lê mais que o teto de arquivos', (
     const g = fontes.obter('base-grande').operacoes.buscar({ termo: 'palha', limit: 1 });
     assert.equal(g.itens.length, 1); assert.ok(g.arquivos_lidos >= 499);
     // e um que não cabe no orçamento de bytes também é pulado sem parar a busca
-    for (let i = 0; i < 20; i++) fs.writeFileSync(path.join(basesDir, 'grande', `0${i}-med.txt`), Buffer.alloc(250 * 1024, 121));
-    fs.writeFileSync(path.join(basesDir, 'grande', 'zz-agulha.md'), 'agulha no fim');
+    // 40 x 250 KB = 9,8 MB: passa do orçamento de 8 MB; os que não cabem são pulados e a agulha pequena ainda é lida
+    for (let i = 0; i < 40; i++) fs.writeFileSync(path.join(basesDir, 'grande', `0${String(i).padStart(2, '0')}-med.txt`), Buffer.alloc(250 * 1024, 121));
+    fs.writeFileSync(path.join(basesDir, 'grande', '0zz-agulha.md'), 'agulha no fim');
     const h = fontes.obter('base-grande').operacoes.buscar({ termo: 'agulha' });
-    assert.equal(h.total, 0, 'a agulha está além dos 500 arquivos'); assert.equal(h.truncado, true);
+    assert.equal(h.total, 1, 'a agulha é achada mesmo com o orçamento estourado'); assert.equal(h.truncado, true);
+    // entre os 500 primeiros nomes: ~32 médios cabem nos 8 MB, os outros ~8 são pulados, e os pequenos (palha) todos entram
+    assert.ok(h.arquivos_lidos >= 480 && h.arquivos_lidos < 500, `arquivos_lidos=${h.arquivos_lidos}`);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
