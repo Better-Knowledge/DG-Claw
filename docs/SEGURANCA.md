@@ -209,6 +209,11 @@ atende outra pessoa usa a credencial dela.
   (padrões em `lib/segredos.regex`) e nome de skill da imagem; a proposta de um agente só entra com aprovação
   humana do texto inteiro, nunca no escopo global, e substituir uma skill existente pede a marca `substituir`
   e aparece em destaque para quem aprova.
+- Desligamento de uma pessoa (`dgclaw pessoa desligar`, `docs/PROPRIEDADE-DO-CONHECIMENTO.md`): estado
+  `desligada` no arquivo de papéis fecha tudo na hora; os agentes param; a memória de trabalho deles vai
+  para uma base do grupo (root, 600/700), sem copiar transcrições (podem ter dado pessoal de terceiros)
+  nem atalhos. A tela Observabilidade (`web/docs/OBSERVABILIDADE.md`) lê só o log de acesso, que não tem
+  conteúdo.
 - **O que fica fora:** o que o agente alcança por outro caminho (arquivo montado, rede, canal) e o
   que ele já recebeu e anotou na própria casa; a revogação fecha a porta, não apaga o que passou.
 

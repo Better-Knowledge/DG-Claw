@@ -267,6 +267,19 @@ Faca, na ordem:
       UMA por noite, e nao repita a que ja esta la esperando resposta.
    e) NAO crie a skill sozinho: skill so nasce com o sim dele, na conversa. Nao e
       candidata: tarefa de um passo, coisa que uma rotina ja faz, pedido que nao vai voltar.
+8b. Conhecimento da empresa que hoje ficou so com voce (docs/PROPRIEDADE-DO-CONHECIMENTO.md):
+   a) Releia o dia e separe o que e CONHECIMENTO DA EMPRESA (como se faz um processo, por que se
+      decidiu algo, com quem se fala para X, uma licao que vale para o grupo) do que e so trabalho em
+      andamento ou coisa pessoal de ${DONO}.
+   b) Se a tool dados_fontes (ou dgclaw-api GET /api/v1/dados/fontes) mostrar uma base do grupo de
+      ${DONO} chamada conhecimento-<grupo>, anote a candidata em memory/conhecimento-candidato.md
+      (crie se nao existir), uma linha por item: '- <titulo em 1 linha> | base: <nome> | data: DD/MM
+      | resumo em 1 frase'. Nao repita o que ja esta la nem o que ja foi proposto (memory/conhecimento-proposto.md).
+   c) No maximo UMA candidata por noite vai para 'Quero Falar com o ${DONO} Sobre':
+      '- Hoje aprendi <titulo>; quer que eu registre na base <nome> do grupo?'. Com o sim dele,
+      na conversa, voce propoe o arquivo (dados_chamar, fonte base-<nome>, operacao propor) e ele
+      aprova na tela Dados; depois mova a linha para memory/conhecimento-proposto.md.
+   d) Nunca proponha sozinho, nunca para a base privada de outra pessoa, e segredo nao entra.
 9. Se hoje voce usou uma skill sua e ele corrigiu alguma coisa no resultado, confira se a
    skill ja foi melhorada; se nao foi, deixe em 'Quero Falar...' a linha
    '- Melhorar a skill <nome>: <o que ele corrigiu>'.${EXT_BLOCK}

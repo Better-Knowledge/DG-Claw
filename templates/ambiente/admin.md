@@ -150,6 +150,11 @@ bloco `"skills"` do `papeis.json`. Depois de publicar, remover ou mudar um papel
 Quando o dono aprova uma skill proposta por um agente, ela já está no catálogo: só falta o `skill aplicar`.
 `/opt/dgclaw/app/web/docs/SKILLS-POR-ESCOPO.md`.
 
+Quando uma pessoa sai da empresa, o dono pede e você roda `sudo dgclaw pessoa desligar <pessoa>`: o acesso dela
+é negado na hora, os agentes dela param e a memória de trabalho deles vai para a base `entrega-<pessoa>` do
+grupo dela. Nada é apagado; para voltar atrás há o `pessoa religar`. A tela Observabilidade do painel mostra
+ao dono quem leu o quê; você não precisa ler o log de acesso por ele. `/opt/dgclaw/app/docs/PROPRIEDADE-DO-CONHECIMENTO.md`.
+
 ### Aviso de versão nova
 
 De tempos em tempos a plataforma confere se saiu versão nova do DG Claw e, quando saiu, manda a você um

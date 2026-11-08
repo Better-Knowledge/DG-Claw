@@ -86,7 +86,9 @@ em `/api/v1/dados` e os agentes não o alcançam (`web/docs/DADOS-POR-PAPEL.md`)
 escopo (`web/docs/BASES-DE-CONHECIMENTO.md`). O catálogo `/etc/dgclaw/ferramentas.json` e o cofre
 `/etc/dgclaw/cofre-sistemas` são o gateway para os sistemas de fora (`web/docs/FERRAMENTAS-POR-ESCOPO.md`).
 `/var/lib/dgclaw/skills` é o catálogo de skills compartilhadas, montado só leitura nos agentes
-(`web/docs/SKILLS-POR-ESCOPO.md`). Os pedidos do primeiro agente ficam
+(`web/docs/SKILLS-POR-ESCOPO.md`). O log de acesso em `/var/lib/dgclaw/web/dados/log` alimenta a tela
+Observabilidade (`web/docs/OBSERVABILIDADE.md`); o desligamento de uma pessoa segue
+`docs/PROPRIEDADE-DO-CONHECIMENTO.md`. Os pedidos do primeiro agente ficam
 na pasta privada de dados do Web, com permissão restrita, e não expõem logs pela API.
 
 ## Identidade, memória e conexões
