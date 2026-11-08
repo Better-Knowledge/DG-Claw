@@ -9,7 +9,8 @@
 //   campos          ['id', 'nome', ...]   os campos que existem; `campos` null na decisão = todos estes
 //   operacoes       { listar({ limit }), buscar({ termo, limit }), ler({ id }) } -> { itens: [..] } | { item }
 //                   cada uma lança ErroFonte(status, mensagem) quando a entrada é inválida
-//   acoes           { <operacao>: { acao: 'enviar_email', validar(params) -> params limpos, executar(params) -> resultado } }
+//   acoes           { <operacao>: { acao: 'enviar_email', validar(params, contexto?) -> params limpos, executar(params, contexto) -> resultado } }
+//                   `contexto` em validar (quando vem da rota e de um agente): { agente, pessoa, papel, politica }
 //
 // Dados locais e fictícios: cada fonte JSON lê <dir>/<nome>.json ({ "itens": [ {...} ] }); sem o arquivo, a
 // lista é vazia. Nenhum sistema real entra por aqui nesta versão (web/docs/DADOS-POR-PAPEL.md).

@@ -52,11 +52,10 @@ skill aplicar` refaz os links depois de publicar, remover ou mudar um papel. Det
 
 ### Como atualizar (skills compartilhadas)
 
-Peça ao Admin, no chat: "atualiza o DG Claw". A atualização cria a pasta do catálogo vazia e não muda nada nos
-agentes até você publicar uma skill. Para a pasta ficar visível dentro dos agentes que já existem, o container
-de cada um precisa ser recriado uma vez: peça ao Admin para rodar `sudo dgclaw agente recriar <slug> --forcar`
-(a casa, o cofre, as portas e as conversas ficam como estão). Agente criado depois da atualização já nasce com
-a pasta montada.
+Peça ao Admin, no chat: "atualiza o DG Claw". A atualização cria a pasta do catálogo vazia e recria o container
+dos agentes que estavam ligados (a casa, o cofre, as portas e as conversas ficam como estão), que é o que faz a
+vista de skills ficar montada dentro deles. Se algum agente estava desligado na hora, ligue-o e peça ao Admin
+para rodar `sudo dgclaw agente recriar <slug>`. Nada muda no que os agentes fazem até você publicar uma skill.
 
 **Ferramentas por escopo: o gateway para os sistemas da empresa.** Os agentes passam a usar o CRM, o ERP, um
 servidor MCP ou um banco de dados pelo DG Claw, sem receber credencial nenhuma: você guarda uma credencial

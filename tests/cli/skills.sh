@@ -54,30 +54,43 @@ cat >"$ETC/papeis.json" <<'EOF'
  "papeis": {"analista": {"skills": ["*"]}, "estagiario": {"skills": ["fechamento-mensal"]}},
  "agentes": {"ana": {"pessoa": "marta", "papel": "analista"}, "bia": {"pessoa": "caio", "papel": "analista"}, "edu": {"pessoa": "marta", "papel": "estagiario"}, "lu": {"pessoa": "lia", "papel": "analista"}}}
 EOF
-# shellcheck source=lib/comum.sh
-. "$REPO/lib/comum.sh" 2>/dev/null || true
-# shellcheck source=lib/skills.sh
-. "$REPO/lib/skills.sh"
-igual "ana: global + a propria; a do grupo esta negada na pessoa" "agentes/ana/so-da-ana globais/fechamento-mensal" "$(skills_permitidas ana | sort | tr '\n' ' ' | sed 's/ $//')"
-igual "bia: so a global (nao esta no financeiro)" "globais/fechamento-mensal" "$(skills_permitidas bia | tr '\n' ' ' | sed 's/ $//')"
-igual "edu: so a listada no papel" "globais/fechamento-mensal" "$(skills_permitidas edu | tr '\n' ' ' | sed 's/ $//')"
-igual "lu (pessoa desligada): nada" "" "$(skills_permitidas lu | tr '\n' ' ')"
-igual "fora dos papeis: so as proprias" "" "$(skills_permitidas zed | tr '\n' ' ')"
+# skills_permitidas roda num bash separado: carregar lib/comum.sh aqui trocaria o ok/mal do proprio teste.
+permitidas() { APP_DIR="$REPO" DGCLAW_RAIZ="$DGCLAW_RAIZ" ENSAIO=0 bash -c ". '$REPO/lib/comum.sh'; . '$REPO/lib/skills.sh'; skills_permitidas \"\$1\"" _ "$1"; }
+igual "ana: global + a propria; a do grupo esta negada na pessoa" "agentes/ana/so-da-ana globais/fechamento-mensal" "$(permitidas ana | sort | tr '\n' ' ' | sed 's/ $//')"
+igual "bia: so a global (nao esta no financeiro)" "globais/fechamento-mensal" "$(permitidas bia | tr '\n' ' ' | sed 's/ $//')"
+igual "edu: so a listada no papel" "globais/fechamento-mensal" "$(permitidas edu | tr '\n' ' ' | sed 's/ $//')"
+igual "lu (pessoa desligada): nada" "" "$(permitidas lu | tr '\n' ' ')"
+igual "fora dos papeis: so as proprias" "" "$(permitidas zed | tr '\n' ' ')"
 printf '{ quebrado' >"$ETC/papeis.json.bak"
 cp "$ETC/papeis.json" "$TMP/papeis.ok"; printf '{ quebrado' >"$ETC/papeis.json"
-igual "papeis.json invalido: so as proprias" "agentes/ana/so-da-ana" "$(skills_permitidas ana | tr '\n' ' ' | sed 's/ $//')"
+igual "papeis.json invalido: so as proprias" "agentes/ana/so-da-ana" "$(permitidas ana | tr '\n' ' ' | sed 's/ $//')"
 cp "$TMP/papeis.ok" "$ETC/papeis.json"
 
-echo "aplicar (o script que vai para dentro do container)"
+echo "publicar: nomes reservados e origem que o agente escreve"
+mk_skill "$TMP/memory" memory
+nega "nome de skill da imagem recusado" dgclaw skill publicar "$TMP/memory" --escopo global
+nega "nem com --nome" dgclaw skill publicar "$TMP/fechamento-mensal" --escopo global --nome aprender
+mk_skill "$TMP/da-ana" da-ana; mkfifo "$TMP/da-ana/fifo"
+nega "fifo na origem recusado (sem travar)" timeout 10 "$CLI" skill publicar "$TMP/da-ana" --escopo global
+nega "a pasta temporaria nao sobrou no catalogo" bash -c "ls -a '$SK/globais' | grep -q '^\\.da-ana'"
+
+echo "aplicar (a vista por agente e o script que vai para dentro do container)"
 criar_agente ana --nome "Ana"
-afirma "o container nasce com o catalogo montado so leitura" grep -q -- "$SK:/run/dgclaw/skills:ro" "$STUB_LOG"
+afirma "o container nasce com a VISTA do agente montada so leitura, nao o catalogo inteiro" grep -q -- "$SK/.vistas/ana:/run/dgclaw/skills:ro" "$STUB_LOG"
+afirma "a vista tem so as skills da ana (global + a propria), copiadas" bash -c "[ -f '$SK/.vistas/ana/fechamento-mensal/SKILL.md' ] && [ -f '$SK/.vistas/ana/so-da-ana/SKILL.md' ] && [ ! -e '$SK/.vistas/ana/conciliacao' ]"
+afirma "a vista e de root, 755/644, e a pasta .vistas e 700" bash -c "[ \"\$(stat -c '%a %u' '$SK/.vistas/ana')\" = '755 0' ] && [ \"\$(stat -c %a '$SK/.vistas/ana/so-da-ana/SKILL.md')\" = 644 ] && [ \"\$(stat -c %a '$SK/.vistas')\" = 700 ]"
 afirma "a criacao ja liga as skills compartilhadas" grep -q 'skills compartilhadas:' "$STUB_LOG.stdin"
-afirma "a lista do agente foi para dentro" grep -q 'PERMITIDAS=" globais/fechamento-mensal agentes/ana/so-da-ana"' "$STUB_LOG.stdin"
+afirma "a lista do agente foi para dentro (so nomes)" grep -q 'PERMITIDAS=" fechamento-mensal so-da-ana"' "$STUB_LOG.stdin"
+afirma "o script nao troca link que aponta para a imagem" grep -q 'ja e uma skill da imagem' "$STUB_LOG.stdin"
 : >"$STUB_LOG.stdin"
 afirma "skill aplicar ana" dgclaw skill aplicar ana
-afirma "mandou o script de links por STDIN" grep -q 'ln -sfn "/run/dgclaw/skills/$rel"' "$STUB_LOG.stdin"
+afirma "mandou o script de links por STDIN" grep -q 'ln -sfn "/run/dgclaw/skills/$nome"' "$STUB_LOG.stdin"
 afirma "remove link antigo que nao esta mais na lista" grep -q 'rm -f "$alvo"' "$STUB_LOG.stdin"
 afirma "skill aplicar sem slug passa por todos os agentes" dgclaw skill aplicar
+# a politica muda (ana perde o papel): a vista fica so com a propria skill
+printf '{"versao": 1, "pessoas": {"marta": {}}, "papeis": {"nada": {}}, "agentes": {"ana": {"pessoa": "marta", "papel": "nada"}}}\n' >"$ETC/papeis.json"
+afirma "skill aplicar depois de tirar o papel" dgclaw skill aplicar ana
+afirma "a vista ficou so com a propria skill" bash -c "[ -f '$SK/.vistas/ana/so-da-ana/SKILL.md' ] && [ ! -e '$SK/.vistas/ana/fechamento-mensal' ]"
 nega "slug invalido recusado" dgclaw skill aplicar "a;b"
 
 echo "remover"

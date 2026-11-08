@@ -847,6 +847,8 @@ criar_rede() {
 
 criar_container() {
     local c="dgclaw-$C_SLUG" casa="$C_CASA" ub="$C_UID_BASE"
+    # A vista de skills do agente precisa existir antes do podman create (e o que vai montado em /run/dgclaw/skills).
+    skills_montar_vista "$C_SLUG"
     if [ "$ENSAIO" != 1 ] && podman container exists "$c" >/dev/null 2>&1; then
         info "o container $c ja existe, so garanto que esta ligado"
     else
@@ -858,7 +860,7 @@ criar_container() {
             --volume "$casa/segredos:/run/dgclaw/segredos:ro"
             --volume "$casa/cofre:/run/dgclaw/cofre:ro"
             --volume "$casa/config:/run/dgclaw/config:ro"
-            --volume "$DG_SKILLS_DIR:/run/dgclaw/skills:ro"
+            --volume "$DG_SKILLS_DIR/.vistas/$C_SLUG:/run/dgclaw/skills:ro"
             --network "dgclaw-$C_SLUG"
             --publish "127.0.0.1:$C_PORTA_RUNNER:4300"
             --publish "127.0.0.1:$C_PORTA_PAINEL:8300"
@@ -1030,30 +1032,34 @@ DENTRO
 # links das skills compartilhadas que a politica libera (lib/skills.sh, skills_permitidas). Links antigos para
 # /run/dgclaw/skills que nao estao mais na lista sao removidos; links para a imagem e pastas do proprio agente ficam.
 ligar_skills_script() {
-    local slug="$1" rel lista=""
-    while IFS= read -r rel; do
-        [ -n "$rel" ] || continue
-        [[ "$rel" =~ ^(globais|grupos/[a-z][a-z0-9_-]{0,39}|agentes/[a-z0-9][a-z0-9-]{1,30})/[a-z][a-z0-9-]{0,39}$ ]] || continue
-        lista="$lista $rel"
-    done < <(skills_permitidas "$slug")
-    printf 'set -euo pipefail\nCASA=/home/agente\nmkdir -p "$CASA/.claude/skills"\nPERMITIDAS="%s"\n' "$lista"
+    local slug="$1" nome lista=""
+    skills_montar_vista "$slug"
+    while IFS= read -r nome; do
+        [ -n "$nome" ] || continue
+        [[ "$nome" =~ ^[a-z][a-z0-9-]{0,39}$ ]] || continue
+        lista="$lista $nome"
+    done < <(skills_vista_nomes "$slug")
+    printf 'set -euo pipefail\nCASA=/home/agente\nmkdir -p "$CASA/.claude/skills"\nchown agente:agente "$CASA/.claude" "$CASA/.claude/skills"\nPERMITIDAS="%s"\n' "$lista"
     cat <<'DENTRO'
 for alvo in "$CASA"/.claude/skills/*; do
     [ -L "$alvo" ] || continue
     dest="$(readlink "$alvo")"
     case "$dest" in /run/dgclaw/skills/*) ;; *) continue ;; esac
-    rel="${dest#/run/dgclaw/skills/}"
-    case " $PERMITIDAS " in *" $rel "*) ;; *) rm -f "$alvo"; echo "skill compartilhada retirada: $(basename "$alvo")" ;; esac
+    nome="$(basename "$alvo")"
+    case " $PERMITIDAS " in *" $nome "*) ;; *) rm -f "$alvo"; echo "skill compartilhada retirada: $nome" ;; esac
 done
-for rel in $PERMITIDAS; do
-    nome="${rel##*/}"
+feitos=0
+for nome in $PERMITIDAS; do
     alvo="$CASA/.claude/skills/$nome"
-    [ -f "/run/dgclaw/skills/$rel/SKILL.md" ] || { echo "aviso: a skill $rel nao esta montada; sigo sem ela." >&2; continue; }
-    if [ -e "$alvo" ] && [ ! -L "$alvo" ]; then echo "aviso: $alvo ja existe e nao e link; a skill compartilhada $rel nao entra." >&2; continue; fi
-    ln -sfn "/run/dgclaw/skills/$rel" "$alvo"
+    [ -f "/run/dgclaw/skills/$nome/SKILL.md" ] || { echo "aviso: a skill $nome nao esta montada; sigo sem ela." >&2; continue; }
+    if [ -e "$alvo" ] && [ ! -L "$alvo" ]; then echo "aviso: $alvo ja existe e nao e link; a skill compartilhada $nome nao entra." >&2; continue; fi
+    # Link que aponta para a imagem (skill nativa) ou para outro lugar fica como esta: so se troca o que ja e compartilhado.
+    if [ -L "$alvo" ]; then case "$(readlink "$alvo")" in /run/dgclaw/skills/*) ;; *) echo "aviso: $nome ja e uma skill da imagem; a compartilhada nao entra." >&2; continue ;; esac; fi
+    ln -sfn "/run/dgclaw/skills/$nome" "$alvo"
     chown -h agente:agente "$alvo"
+    feitos=$((feitos + 1))
 done
-echo "skills compartilhadas: $(printf '%s' "$PERMITIDAS" | wc -w | tr -d ' ') ligada(s)"
+echo "skills compartilhadas: $feitos ligada(s)"
 DENTRO
 }
 
@@ -1329,6 +1335,9 @@ agente_acao() {
             fi
             rodar_firewall
             ok "agente $slug iniciado"
+            if [ "$ENSAIO" != 1 ] && esperar_systemd "$c" 2>/dev/null; then
+                ligar_skills "$slug" >/dev/null 2>&1 || aviso "nao consegui refazer as skills compartilhadas do agente $slug; rode: dgclaw skill aplicar $slug"
+            fi
             ;;
         reiniciar)
             if [ "$ENSAIO" != 1 ] && [ "$(podman inspect -f '{{.State.Status}}' "$c" 2>/dev/null)" != running ]; then
@@ -2207,7 +2216,7 @@ skill_aplicar() {
     for s in $slugs; do
         c="dgclaw-$s"
         if [ "$ENSAIO" != 1 ] && [ "$(podman inspect -f '{{.State.Status}}' "$c" 2>/dev/null)" != running ]; then
-            info "agente $s: container nao esta ligado; as skills entram no proximo iniciar/reparar."; continue
+            skills_montar_vista "$s"; info "agente $s: container nao esta ligado; a vista foi refeita e os links entram no proximo iniciar ou reparar."; continue
         fi
         if ligar_skills "$s"; then ok "agente $s: skills compartilhadas aplicadas (valem na proxima sessao dele)"
         else aviso "agente $s: nao consegui aplicar as skills (veja acima)"; ruins=1; fi

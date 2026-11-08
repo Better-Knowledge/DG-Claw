@@ -53,8 +53,7 @@ test('fonte skills: lista o catálogo compartilhado; propor valida frontmatter, 
   try {
     const fontes = criarFontes({ dir: path.join(c.base, 'fontes'), log: c.cap.log, skillsDir: c.skillsDir, papeis: c.papeis });
     const f = fontes.obter('skills');
-    const l = f.operacoes.listar({});
-    assert.deepEqual(l.itens.map((i) => [i.nome, i.escopo]), [['fechamento-mensal', 'global'], ['conciliacao', 'grupo:financeiro']]);
+    assert.deepEqual(Object.keys(f.operacoes), [], 'a fonte é só ação: o catálogo dos outros escopos não é do agente');
     const a = f.acoes.propor;
     assert.equal(a.acao, 'propor_skill');
     const ctx = { agente: 'ana', pessoa: 'marta', papel: 'analista', politica: c.papeis.estado().politica };
@@ -62,6 +61,11 @@ test('fonte skills: lista o catálogo compartilhado; propor valida frontmatter, 
     assert.equal(ok.nome, 'relatorio-semanal');
     const lanca = (p, status, rx) => { try { a.validar(p, ctx); } catch (e) { assert.ok(e instanceof ErroFonte); assert.equal(e.status, status, e.message); if (rx) assert.match(e.message, rx); return; } assert.fail('devia recusar ' + JSON.stringify(p)); };
     lanca({ nome: 'X', grupo: 'financeiro', conteudo: SKILL('X') }, 400, /"nome"/);
+    lanca({ nome: 'memory', grupo: 'financeiro', conteudo: SKILL('memory') }, 400, /skill da imagem/);
+    lanca({ nome: 'aprender', grupo: 'financeiro', conteudo: SKILL('aprender') }, 400, /skill da imagem/);
+    lanca({ nome: 'conciliacao', grupo: 'financeiro', conteudo: SKILL('conciliacao') }, 409, /Já existe a skill "conciliacao".*"substituir": true/);
+    lanca({ nome: 'a', grupo: 'financeiro', conteudo: SKILL('a') + 'TELEGRAM_TOKEN=1234567890:AAHabcdefghijklmnopqrstuvwxyz0123456\n' }, 400, /segredo/);
+    lanca({ nome: 'a', grupo: 'financeiro', conteudo: SKILL('a'), substituir: 'sim' }, 400, /"substituir"/);
     lanca({ nome: 'a', grupo: 'projeto-x', conteudo: SKILL('a') }, 403, /não faz parte do grupo "projeto-x"/);
     lanca({ nome: 'a', grupo: 'financeiro', conteudo: '# sem frontmatter' }, 400, /frontmatter/);
     lanca({ nome: 'a', grupo: 'financeiro', conteudo: SKILL('b') }, 400, /name: b/);
@@ -75,7 +79,18 @@ test('fonte skills: lista o catálogo compartilhado; propor valida frontmatter, 
     const arq = path.join(c.skillsDir, 'grupos', 'financeiro', 'relatorio-semanal', 'SKILL.md');
     assert.equal(fs.readFileSync(arq, 'utf8'), SKILL('relatorio-semanal'));
     assert.equal(fs.statSync(arq).mode & 0o777, 0o644); assert.equal(fs.statSync(path.dirname(arq)).mode & 0o777, 0o755);
-    assert.equal(a.executar(ok, { agente: 'ana', aprovacao: 'ap2' }).substituiu, true);
+    // sem substituir, a segunda gravação é recusada; com substituir e validada de novo, passa
+    assert.throws(() => a.executar(ok, { agente: 'ana', aprovacao: 'ap2' }), (e) => e instanceof ErroFonte && e.status === 409);
+    const ok2 = a.validar({ nome: 'relatorio-semanal', grupo: 'financeiro', conteudo: SKILL('relatorio-semanal') + 'v2\n', substituir: true }, ctx);
+    assert.equal(a.executar(ok2, { agente: 'ana', aprovacao: 'ap2' }).substituiu, true);
+    // skill publicada pela CLI com outros arquivos: o agente não substitui
+    fs.writeFileSync(path.join(c.skillsDir, 'grupos', 'financeiro', 'conciliacao', 'ajuda.py'), 'print(1)');
+    lanca({ nome: 'conciliacao', grupo: 'financeiro', conteudo: SKILL('conciliacao'), substituir: true }, 409, /mais arquivos além do SKILL.md/);
+    // a pessoa saiu do grupo entre o pedido e a aprovação: a execução recusa
+    const semGrupo = JSON.parse(JSON.stringify(PAPEIS)); semGrupo.pessoas.marta.grupos = [];
+    fs.writeFileSync(c.arqPapeis, JSON.stringify(semGrupo));
+    assert.throws(() => a.executar(ok2, { agente: 'ana', aprovacao: 'ap3' }), (e) => e instanceof ErroFonte && e.status === 403 && /já não faz parte/.test(e.message));
+    fs.writeFileSync(c.arqPapeis, JSON.stringify(PAPEIS));
     fs.mkdirSync(path.join(c.skillsDir, 'grupos', 'atalhado')); fs.symlinkSync(c.base, path.join(c.skillsDir, 'grupos', 'atalhado', 'fuga'));
     assert.throws(() => a.executar({ nome: 'fuga', grupo: 'atalhado', conteudo: SKILL('fuga') }, { agente: 'ana' }), (e) => e instanceof ErroFonte && e.status === 403);
     assert.ok(!fs.existsSync(path.join(c.base, 'SKILL.md')));
@@ -104,20 +119,33 @@ test('rota: propor skill vira aprovação; o dono aprova e o arquivo nasce no gr
   });
   const CAIXA = (slug) => ({ usuario: 'agente:' + slug, via: 'caixa', agente: slug });
   try {
-    // a fonte skills aparece para quem tem a ação (e ninguém lê "listar" sem leitura declarada: só a ação)
+    // a fonte skills aparece para quem tem a ação (só ação: não há listar)
     const f = await pedir('GET', '/api/v1/dados/fontes', undefined, CAIXA('ana'));
     const sk = f.json.fontes.find((x) => x.nome === 'skills');
     assert.deepEqual(sk.acoes, { propor: 'propor_skill' });
     assert.equal((await pedir('GET', '/api/v1/dados/fontes', undefined, CAIXA('edu'))).json.fontes.find((x) => x.nome === 'skills'), undefined, 'estagiário não tem a ação');
     const e = await pedir('POST', '/api/v1/dados/fontes/skills/propor', { nome: 'relatorio-semanal', grupo: 'financeiro', conteudo: SKILL('relatorio-semanal') }, CAIXA('ana'));
-    assert.equal(e.status, 202, e.texto); assert.match(e.json.pedido.descricao, /skill "relatorio-semanal" para o grupo financeiro/);
+    assert.equal(e.status, 202, e.texto); assert.match(e.json.pedido.descricao, /skill nova "relatorio-semanal" para o grupo financeiro/);
     assert.ok(!fs.existsSync(path.join(c.skillsDir, 'grupos', 'financeiro', 'relatorio-semanal')));
     assert.equal((await pedir('POST', '/api/v1/dados/fontes/skills/propor', { nome: 'x', grupo: 'projeto-x', conteudo: SKILL('x') }, CAIXA('ana'))).status, 403, 'grupo que não é da pessoa');
     assert.equal((await pedir('POST', '/api/v1/dados/fontes/skills/propor', { nome: 'x', grupo: 'financeiro', conteudo: SKILL('x') }, CAIXA('edu'))).status, 403, 'papel sem a ação');
     const hash = (await pedir('GET', '/api/v1/dados/aprovacoes?estado=pendente')).json.aprovacoes[0].hash;
     const a = await pedir('POST', `/api/v1/dados/aprovacoes/${e.json.pedido.id}/aprovar`, { hash });
     assert.equal(a.status, 200, a.texto); assert.equal(a.json.pedido.estado, 'executada'); assert.match(a.json.pedido.resultado.proximo_passo, /dgclaw skill aplicar/);
+    assert.match(e.json.pedido.descricao, /skill nova/);
+    // substituir: a frase da aprovação avisa, e sem a flag o pedido nem nasce
+    assert.equal((await pedir('POST', '/api/v1/dados/fontes/skills/propor', { nome: 'relatorio-semanal', grupo: 'financeiro', conteudo: SKILL('relatorio-semanal') }, CAIXA('ana'))).status, 409);
+    const e2 = await pedir('POST', '/api/v1/dados/fontes/skills/propor', { nome: 'relatorio-semanal', grupo: 'financeiro', conteudo: SKILL('relatorio-semanal') + 'v2\n', substituir: true }, CAIXA('ana'));
+    assert.equal(e2.status, 202, e2.texto); assert.match(e2.json.pedido.descricao, /ATENÇÃO: .*SUBSTITUIR a skill "relatorio-semanal"/);
     assert.equal(fs.readFileSync(path.join(c.skillsDir, 'grupos', 'financeiro', 'relatorio-semanal', 'SKILL.md'), 'utf8'), SKILL('relatorio-semanal'));
     assert.ok(!JSON.stringify(dados.acessos.ultimas(50)).includes('passo um'), 'o conteúdo da skill não vai para o log');
   } finally { srv.close(); c.fim(); }
+});
+
+test('os padrões de segredo são os mesmos para a CLI e para o Web (lib/segredos.regex)', () => {
+  const { RX_SEGREDO, carregaSegredos } = require('../lib/dados-fontes/skills');
+  const rx = carregaSegredos(path.join(__dirname, '..', '..', 'lib', 'segredos.regex'));
+  assert.equal(rx.source, RX_SEGREDO.source);
+  for (const s of ['GROQ_API_KEY=gsk_WvKabcdefghijklmnopqrstuv', 'Password: Abcdefghijklmnop', 'TELEGRAM_TOKEN=1234567890:AAHabcdefghijklmnopqrstuvwxyz0123456', 'AIzaSyA1234567890abcdefghijklmnopqrstuvwx', 'jwt eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIn0', 'sk-abcdefghijklmnopqrst']) assert.ok(rx.test(s), s);
+  for (const s of ['a chave está no cofre, nome OPENAI_API_KEY', 'token: curto', 'senha: a sua']) assert.ok(!rx.test(s), s);
 });

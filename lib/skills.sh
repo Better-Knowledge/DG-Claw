@@ -14,6 +14,17 @@
 
 RX_NOME_SKILL='^[a-z][a-z0-9-]{0,39}$'
 SKILL_MAX_BYTES=2097152   # 2 MB por skill (pasta inteira)
+# A copia do DG Claw de onde vem a lista de segredos e os nomes das skills da imagem: APP_DIR no dgclaw,
+# SCRIPT_DIR no instalador (que carrega esta lib para criar as pastas).
+SKILLS_APP="${APP_DIR:-${SCRIPT_DIR:-/opt/dgclaw/app}}"
+# Os padroes de segredo vivem num arquivo so, lido tambem pelo Web (web/lib/dados-fontes/skills.js).
+SKILLS_SEGREDOS_REGEX="${DGCLAW_SEGREDOS_REGEX:-$SKILLS_APP/lib/segredos.regex}"
+
+# skills_nome_reservado <nome>: 0 se o nome e de uma skill da imagem ou do Admin (as pastas de skills/ do
+# DG Claw): uma skill compartilhada com esse nome tomaria o lugar da nativa em todo agente.
+skills_nome_reservado() {
+    [ -d "$SKILLS_APP/skills/$1" ] || [ "$1" = dgclaw ]
+}
 
 skills_garantir_pastas() {
     local d
@@ -51,8 +62,9 @@ skills_conferir_pasta() {
     # O nome no frontmatter precisa ser o nome da pasta (e o que o Claude Code mostra).
     achado="$(sed -n '1,/^---$/{s/^name:[[:space:]]*//p}' "$origem/SKILL.md" | head -1 | tr -d '\r')"
     [ "$achado" = "$nome" ] || falha "o SKILL.md diz 'name: ${achado:-(nada)}', mas a skill se chama '$nome'." "corrija o name no frontmatter do SKILL.md para $nome"
-    # Segredo nunca entra em skill: o arquivo fica legivel por todo agente que a recebe.
-    if grep -rEIn -e 'sk-[A-Za-z0-9_-]{16,}' -e 'xox[abp]-[A-Za-z0-9-]{10,}' -e 'ghp_[A-Za-z0-9]{20,}' -e 'AKIA[0-9A-Z]{16}' -e '-----BEGIN [A-Z ]*PRIVATE KEY-----' -e '(api[_-]?key|token|senha|password|secret)[[:space:]]*[:=][[:space:]]*["'"'"']?[A-Za-z0-9_./+=-]{12,}' "$origem" >/dev/null; then
+    # Segredo nunca entra em skill: o arquivo fica legivel por todo agente que a recebe. Padroes em lib/segredos.regex.
+    [ -s "$SKILLS_SEGREDOS_REGEX" ] || falha "nao achei a lista de padroes de segredo em $SKILLS_SEGREDOS_REGEX." "a copia do DG Claw esta incompleta; reinstale"
+    if grep -rEIin -f "$SKILLS_SEGREDOS_REGEX" "$origem" >/dev/null; then
         falha "a pasta '$origem' parece ter um segredo (chave, token ou senha)." "tire o valor; a skill diz ONDE pegar a chave (no cofre), nunca o valor"
     fi
 }
@@ -61,14 +73,21 @@ skills_conferir_pasta() {
 skills_publicar() {
     local origem="$1" escopo="$2" nome="${3:-$(basename "$1")}" destino pasta tmp
     [[ "$nome" =~ $RX_NOME_SKILL ]] || falha "o nome '$nome' nao serve: use de 1 a 40 caracteres entre letras minusculas, numeros e hifen, comecando por letra." "exemplo: fechamento-mensal"
+    skills_nome_reservado "$nome" && falha "o nome '$nome' e de uma skill da imagem do DG Claw (ou do Admin); uma skill compartilhada com esse nome tomaria o lugar dela em todo agente." "escolha outro nome (ex.: $nome-da-empresa)"
     pasta="$(skills_escopo_pasta "$escopo")"
-    skills_conferir_pasta "$origem" "$nome"
+    [ -d "$origem" ] || falha "a pasta '$origem' nao existe." "aponte a pasta da skill (a que tem o SKILL.md)"
     destino="$pasta/$nome"
-    if [ "$ENSAIO" = 1 ]; then info "[ensaio] publicaria a skill $nome em ${destino#"$R"} (755/644, root)"; return 0; fi
+    if [ "$ENSAIO" = 1 ]; then skills_conferir_pasta "$origem" "$nome"; info "[ensaio] publicaria a skill $nome em ${destino#"$R"} (755/644, root)"; return 0; fi
     skills_garantir_pastas
     mkdir -p "$pasta" && chmod 755 "$pasta"
+    # Copia PRIMEIRO para uma pasta de root e confere a copia: a origem pode ser uma pasta que o agente escreve
+    # (a skill aprendida na casa dele), e entre conferir e copiar ele poderia trocar um arquivo por atalho ou fifo.
     tmp="$(mktemp -d "$pasta/.$nome.XXXXXX")"
-    cp -R "$origem/." "$tmp/"
+    if ! cp -R --no-dereference --preserve=mode "$origem/." "$tmp/" 2>/dev/null; then rm -rf "$tmp"; falha "nao consegui copiar a pasta '$origem'." "confira a permissao e o espaco em disco"; fi
+    if find "$tmp" ! -type f ! -type d | grep -q .; then rm -rf "$tmp"; falha "a pasta '$origem' tem atalho, fifo ou outro arquivo que nao e comum; skill compartilhada so tem arquivos e pastas." "troque o atalho pelo arquivo"; fi
+    SKILLS_TMP_LIMPAR="$tmp"; trap '[ -n "${SKILLS_TMP_LIMPAR:-}" ] && rm -rf "$SKILLS_TMP_LIMPAR"' EXIT
+    skills_conferir_pasta "$tmp" "$nome"
+    SKILLS_TMP_LIMPAR=""; trap - EXIT
     find "$tmp" -type d -exec chmod 755 {} +
     find "$tmp" -type f -exec chmod 644 {} +
     chown -R 0:0 "$tmp"
@@ -106,7 +125,12 @@ skills_permitidas() {
     local slug="$1" linha escopo nome rel grupo
     [[ "$slug" =~ ^[a-z0-9][a-z0-9-]{1,30}$ ]] || return 0
     local pol="" pessoa="" papel="" estado="ativa" grupos="" papel_skills="" pessoa_skills=""
-    if [ -s "$DG_PAPEIS_JSON" ] && pol="$(jq -c --arg s "$slug" '
+    # So confia no papeis.json que o Web aceitaria: arquivo que o Web rejeita libera so as proprias.
+    local papeis_ok=0
+    if [ -s "$DG_PAPEIS_JSON" ] && node -e '
+        const { validaPapeis } = require(process.argv[1]); const fs = require("node:fs");
+        try { process.exit(validaPapeis(JSON.parse(fs.readFileSync(process.argv[2], "utf8"))).ok ? 0 : 1); } catch (e) { process.exit(1); }' "$SKILLS_APP/web/lib/papeis.js" "$DG_PAPEIS_JSON" 2>/dev/null; then papeis_ok=1; fi
+    if [ "$papeis_ok" = 1 ] && pol="$(jq -c --arg s "$slug" '
         (.agentes[$s] // null) as $a
         | if $a == null then null else
           {pessoa: $a.pessoa, papel: $a.papel,
@@ -134,4 +158,37 @@ skills_permitidas() {
         fi
         printf '%s\n' "$rel"
     done < <(skills_listar_tsv)
+}
+
+# skills_montar_vista <slug>: monta /var/lib/dgclaw/skills/.vistas/<slug>/<nome> com copias das skills que a
+# politica libera para o agente. E ESSA pasta (e so ela) que o container monta em /run/dgclaw/skills: o agente
+# nao enxerga as skills dos outros escopos. Refeita na criacao, no reparar, no iniciar e no skill aplicar.
+skills_montar_vista() {
+    local slug="$1" vista rel nome tmp
+    [[ "$slug" =~ ^[a-z0-9][a-z0-9-]{1,30}$ ]] || return 1
+    skills_garantir_pastas
+    vista="$DG_SKILLS_DIR/.vistas/$slug"
+    if [ "$ENSAIO" = 1 ]; then info "[ensaio] montaria a vista de skills do agente $slug em ${vista#"$R"} com: $(skills_permitidas "$slug" | tr '\n' ' ')"; return 0; fi
+    mkdir -p "$DG_SKILLS_DIR/.vistas" && chmod 700 "$DG_SKILLS_DIR/.vistas"
+    tmp="$(mktemp -d "$DG_SKILLS_DIR/.vistas/.$slug.XXXXXX")"
+    while IFS= read -r rel; do
+        [ -n "$rel" ] || continue
+        [[ "$rel" =~ ^(globais|grupos/[a-z][a-z0-9_-]{0,39}|agentes/[a-z0-9][a-z0-9-]{1,30})/[a-z][a-z0-9-]{0,39}$ ]] || continue
+        nome="${rel##*/}"
+        [ -f "$DG_SKILLS_DIR/$rel/SKILL.md" ] || continue
+        [ -e "$tmp/$nome" ] && continue   # duas skills com o mesmo nome em escopos diferentes: a primeira (global) vence
+        cp -R --no-dereference "$DG_SKILLS_DIR/$rel" "$tmp/$nome"
+    done < <(skills_permitidas "$slug")
+    find "$tmp" -type d -exec chmod 755 {} +
+    find "$tmp" -type f -exec chmod 644 {} +
+    chown -R 0:0 "$tmp"
+    rm -rf "$vista"
+    mv "$tmp" "$vista"
+}
+
+# skills_vista_nomes <slug>: os nomes das skills na vista montada, um por linha.
+skills_vista_nomes() {
+    local d
+    for d in "$DG_SKILLS_DIR/.vistas/$1"/*/; do [ -f "$d/SKILL.md" ] && basename "$d"; done
+    return 0
 }

@@ -203,10 +203,12 @@ atende outra pessoa usa a credencial dela.
   container, à resposta ou ao log; catálogo fechado de operações com esquema de parâmetros; escopo
   exigido na pessoa e no papel; escrita só com aprovação humana. O gateway não segue redirecionamento,
   limita a resposta a 1 MB e sobe servidores MCP com ambiente limpo.
-- Skills compartilhadas (`web/docs/SKILLS-POR-ESCOPO.md`): catálogo de root em `/var/lib/dgclaw/skills`
-  montado só leitura no container; o agente recebe links só das skills que o papel libera (e do grupo da
-  pessoa); publicar recusa atalho, binário e segredo; a proposta de um agente só entra com aprovação humana
-  do texto inteiro e nunca no escopo global.
+- Skills compartilhadas (`web/docs/SKILLS-POR-ESCOPO.md`): catálogo de root em `/var/lib/dgclaw/skills`;
+  cada container monta só leitura apenas a vista do próprio agente (cópias das skills que o papel libera e o
+  grupo da pessoa alcança), nunca o catálogo inteiro; publicar e propor recusam atalho, fifo, binário, segredo
+  (padrões em `lib/segredos.regex`) e nome de skill da imagem; a proposta de um agente só entra com aprovação
+  humana do texto inteiro, nunca no escopo global, e substituir uma skill existente pede a marca `substituir`
+  e aparece em destaque para quem aprova.
 - **O que fica fora:** o que o agente alcança por outro caminho (arquivo montado, rede, canal) e o
   que ele já recebeu e anotou na própria casa; a revogação fecha a porta, não apaga o que passou.
 
