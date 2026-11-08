@@ -10,7 +10,9 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 **Colaboradores com vários agentes.** Uma pessoa convidada pode usar mais de um agente de trabalho, e um agente
 pode ter várias pessoas: no convite você marca os agentes que ela vai usar, e o botão **Editar agentes** (tela
 Colaboradores) muda a lista depois, sem derrubar a sessão dela. Com mais de um agente, ela troca de agente pelo menu,
-como você. O que ela não alcança continua igual: o Admin, os agentes que não foram marcados e as telas da caixa
+como você. Lembre que todas as pessoas convidadas para o mesmo agente compartilham a conversa e o painel dele (não há
+conversas separadas por pessoa): se duas pessoas não devem ver o trabalho uma da outra, use um agente para cada uma.
+O que ela não alcança continua igual: o Admin, os agentes que não foram marcados e as telas da caixa
 inteira. Quem já tinha convidado alguém não precisa fazer nada: o convite antigo continua valendo para o agente dele.
 Pelo chat, o Admin também convida, troca os agentes, reenvia e revoga (`sudo dgclaw colaborador ...`), com o mesmo
 arquivo e as mesmas regras da tela.

@@ -122,7 +122,7 @@
     const caixas = caixasDeAgentes([est.agente], 'novo');
     const b = el('button', 'co-btn co-pri', rotulo);
     b.type = 'submit';
-    f.append(el('h3', 'co-sub', rotulo), lMail, lNome, caixas, b);
+    f.append(el('h3', 'co-sub', rotulo), lMail, lNome, caixas, el('p', 'co-fraco', 'Todas as pessoas convidadas para um agente compartilham a mesma conversa e o mesmo painel dele. Se duas pessoas não devem ver o trabalho uma da outra, use um agente para cada uma.'), b);
     f.addEventListener('submit', async ev => {
       ev.preventDefault();
       mostraErro('');

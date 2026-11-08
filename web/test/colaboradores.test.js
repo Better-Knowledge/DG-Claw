@@ -495,3 +495,39 @@ test('força bruta por conta do colaborador: IP novo tranca, o IP de onde ele j�
     assert.equal(JSON.parse(fs.readFileSync(arq, 'utf8')).ips_ok['colab:' + x.id], undefined, 'revogar apaga a memória de IPs do registro');
   } finally { await s.fechar(); }
 });
+
+test('dois escritores (Web e CLI): a gravação que leu a lista antes de outra mudança é recusada com 409 e a mudança sobrevive', async () => {
+  const { criarColaboradores } = require('../lib/colaboradores');
+  const { gerarHashSenha } = require('../lib/auth');
+  const dir = pastaTemp('colab-corrida');
+  const log = () => {};
+  let segura = null;
+  const lento = () => new Promise((resolve) => { segura = resolve; }); // o scrypt "demorado" da instância A
+  const A = criarColaboradores({ config: { dataDir: dir }, log, gerarHash: () => lento().then(() => 'scrypt$1$1$1$a$b') });
+  const B = criarColaboradores({ config: { dataDir: dir }, log, gerarHash: gerarHashSenha });
+  const inst = { ana: 'i:1' };
+  const maria = await B.criar({ agentes: ['ana'], email: 'maria@x.com', instancias: inst });
+  // A começa a convidar o joão: já leu a lista (com a maria ativa) e está esperando o scrypt
+  const pendente = A.criar({ agentes: ['ana'], email: 'joao@x.com', instancias: inst });
+  await new Promise((r) => setTimeout(r, 30));
+  // enquanto isso B (o outro processo) revoga a maria e grava
+  await B.revogar(maria.registro.id);
+  segura();
+  await assert.rejects(pendente, (e) => e.status === 409 && /mudou enquanto/.test(e.message), 'a gravação de A, feita sobre a lista velha, é recusada');
+  const arq = JSON.parse(fs.readFileSync(path.join(dir, 'colaboradores.json'), 'utf8'));
+  assert.equal(arq.colaboradores.length, 1); assert.ok(arq.colaboradores[0].revogado_em, 'a revogação de B sobreviveu');
+  // A relê e, na segunda tentativa, grava por cima da lista nova
+  const A2 = criarColaboradores({ config: { dataDir: dir }, log, gerarHash: gerarHashSenha });
+  const joao = await A2.criar({ agentes: ['ana'], email: 'joao@x.com', instancias: inst });
+  assert.equal(joao.registro.estado, 'aguardando_primeiro_acesso');
+  const depois = JSON.parse(fs.readFileSync(path.join(dir, 'colaboradores.json'), 'utf8'));
+  assert.equal(depois.colaboradores.length, 2); assert.ok(depois.colaboradores.find((c) => c.email === 'maria@x.com').revogado_em);
+  // a instância A, depois do 409, também relê sozinha
+  assert.equal(A.lista().length, 2);
+  // trava órfã (processo que morreu há mais de 10 s) não trava ninguém e é removida
+  const trava = path.join(dir, 'colaboradores.json.trava');
+  fs.mkdirSync(trava); const antes = new Date(Date.now() - 20000); fs.utimesSync(trava, antes, antes);
+  await B.revogar(joao.registro.id);
+  assert.ok(!fs.existsSync(trava), 'a trava órfã foi removida');
+  assert.ok(JSON.parse(fs.readFileSync(path.join(dir, 'colaboradores.json'), 'utf8')).colaboradores.every((c) => c.revogado_em));
+});

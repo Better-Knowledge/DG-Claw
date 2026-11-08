@@ -72,6 +72,8 @@ function espelhaSingular(c) {
   c.instancia = c.agentes[0] ? (c.instancias[c.agentes[0]] || null) : null;
 }
 
+const marcaDe = (st) => `${st.ino}:${st.mtimeMs}:${st.size}`;
+
 const TRAVA_ESPERA_MS = 2000;
 const TRAVA_VELHA_MS = 10000;
 /**
@@ -84,7 +86,14 @@ function comTrava(arquivo, fn) {
   for (;;) {
     try { fs.mkdirSync(trava); break; } catch (e) {
       if (e.code !== 'EEXIST') throw e;
-      try { if (Date.now() - fs.statSync(trava).mtimeMs > TRAVA_VELHA_MS) { fs.rmdirSync(trava); continue; } } catch (_) { /* sumiu entre o stat e o rmdir: tenta de novo */ }
+      // Trava órfã: renomear antes de apagar, porque o rename é atômico e só um dos processos que a acharam velha ganha;
+      // o outro vê ENOENT e volta ao mkdir, em vez de apagar a trava nova de quem ganhou.
+      try {
+        if (Date.now() - fs.statSync(trava).mtimeMs > TRAVA_VELHA_MS) {
+          const velha = `${trava}.velha.${process.pid}.${crypto.randomBytes(3).toString('hex')}`;
+          fs.renameSync(trava, velha); fs.rmdirSync(velha); continue;
+        }
+      } catch (_) { /* sumiu ou outro processo a levou entre o stat e o rename: tenta de novo */ }
       if (Date.now() - inicio > TRAVA_ESPERA_MS) throw erroStatus(503, 'Outra gravação na lista de colaboradores está em andamento (a CLI, provavelmente). Tente de novo em alguns segundos.');
       Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25);
     }
@@ -107,6 +116,7 @@ function criarColaboradores({ config, log, agora, gerarHash }) {
   let lista = [];
   let raizAlheia = {};     // chaves do arquivo que não são nossas (comentario...): sobrevivem à gravação
   let mtimeVisto = -1;     // -1: ainda não li; 0: arquivo ausente
+  let marcaVista = 'nunca';  // inode:mtime:tamanho do arquivo que a lista em memória reflete (grava() confere sob a trava)
   let ilegivel = null;     // motivo, quando o arquivo existe e não deu para ler
   let fila = Promise.resolve();
 
@@ -114,12 +124,13 @@ function criarColaboradores({ config, log, agora, gerarHash }) {
   function carrega() {
     let st;
     try { st = fs.statSync(arquivo); } catch (e) {
-      if (e.code === 'ENOENT') { lista = []; ilegivel = null; mtimeVisto = 0; return; }
+      if (e.code === 'ENOENT') { lista = []; ilegivel = null; mtimeVisto = 0; marcaVista = 'ausente'; return; }
       if (mtimeVisto !== -2) log('erro', `Não consegui acessar ${arquivo} (${e.code || e.message}). Trato como "nenhum colaborador" e não gravo nada até o arquivo voltar a abrir; confira a permissão de ${config.dataDir}.`);
       lista = []; ilegivel = `${e.code || e.message}`; mtimeVisto = -2;
       return;
     }
     const marca = st.mtimeMs;
+    marcaVista = marcaDe(st);
     if (marca === mtimeVisto) return;
     try {
       const j = JSON.parse(fs.readFileSync(arquivo, 'utf8'));
@@ -142,14 +153,24 @@ function criarColaboradores({ config, log, agora, gerarHash }) {
       fs.mkdirSync(path.dirname(arquivo), { recursive: true, mode: 0o700 });
       for (const c of lista) espelhaSingular(c);
       comTrava(arquivo, () => {
+        // A trava cobre só este trecho; a leitura e o scrypt ficaram fora dela. Se o arquivo mudou desde a leitura que
+        // a lista em memória reflete (a CLI, o painel em outro processo, edição à mão), gravar agora apagaria essa
+        // mudança: recusa, e a próxima leitura recarrega. Quem chamou desfaz a alteração em memória.
+        let agora = 'ausente';
+        try { agora = marcaDe(fs.statSync(arquivo)); } catch (e) { if (e.code !== 'ENOENT') throw e; }
+        if (agora !== marcaVista) {
+          mtimeVisto = -1;
+          throw erroStatus(409, 'A lista de colaboradores mudou enquanto a sua alteração era preparada (o painel ou a CLI gravou). Tente de novo.');
+        }
         fs.writeFileSync(tmp, JSON.stringify(Object.assign({}, raizAlheia, { versao: 1, colaboradores: lista }), null, 2) + '\n', { mode: 0o600 });
         fs.chmodSync(tmp, 0o600);
         fs.renameSync(tmp, arquivo);
+        const st = fs.statSync(arquivo);
+        mtimeVisto = st.mtimeMs; marcaVista = marcaDe(st);
       });
-      mtimeVisto = fs.statSync(arquivo).mtimeMs;
     } catch (e) {
       try { fs.unlinkSync(tmp); } catch (_) { /* o temporário nem chegou a existir */ }
-      if (e && e.status === 503) throw e;
+      if (e && (e.status === 503 || e.status === 409)) throw e;
       log('erro', `Não consegui gravar ${arquivo} (${e.code || e.message}). Confira o espaço em disco e a permissão de ${config.dataDir}.`);
       throw erroStatus(500, `Não consegui gravar a lista de colaboradores (${e.code || e.message}). Confira o espaço em disco e a permissão da pasta de dados do Web.`);
     }

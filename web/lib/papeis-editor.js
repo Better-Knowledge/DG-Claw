@@ -53,7 +53,13 @@ function criarPapeisEditor({ caminho, log }) {
       }
       let idade = 0;
       try { idade = Date.now() - fs.statSync(trava).mtimeMs; } catch (_) { continue; }
-      if (idade > TRAVA_VELHA_MS) { try { fs.rmdirSync(trava); } catch (e) { if (e.code !== 'ENOENT') throw e; } continue; }
+      // Trava órfã: renomear antes de apagar, porque o rename é atômico e só um dos processos que a acharam velha ganha;
+      // o outro vê ENOENT e volta ao mkdir, em vez de apagar a trava nova de quem ganhou.
+      if (idade > TRAVA_VELHA_MS) {
+        const velha = `${trava}.velha.${process.pid}.${Math.random().toString(36).slice(2, 8)}`;
+        try { fs.renameSync(trava, velha); fs.rmdirSync(velha); } catch (e) { if (e.code !== 'ENOENT') throw e; }
+        continue;
+      }
       if (Date.now() > limite) throw new ErroEdicao(`Outra edição do arquivo de papéis está em andamento (${trava}). Tente de novo em instantes.`, 503);
       Atomics.wait(DORME, 0, 0, 20);
     }
