@@ -41,6 +41,23 @@ da atualização lista os agentes que ainda precisam disso. Servidor arm64 preci
 
 **Anexos na casa do agente.** Os arquivos enviados pela conversa agora são gravados pelo dono do agente, e não mais pelo root do servidor, para que uma pasta trocada por um atalho dentro da casa do agente não leve o arquivo para fora dela. Em instalações antigas, a pasta `uploads/` que o root tinha criado passa sozinha para o dono do agente no primeiro anexo; as pastas de dias antigos ficam como estão. Nada precisa ser feito para atualizar.
 
+**Ferramentas por escopo: o gateway para os sistemas da empresa.** Os agentes passam a usar o CRM, o ERP, um
+servidor MCP ou um banco de dados pelo DG Claw, sem receber credencial nenhuma: você guarda uma credencial
+por sistema (`printf %s "$CHAVE" | sudo dgclaw sistema credencial crm`), descreve as operações do sistema em
+`/etc/dgclaw/ferramentas.json` (cada uma com o seu escopo, como `crm:ler` ou `crm:escrever`, e os parâmetros
+que aceita) e dá os escopos às pessoas e aos papéis. O agente só vê as operações que o papel dele alcança;
+operação que escreve vira um pedido que você aprova na tela Dados. Dentro do agente isso aparece como três
+tools do Claude Code (`dados_fontes`, `dados_chamar`, `dados_pedido`), que servem também para as fontes e as
+bases de conhecimento. Com isso, 20 sistemas e 20 agentes são 20 credenciais, e desligar uma pessoa derruba
+tudo o que era dela sem trocar credencial. Detalhes e limites em `web/docs/FERRAMENTAS-POR-ESCOPO.md`.
+
+### Como atualizar (ferramentas por escopo)
+
+Peça ao Admin, no chat: "atualiza o DG Claw". A atualização cria o catálogo `/etc/dgclaw/ferramentas.json`
+vazio e a pasta do cofre de sistemas; nada muda para os seus agentes até você cadastrar um sistema. Os agentes
+precisam ser recriados para ganhar o servidor MCP novo nas configurações deles; a atualização faz isso sozinha
+com o `agente recriar`. Se algum agente não for recriado, rode `sudo dgclaw agente reparar <slug>`.
+
 **Bases de conhecimento por escopo.** Você cadastra pastas de texto como bases (`sudo dgclaw base criar manual-rh
 --escopo empresa`), e cada base tem um escopo: privada de uma pessoa, de um grupo (departamento, projeto ou
 equipe), da empresa inteira ou pública. Os grupos e as pessoas de cada grupo ficam no arquivo de papéis, e cada

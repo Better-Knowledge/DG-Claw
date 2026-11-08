@@ -58,7 +58,13 @@ test('histórico, log e papéis viram HTML seguro', () => {
   const ok = T.htmlPapeis({ valido: true, origem: 'arquivo', hash: 'abc', pessoas: 1, papeis: 2, agentes: ['ana'], politica: { agentes: { ana: { pessoa: 'marta', papel: 'recepcao' } } } });
   assert.ok(ok.includes('<code>ana</code> trabalha para <code>marta</code>') && ok.includes('Hash abc'));
   assert.match(T.htmlPapeis({ valido: true, origem: 'arquivo', pessoas: 0, papeis: 1, agentes: [], politica: { agentes: {} } }), /Nenhum agente ligado/);
-  for (const k of ['pendentes', 'papeis', 'bases', 'log']) { const p = T.PASSOS[k]; assert.ok(p.alvo && p.titulo && p.oque && p.como && p.porque, k); }
+  for (const k of ['pendentes', 'papeis', 'bases', 'ferramentas', 'log']) { const p = T.PASSOS[k]; assert.ok(p.alvo && p.titulo && p.oque && p.como && p.porque, k); }
+  assert.match(T.htmlFerramentas({ valido: false, erro: '<x>' }), /dp-erro.*&lt;x&gt;/);
+  assert.match(T.htmlFerramentas({ valido: true, ferramentas: {}, credenciais: [] }), /Nenhuma ferramenta no catálogo/);
+  const hf = T.htmlFerramentas({ valido: true, credenciais: ['crm'], ferramentas: { crm: { titulo: 'CRM <x>', tipo: 'api', credencial: 'crm', operacoes: { listar: { escopo: 'crm:ler', acao: false }, criar: { escopo: 'crm:escrever', acao: true } } }, notion: { titulo: 'notion', tipo: 'mcp', credencial: 'notion', operacoes: {} } } });
+  assert.ok(hf.includes('<code>crm</code> CRM &lt;x&gt; · api · credencial crm<br>listar <small>crm:ler</small>, criar (ação) <small>crm:escrever</small>'));
+  assert.ok(hf.includes('credencial notion não está no cofre'));
+  assert.ok(fs.readFileSync(path.join(__dirname, '../public/dados.html'), 'utf8').includes('id="secFerramentas"'));
   assert.match(T.htmlBases({ valido: false, erro: '<x>' }), /dp-erro.*&lt;x&gt;/);
   assert.match(T.htmlBases({ valido: true, bases: {} }), /Nenhuma base cadastrada/);
   const hb = T.htmlBases({ valido: true, bases: { 'manual-rh': { nome: 'Manual <RH>', escopo: 'empresa', classificacao: 'interno', dono: 'rh' }, 'c-x': { nome: 'c-x', escopo: 'grupo', grupo: 'projeto-x', classificacao: 'sensivel', dono: 'nao-informado' } } });

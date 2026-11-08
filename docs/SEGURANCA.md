@@ -198,6 +198,11 @@ atende outra pessoa usa a credencial dela.
   com escopo (privada, grupo, empresa, pública) cruzado com a pessoa e o papel do agente; a escrita só
   acontece depois da aprovação de uma pessoa, num temporário `O_EXCL | O_NOFOLLOW` renomeado para dentro
   da base. Pessoa desligada no arquivo de papéis não alcança nada.
+- Ferramentas (`web/docs/FERRAMENTAS-POR-ESCOPO.md`): uma credencial por sistema em
+  `/etc/dgclaw/cofre-sistemas` (root, 600), lida pelo Web na hora da chamada e nunca entregue ao
+  container, à resposta ou ao log; catálogo fechado de operações com esquema de parâmetros; escopo
+  exigido na pessoa e no papel; escrita só com aprovação humana. O gateway não segue redirecionamento,
+  limita a resposta a 1 MB e sobe servidores MCP com ambiente limpo.
 - **O que fica fora:** o que o agente alcança por outro caminho (arquivo montado, rede, canal) e o
   que ele já recebeu e anotou na própria casa; a revogação fecha a porta, não apaga o que passou.
 

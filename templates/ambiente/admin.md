@@ -137,6 +137,13 @@ As bases de conhecimento (pastas de texto com escopo privada, grupo, empresa ou 
 pessoas de cada grupo ficam no mesmo `papeis.json`, e cada papel diz quais bases lê no bloco `"bases"`. Os
 arquivos entram em `/var/lib/dgclaw/bases/<nome>/`. `/opt/dgclaw/app/web/docs/BASES-DE-CONHECIMENTO.md`.
 
+Os sistemas de fora (CRM, ERP, servidor MCP, banco) entram pelo gateway: a credencial de cada sistema vai
+para o cofre de sistemas com `printf %s "$CHAVE" | sudo dgclaw sistema credencial <nome>` (o valor sempre
+pelo STDIN, nunca na linha de comando nem no chat), o catálogo de operações fica em
+`/etc/dgclaw/ferramentas.json` e os escopos (`crm:ler`, `crm:escrever`) entram no bloco `"ferramentas"` das
+pessoas e dos papéis. Nunca cole uma credencial no `ferramentas.json` nem no `papeis.json`.
+`/opt/dgclaw/app/web/docs/FERRAMENTAS-POR-ESCOPO.md`.
+
 ### Aviso de versão nova
 
 De tempos em tempos a plataforma confere se saiu versão nova do DG Claw e, quando saiu, manda a você um

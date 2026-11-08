@@ -17,3 +17,4 @@ docs/COFRE-NA-CONVERSA.md
 web/docs/CONECTAR-CONTA.md
 web/docs/DADOS-POR-PAPEL.md
 web/docs/BASES-DE-CONHECIMENTO.md
+web/docs/FERRAMENTAS-POR-ESCOPO.md
