@@ -88,6 +88,24 @@ afirma "caio (sem grupo) para base empresa: pode" dgclaw pessoa desligar caio --
 afirma "copiou para la" test -f "$LIB/bases/manual-rh/bia/MEMORY.md"
 jq '.pessoas.caio.estado = "ativa"' "$PAP" >"$TMP/p3.json" && cp "$TMP/p3.json" "$PAP"
 
+echo "agente que nao para: a memoria nao e copiada com ele vivo"
+jq '.pessoas.marta.estado = "ativa"' "$PAP" >"$TMP/p4.json" && cp "$TMP/p4.json" "$PAP"
+echo running >"$STUB_ESTADO/c-dgclaw-ana"; echo sempre >"$STUB_ESTADO/stop-trava-dgclaw-ana"
+rm -rf "$LIB/bases/entrega-marta"
+nega "desligar com um agente que fica em stopping: falha" dgclaw pessoa desligar marta --sim
+igual "a pessoa FICA desligada (o acesso ja foi negado pelo Web)" "desligada" "$(jq -r .pessoas.marta.estado "$PAP")"
+nega "nada foi copiado" test -e "$LIB/bases/entrega-marta/ana"
+rm -f "$STUB_ESTADO/stop-trava-dgclaw-ana"; echo exited >"$STUB_ESTADO/c-dgclaw-ana"
+afirma "rodar de novo com o agente parado completa a entrega" dgclaw pessoa desligar marta --sim
+afirma "agora copiou" test -f "$LIB/bases/entrega-marta/ana/MEMORY.md"
+jq '.pessoas.marta.estado = "ativa"' "$PAP" >"$TMP/p5.json" && cp "$TMP/p5.json" "$PAP"
+
+echo "o catalogo muda entre a confirmacao e a copia: a copia e recusada"
+entregar() { APP_DIR="$REPO" DGCLAW_RAIZ="$DGCLAW_RAIZ" ENSAIO=0 bash -c ". '$REPO/lib/comum.sh'; . '$REPO/lib/agentes.sh'; . '$REPO/lib/bases.sh'; . '$REPO/lib/pessoas.sh'; pessoas_entregar_memoria \"\$@\"" _ "$@"; }
+afirma "a base vira publica depois da confirmacao" dgclaw base criar entrega-x --escopo publica
+nega "a copia com o escopo conferido antes (grupo) e recusada" entregar marta entrega-x grupo:financeiro
+nega "nada foi copiado para la" test -e "$LIB/bases/entrega-x/ana"
+
 echo "catalogo de bases invalido: desligar recusa antes de mudar algo (a entrega falharia depois)"
 cp "$ETC/bases.json" "$TMP/bases.ok"
 jq '.bases["Nome Invalido"] = {"escopo": "empresa"}' "$ETC/bases.json" >"$TMP/b2.json" && cp "$TMP/b2.json" "$ETC/bases.json"
