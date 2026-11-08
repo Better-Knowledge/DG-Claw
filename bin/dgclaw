@@ -23,6 +23,8 @@ APP_DIR="$(cd "$(dirname "$DGCLAW_BIN_REAL")/.." && pwd)"
 . "$APP_DIR/lib/agentes.sh"
 # shellcheck source=lib/bases.sh
 . "$APP_DIR/lib/bases.sh"
+# shellcheck source=lib/sistemas.sh
+. "$APP_DIR/lib/sistemas.sh"
 # shellcheck source=lib/backup.sh
 . "$APP_DIR/lib/backup.sh"
 # shellcheck source=lib/atualizar.sh
@@ -122,6 +124,14 @@ Bases de conhecimento (o que os agentes podem ler, por escopo)
   dgclaw base listar [--json]           lista as bases, o escopo e quantos arquivos ha em cada pasta
   dgclaw base remover <nome> [--sim]    tira a base do catalogo; a pasta NAO e apagada: vai para
       /var/lib/dgclaw/bases-aposentadas/<nome>-<data>. Pede confirmacao quando ha terminal.
+
+Sistemas (ferramentas por escopo: API, MCP e banco)
+  dgclaw sistema credencial <nome>      guarda a credencial de um sistema (o valor vem SEMPRE pelo STDIN)
+      Uma credencial por sistema, em /etc/dgclaw/cofre-sistemas/<nome>; o agente nunca a recebe: o Web a
+      injeta na hora da chamada. O catalogo de ferramentas fica em /etc/dgclaw/ferramentas.json.
+      Exemplo:  printf %s "$CHAVE" | sudo dgclaw sistema credencial crm
+  dgclaw sistema listar                 os nomes das credenciais (nunca os valores) e as ferramentas do catalogo
+  dgclaw sistema remover <nome>         apaga a credencial; as ferramentas que a usam param de funcionar na hora
 
 Dominio do painel
   dgclaw dominio [mostrar]               mostra o dominio atual do painel e o IP publico da VPS
@@ -513,7 +523,8 @@ gerar_runner_json() {
                   mcpConfig: "/home/agente/.plataforma/dgchat.mcp.json",
                   identidadeArquivo: "/home/agente/.plataforma/identidade.md",
                   allowTools: ["mcp__dgchat__reply", "mcp__dgchat__send_file",
-                               "mcp__dgchat__whatsapp_reply", "mcp__dgchat__whatsapp_send_file"],
+                               "mcp__dgchat__whatsapp_reply", "mcp__dgchat__whatsapp_send_file",
+                               "mcp__dgclaw__dados_fontes", "mcp__dgclaw__dados_chamar", "mcp__dgclaw__dados_pedido"],
                   envExtra: {DGCHAT_AGENT: $slug,
                              DGCHAT_OUTBOUND: "/home/agente/.plataforma/dgchat/outbound.jsonl",
                              DGCHAT_ENTREGA: "disco",
@@ -534,7 +545,9 @@ gerar_mcp_json() {
         {mcpServers: {dgchat: {command: "node",
             args: ["/opt/dgclaw/app/scripts/dgchat-mcp/server.mjs"],
             env: {DGCHAT_AGENT: $slug,
-                  DGCHAT_OUTBOUND: "/home/agente/.plataforma/dgchat/outbound.jsonl"}}}}'
+                  DGCHAT_OUTBOUND: "/home/agente/.plataforma/dgchat/outbound.jsonl"}},
+          dgclaw: {command: "node",
+            args: ["/opt/dgclaw/app/bin/dgclaw-dados-mcp"]}}}'
 }
 
 # Escolhido o minimo que os scripts do plugin exigem (DGCLAW_SLUG, WORKSPACE, NAME) mais
@@ -2048,6 +2061,48 @@ base_main() {
     esac
 }
 
+# --- sistemas: cofre de credenciais e catalogo de ferramentas ------------------------------
+
+sistema_credencial() {
+    [ $# -ge 1 ] || falha "faltou o nome do sistema." 'exemplo: printf %s "$CHAVE" | sudo dgclaw sistema credencial crm'
+    [ $# -eq 1 ] || falha "so o nome vai na linha; o valor vem pelo STDIN." 'exemplo: printf %s "$CHAVE" | sudo dgclaw sistema credencial crm'
+    sistemas_credencial_gravar "$1"
+    [ "$ENSAIO" = 1 ] || ok "credencial $1 guardada em ${DG_COFRE_SISTEMAS#"$R"}/$1 (root, 600). Nenhum reinicio e preciso: o Web a le a cada chamada."
+}
+
+sistema_listar() {
+    [ $# -eq 0 ] || falha "opcao desconhecida: $1" "use: dgclaw sistema listar"
+    exigir_ferramentas jq
+    local nomes ferr
+    nomes="$(sistemas_credenciais_nomes)"
+    if [ -s "$DG_FERRAMENTAS_JSON" ]; then
+        ferr="$(jq -r '.ferramentas | to_entries[] | "\(.key)\t\(.value.tipo // "?")\t\(.value.credencial // "-")\t\((.value.operacoes // {}) | length)"' "$DG_FERRAMENTAS_JSON" 2>/dev/null)" \
+            || ferr="(o catalogo ${DG_FERRAMENTAS_JSON#"$R"} nao e um JSON valido; o Web esta com todas as ferramentas fechadas)"
+    else ferr=""; fi
+    echo "Credenciais no cofre de sistemas (${DG_COFRE_SISTEMAS#"$R"}), so os nomes:"
+    if [ -n "$nomes" ]; then printf '  %s\n' $nomes; else echo "  (nenhuma; guarde com: printf %s \"\$CHAVE\" | sudo dgclaw sistema credencial <nome>)"; fi
+    echo "Ferramentas no catalogo (${DG_FERRAMENTAS_JSON#"$R"}):"
+    if [ -n "$ferr" ]; then printf '  %-24s %-8s %-20s %s\n' NOME TIPO CREDENCIAL OPERACOES; printf '%s\n' "$ferr" | awk -F'\t' '{printf "  %-24s %-8s %-20s %s\n", $1, $2, $3, $4}'
+    else echo "  (nenhuma; edite o catalogo seguindo /opt/dgclaw/app/web/docs/FERRAMENTAS-POR-ESCOPO.md)"; fi
+}
+
+sistema_remover() {
+    [ $# -eq 1 ] || falha "use: dgclaw sistema remover <nome>" "veja os nomes com: dgclaw sistema listar"
+    sistemas_credencial_remover "$1"
+    [ "$ENSAIO" = 1 ] || ok "credencial $1 apagada; as ferramentas que a usam passam a responder que a credencial nao esta no cofre."
+}
+
+sistema_main() {
+    local sub="${1:-}"; shift || true
+    case "$sub" in
+        credencial) sistema_credencial "$@" ;;
+        listar) sistema_listar "$@" ;;
+        remover) sistema_remover "$@" ;;
+        "") falha "faltou dizer o que fazer com os sistemas." "use: credencial, listar ou remover (veja dgclaw --ajuda)." ;;
+        *) falha "'sistema $sub' nao existe." "use: credencial, listar ou remover (veja dgclaw --ajuda)." ;;
+    esac
+}
+
 # --- imagem ---------------------------------------------------------------------------------
 
 # Status e informacao, nao erro: "nao construida" e "construindo" saem com 0 (o chat do Admin
@@ -2476,6 +2531,7 @@ main() {
     case "$cmd" in
         agente) agente_main "$@" ;;
         base) base_main "$@" ;;
+        sistema) sistema_main "$@" ;;
         imagem) imagem_main "$@" ;;
         senha) senha_main "$@" ;;
         seguranca) seguranca_main "$@" ;;

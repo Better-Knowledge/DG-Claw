@@ -43,6 +43,10 @@ caso_instalacao_cria_arquivos_com_os_modos_certos() {
     afirma "papeis.json 600" modo_e "$e/papeis.json" 600
     afirma "bases.json 600 e vazio" bash -c "[ \"\$(stat -c %a '$e/bases.json')\" = 600 ] && jq -e '.versao == 1 and (.bases | length) == 0' '$e/bases.json'"
     afirma "pasta das bases 700" modo_e "$RAIZ/var/lib/dgclaw/bases" 700
+    afirma "ferramentas.json 600 e vazio" bash -c "[ \"\$(stat -c %a '$e/ferramentas.json')\" = 600 ] && jq -e '.versao == 1 and (.ferramentas | length) == 0' '$e/ferramentas.json'"
+    afirma "cofre de sistemas 700" modo_e "$e/cofre-sistemas" 700
+    # O Admin roda no host e nao usa a caixa: o MCP de dados (dgclaw-dados-mcp) e so dos agentes de trabalho.
+    nega "dgchat.mcp.json do admin NAO aponta o MCP de dados" jq -e '.mcpServers.dgclaw' "$a/admin/.plataforma/dgchat.mcp.json"
     afirma "papeis.json vem do modelo e nega tudo (sem agente ligado)" jq -e '.versao == 1 and (.agentes | length) == 0 and (.papeis | length) >= 1' "$e/papeis.json"
     afirma "agentes.json com um Admin" jq -e '(.agentes | length) == 1 and .agentes[0].slug == "admin" and .agentes[0].tipo == "admin" and .agentes[0].runner == "http://127.0.0.1:4300" and .agentes[0].chat_id == "c_admin" and .agentes[0].transcripts_dir == "/root/.claude/projects/-opt-dgclaw-admin" and .agentes[0].runner_token_arquivo == "/etc/dgclaw/runner/admin.token" and .agentes[0].porta_painel == null' "$e/agentes.json"
     nega "agentes.json sem caminho da raiz de teste" tem "$e/agentes.json" "$RAIZ"
@@ -236,6 +240,12 @@ caso_reinstalar_preserva_o_papeis_json_editado() {
     printf '{"versao": 1, "bases": {"manual-rh": {"escopo": "empresa"}}}\n' >"$b"
     afirma "quarta rodada" instalar "" --usuario maria --provedor claude
     afirma "bases.json editado continua igual" jq -e '.bases["manual-rh"].escopo == "empresa"' "$b"
+    # O catalogo de ferramentas e a credencial tambem ficam.
+    printf '{"versao": 1, "ferramentas": {"crm": {"tipo": "api", "base_url": "https://a.test", "operacoes": {}}}}\n' >"$RAIZ/etc/dgclaw/ferramentas.json"
+    printf 'segredo\n' >"$RAIZ/etc/dgclaw/cofre-sistemas/crm"; chmod 600 "$RAIZ/etc/dgclaw/cofre-sistemas/crm"
+    afirma "quinta rodada" instalar "" --usuario maria --provedor claude
+    afirma "ferramentas.json editado continua" jq -e '.ferramentas.crm.tipo == "api"' "$RAIZ/etc/dgclaw/ferramentas.json"
+    igual "a credencial continua" "segredo" "$(cat "$RAIZ/etc/dgclaw/cofre-sistemas/crm")"
     # E sem o modelo no repositorio (clone antigo, zip), a primeira instalacao grava a politica vazia em vez de falhar.
     rm -f "$e" "$FALSO/templates/papeis.exemplo.json"
     afirma "terceira rodada sem o modelo" instalar "" --usuario maria --provedor claude
