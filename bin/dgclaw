@@ -21,6 +21,8 @@ APP_DIR="$(cd "$(dirname "$DGCLAW_BIN_REAL")/.." && pwd)"
 . "$APP_DIR/lib/comum.sh"
 # shellcheck source=lib/agentes.sh
 . "$APP_DIR/lib/agentes.sh"
+# shellcheck source=lib/bases.sh
+. "$APP_DIR/lib/bases.sh"
 # shellcheck source=lib/backup.sh
 . "$APP_DIR/lib/backup.sh"
 # shellcheck source=lib/atualizar.sh
@@ -106,6 +108,20 @@ Agentes
   dgclaw agente remover <slug> [--sim]   tira o agente do ar. Nao apaga: a casa dele vai
       para /var/lib/dgclaw/aposentados/. Pede confirmacao quando ha terminal.
       Exemplo:  dgclaw agente remover ana --sim
+
+Bases de conhecimento (o que os agentes podem ler, por escopo)
+  dgclaw base criar <nome> --escopo empresa|publica|grupo:<grupo>|pessoa:<pessoa> [opcoes]
+      Cadastra uma base: uma pasta de texto (Markdown, txt, csv, json) em /var/lib/dgclaw/bases/<nome>,
+      que os agentes alcancam pela rota de dados conforme o escopo e os papeis (/etc/dgclaw/papeis.json).
+      Opcoes: --nome "<Titulo>" --dono "<quem responde por ela>" --classificacao publico|interno|pessoal|sensivel
+              --finalidade "<para que serve>" --retencao <dias, 0 = sem prazo>
+      Exemplo:  dgclaw base criar manual-rh --escopo empresa --nome "Manual do RH" --dono rh --classificacao interno
+      Exemplo:  dgclaw base criar contratos-x --escopo grupo:projeto-x --classificacao sensivel
+      Rodar de novo com o mesmo nome atualiza o catalogo; a pasta e o que ha nela ficam.
+
+  dgclaw base listar [--json]           lista as bases, o escopo e quantos arquivos ha em cada pasta
+  dgclaw base remover <nome> [--sim]    tira a base do catalogo; a pasta NAO e apagada: vai para
+      /var/lib/dgclaw/bases-aposentadas/<nome>-<data>. Pede confirmacao quando ha terminal.
 
 Dominio do painel
   dgclaw dominio [mostrar]               mostra o dominio atual do painel e o IP publico da VPS
@@ -1881,6 +1897,140 @@ agente_main() {
     esac
 }
 
+# --- bases de conhecimento ------------------------------------------------------------------
+
+RX_NOME_BASE='^[a-z][a-z0-9_-]{0,39}$'
+
+# base_criar <nome> --escopo ... [opcoes]: cadastra (ou atualiza) a base no catalogo e cria a pasta dela.
+base_criar() {
+    [ $# -ge 1 ] || falha "faltou o nome da base." 'exemplo: dgclaw base criar manual-rh --escopo empresa'
+    local nome="$1"; shift
+    local escopo="" titulo="" dono="" classif="" finalidade="" retencao="" grupo="" pessoa=""
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --escopo|--nome|--dono|--classificacao|--finalidade|--retencao)
+                [ $# -ge 2 ] || falha "a opcao $1 precisa de um valor." "exemplo: $1 \"valor\"; veja dgclaw --ajuda"
+                case "$1" in
+                    --escopo) escopo="$2" ;;
+                    --nome) titulo="$(uma_linha "$2")" ;;
+                    --dono) dono="$(uma_linha "$2")" ;;
+                    --classificacao) classif="$2" ;;
+                    --finalidade) finalidade="$(uma_linha "$2")" ;;
+                    --retencao) retencao="$2" ;;
+                esac
+                shift 2 ;;
+            *) falha "opcao desconhecida: $1" "veja as opcoes de 'base criar' com: dgclaw --ajuda" ;;
+        esac
+    done
+    [[ "$nome" =~ $RX_NOME_BASE ]] || falha "o nome '$nome' nao serve: use de 1 a 40 caracteres entre letras minusculas, numeros, _ e -, comecando por letra." "exemplo: manual-rh, contratos-x"
+    [ -n "$escopo" ] || falha "faltou o escopo (--escopo)." "use --escopo empresa, --escopo publica, --escopo grupo:<grupo> ou --escopo pessoa:<pessoa>"
+    case "$escopo" in
+        empresa|publica) ;;
+        grupo:*) grupo="${escopo#grupo:}"; escopo=grupo
+            [[ "$grupo" =~ $RX_NOME_BASE ]] || falha "o grupo '$grupo' nao e um nome valido." "use o nome do grupo como esta em /etc/dgclaw/papeis.json (ex.: --escopo grupo:financeiro)" ;;
+        pessoa:*) pessoa="${escopo#pessoa:}"; escopo=privada
+            [[ "$pessoa" =~ $RX_NOME_BASE ]] || falha "a pessoa '$pessoa' nao e um nome valido." "use o nome da pessoa como esta em /etc/dgclaw/papeis.json (ex.: --escopo pessoa:marta)" ;;
+        *) falha "o escopo '$escopo' nao existe." "use empresa, publica, grupo:<grupo> ou pessoa:<pessoa>" ;;
+    esac
+    if [ -n "$classif" ]; then
+        case "$classif" in publico|interno|pessoal|sensivel) ;; *) falha "a classificacao '$classif' nao existe." "use publico, interno, pessoal ou sensivel" ;; esac
+    fi
+    if [ -n "$retencao" ]; then
+        [[ "$retencao" =~ ^[0-9]{1,5}$ ]] || falha "a retencao precisa ser um numero de dias (0 = sem prazo)." "exemplo: --retencao 365"
+    fi
+    [ "${#titulo}" -le 120 ] || falha "o titulo (--nome) passa de 120 caracteres." "encurte o titulo"
+    [ "${#dono}" -le 80 ] || falha "o dono passa de 80 caracteres." "encurte o texto de --dono"
+    [ "${#finalidade}" -le 300 ] || falha "a finalidade passa de 300 caracteres." "encurte o texto de --finalidade"
+    exigir_ferramentas jq
+    local obj
+    obj="$(jq -nc --arg e "$escopo" --arg g "$grupo" --arg p "$pessoa" --arg t "$titulo" --arg d "$dono" --arg c "$classif" --arg f "$finalidade" --arg r "$retencao" '
+        {escopo: $e}
+        + (if $g != "" then {grupo: $g} else {} end)
+        + (if $p != "" then {pessoa: $p} else {} end)
+        + (if $t != "" then {nome: $t} else {} end)
+        + (if $d != "" then {dono: $d} else {} end)
+        + (if $c != "" then {classificacao: $c} else {} end)
+        + (if $f != "" then {finalidade: $f} else {} end)
+        + (if $r != "" then {retencao_dias: ($r | tonumber)} else {} end)')"
+    if [ "$ENSAIO" = 1 ]; then
+        info "[ensaio] registraria a base $nome ($obj) em ${DG_BASES_JSON#"$R"} e criaria ${DG_BASES_DIR#"$R"}/$nome (modo 700)"
+        return 0
+    fi
+    bases_garantir_arquivo
+    local existia=0
+    [ -z "$(bases_obter "$nome")" ] || existia=1
+    bases_registrar "$nome" "$obj"
+    mkdir -p "$DG_BASES_DIR/$nome" && chmod 700 "$DG_BASES_DIR/$nome"
+    if [ "$existia" = 1 ]; then ok "base $nome atualizada no catalogo (a pasta e os arquivos ficaram como estavam)"
+    else ok "base $nome cadastrada (escopo $escopo${grupo:+, grupo $grupo}${pessoa:+, pessoa $pessoa}); ponha os arquivos .md em ${DG_BASES_DIR#"$R"}/$nome/"; fi
+    info "quem alcanca a base e decidido pelo Web na hora, pelo escopo e por ${DG_PAPEIS_JSON#"$R"} (bloco \"bases\" de cada papel); nada precisa ser reiniciado."
+}
+
+base_listar() {
+    local json=0
+    case "${1:-}" in "") ;; --json) json=1 ;; *) falha "opcao desconhecida: $1" "use: dgclaw base listar [--json]" ;; esac
+    exigir_ferramentas jq
+    local saida
+    # A chave do catalogo e o nome; o campo "nome" de dentro (o titulo) vira "titulo" para nao se misturarem.
+    saida="$(bases_ler | jq -c '.bases | to_entries[] | {nome: .key} + (.value | with_entries(if .key == "nome" then .key = "titulo" else . end))')"
+    local linhas=() l n qtd
+    while IFS= read -r l; do
+        [ -n "$l" ] || continue
+        n="$(printf '%s' "$l" | jq -r .nome)"
+        qtd=0
+        [ -d "$DG_BASES_DIR/$n" ] && qtd="$(find "$DG_BASES_DIR/$n" -type f \( -name '*.md' -o -name '*.txt' -o -name '*.csv' -o -name '*.json' \) 2>/dev/null | wc -l | tr -d ' ')"
+        linhas+=("$(printf '%s' "$l" | jq -c --argjson q "$qtd" '. + {arquivos: $q}')")
+    done <<<"$saida"
+    if [ "$json" = 1 ]; then
+        printf '%s\n' "${linhas[@]+"${linhas[@]}"}" | jq -s '.'
+        return 0
+    fi
+    if [ "${#linhas[@]}" -eq 0 ]; then echo "nenhuma base cadastrada. Crie com: dgclaw base criar <nome> --escopo empresa"; return 0; fi
+    printf '%-24s %-10s %-16s %-10s %s\n' NOME ESCOPO 'GRUPO/PESSOA' ARQUIVOS TITULO
+    for l in "${linhas[@]}"; do
+        printf '%s' "$l" | jq -r '[.nome, .escopo, (.grupo // .pessoa // "-"), (.arquivos | tostring), (.titulo // .nome)] | @tsv' \
+            | awk -F'\t' '{printf "%-24s %-10s %-16s %-10s %s\n", $1, $2, $3, $4, $5}'
+    done
+}
+
+base_remover() {
+    [ $# -ge 1 ] || falha "faltou o nome da base." "exemplo: dgclaw base remover manual-rh --sim"
+    local nome="$1"; shift
+    local sim=0 a
+    for a in "$@"; do case "$a" in --sim) sim=1 ;; *) falha "opcao desconhecida: $a" "use: dgclaw base remover <nome> [--sim]" ;; esac; done
+    [[ "$nome" =~ $RX_NOME_BASE ]] || falha "o nome '$nome' nao e valido." "veja as bases com: dgclaw base listar"
+    exigir_ferramentas jq
+    [ -n "$(bases_obter "$nome")" ] || falha "a base '$nome' nao esta no catalogo." "veja as que existem com: dgclaw base listar"
+    local destino="$DG_LIB/bases-aposentadas/$nome-$(date +%Y%m%d-%H%M%S)"
+    if [ "$sim" != 1 ]; then
+        [ -t 0 ] || falha "sem terminal para confirmar." "rode com --sim para remover sem perguntar: dgclaw base remover $nome --sim"
+        printf 'Vou tirar a base %s do catalogo. A pasta NAO e apagada: vai para %s/.\nDigite o nome (%s) para confirmar: ' "$nome" "${destino#"$R"}" "$nome"
+        local resp; read -r resp
+        [ "$resp" = "$nome" ] || falha "a confirmacao nao confere (digitado: '$resp')." "nada foi feito. Rode de novo e digite $nome."
+    fi
+    if [ "$ENSAIO" = 1 ]; then info "[ensaio] tiraria $nome de ${DG_BASES_JSON#"$R"} e moveria a pasta para ${destino#"$R"}"; return 0; fi
+    bases_remover "$nome"
+    if [ -d "$DG_BASES_DIR/$nome" ]; then
+        mkdir -p "$(dirname "$destino")" && chmod 700 "$(dirname "$destino")"
+        mv "$DG_BASES_DIR/$nome" "$destino"
+        ok "base $nome fora do catalogo; a pasta foi para ${destino#"$R"}"
+    else
+        ok "base $nome fora do catalogo (nao havia pasta)"
+    fi
+    info "os agentes deixam de alcancar a base na hora; o que eles ja leram continua na memoria deles."
+}
+
+base_main() {
+    local sub="${1:-}"; shift || true
+    case "$sub" in
+        criar) base_criar "$@" ;;
+        listar) base_listar "$@" ;;
+        remover) base_remover "$@" ;;
+        "") falha "faltou dizer o que fazer com as bases." "use: criar, listar ou remover (veja dgclaw --ajuda)." ;;
+        *) falha "'base $sub' nao existe." "use: criar, listar ou remover (veja dgclaw --ajuda)." ;;
+    esac
+}
+
 # --- imagem ---------------------------------------------------------------------------------
 
 # Status e informacao, nao erro: "nao construida" e "construindo" saem com 0 (o chat do Admin
@@ -2308,6 +2458,7 @@ main() {
     set -- "${args[@]:1}"
     case "$cmd" in
         agente) agente_main "$@" ;;
+        base) base_main "$@" ;;
         imagem) imagem_main "$@" ;;
         senha) senha_main "$@" ;;
         seguranca) seguranca_main "$@" ;;
