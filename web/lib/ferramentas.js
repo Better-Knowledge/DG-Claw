@@ -43,9 +43,10 @@ const CAMPOS_POR_TIPO = { api: ['base_url', 'auth', 'cabecalho_agente'], banco: 
 // O cabeçalho que leva o slug do agente ao sistema de destino tem de ser PRÓPRIO (X-...) e nunca um que o
 // destino ou um proxy interpretem com efeito colateral (método, origem, IP, autenticação, a própria caixa).
 const RX_CABECALHO_AGENTE = /^X-[A-Za-z0-9-]{1,59}$/;
-const CABECALHOS_PROIBIDOS = /^x-(forwarded-|http-method-override|method-override|real-ip|original-|dgclaw-caixa$|requested-with$|csrf|xsrf|auth|api-key$|access-token$)/i;
-// Variáveis de ambiente que o slug do agente não pode ocupar no servidor MCP (mudariam como o programa roda).
-const RX_ENV_AGENTE_PROIBIDA = /^(PATH|HOME|SHELL|USER|LOGNAME|TMPDIR|LANG|LC_|LD_|DYLD_|NODE_OPTIONS|NODE_PATH|NODE_EXTRA_CA_CERTS|PYTHON|PERL5|RUBY|JAVA_TOOL_OPTIONS|BASH_ENV|ENV$|IFS$|PROMPT_COMMAND|GIT_|SSL_|HTTPS?_PROXY|NO_PROXY)/;
+const CABECALHOS_PROIBIDOS = /^x-(forwarded(-|$)|http-method|method-override|rewrite-url$|override-url$|host$|scheme$|real-ip$|remote-(ip|addr)$|(cluster-)?client-ip$|originating-ip$|original-|dgclaw-(caixa|proxy|usuario)$|requested-with$|csrf|xsrf|auth|[a-z0-9-]*(token|key|secret|signature|password|senha)$)/i;
+// A variável que leva o slug do agente ao servidor MCP tem de ser própria do DG Claw: uma lista negra nunca
+// alcança tudo o que muda como um programa roda (NODE_*, OPENSSL_*, GCONV_PATH, PAGER...).
+const RX_ENV_AGENTE = /^DGCLAW_[A-Z0-9_]{1,60}$/;
 const CAMPOS_OP_COMUNS = ['escopo', 'params', 'acao', 'descricao', 'comentario', 'campos', 'max_itens'];
 const CAMPOS_OP_POR_TIPO = { api: ['metodo', 'rota'], banco: ['sql'], mcp: ['tool'] };
 const MAX_FERRAMENTAS = 200;
@@ -183,7 +184,7 @@ function validaFerramentas(bruto) {
         if (f.args !== undefined && (!Array.isArray(f.args) || f.args.length > 30 || f.args.some((x) => typeof x !== 'string' || x.length > 300 || /[\u0000-\u001f]/.test(x)))) erros.push(`${onde}.args precisa ser uma lista de até 30 textos.`);
         if (f.credencial_env !== undefined && (typeof f.credencial_env !== 'string' || !RX_ENV.test(f.credencial_env))) erros.push(`${onde}.credencial_env precisa ser o nome de uma variável de ambiente (MAIÚSCULAS).`);
         if (temAlgumaCredencial && !f.credencial_env) erros.push(`${onde}: com "credencial" (ou "credenciais"), diga em qual variável ela vai ("credencial_env").`);
-        if (f.env_agente !== undefined && (typeof f.env_agente !== 'string' || !RX_ENV.test(f.env_agente) || f.env_agente === f.credencial_env || RX_ENV_AGENTE_PROIBIDA.test(f.env_agente) || (ehObjeto(f.env) && Object.prototype.hasOwnProperty.call(f.env, f.env_agente)))) erros.push(`${onde}.env_agente precisa ser o nome de uma variável de ambiente própria (MAIÚSCULAS, ex.: DGCLAW_AGENTE), diferente de credencial_env, das chaves de "env" e das que mudam como o programa roda (PATH, HOME, LD_*, NODE_OPTIONS...).`);
+        if (f.env_agente !== undefined && (typeof f.env_agente !== 'string' || !RX_ENV_AGENTE.test(f.env_agente) || f.env_agente === f.credencial_env || (ehObjeto(f.env) && Object.prototype.hasOwnProperty.call(f.env, f.env_agente)))) erros.push(`${onde}.env_agente precisa ser uma variável própria do DG Claw, começando por DGCLAW_ (ex.: DGCLAW_AGENTE), diferente de credencial_env e das chaves de "env".`);
         if (f.env !== undefined && (!ehObjeto(f.env) || Object.keys(f.env).length > 20 || Object.entries(f.env).some(([k, v]) => !RX_ENV.test(k) || typeof v !== 'string' || v.length > 300 || /[\u0000-\u001f]/.test(v)))) erros.push(`${onde}.env precisa ser um objeto { "VAR": "valor" } com até 20 itens.`);
         else if (f.env && f.credencial_env && Object.prototype.hasOwnProperty.call(f.env, f.credencial_env)) erros.push(`${onde}.env não pode definir ${f.credencial_env}: a credencial vem do cofre de sistemas.`);
         if (f.env && Object.keys(f.env).some((k) => /(TOKEN|SECRET|KEY|PASSWORD|SENHA)/.test(k))) erros.push(`${onde}.env parece ter um segredo (TOKEN, KEY, SECRET...). Segredo vai para o cofre de sistemas, não para o catálogo.`);

@@ -151,8 +151,8 @@ function criarDados({ dir, papeis, bases, basesDir, ferramentas, cofreSistemas, 
     // Ferramenta: escopo que falta para ESTA operação (mas o agente alcança outras) é 403 com o motivo; base: invisível.
     if (d.decisao === 'negado' && d.invisivel && !fonte.ferramenta) naoExiste();
     if (d.decisao === 'negado') nega(403, d.motivo);
-    // Ferramenta: o NOME da credencial que a operação usa vai para o log (nunca o valor), para a observabilidade por
-    // agente. Só a partir daqui: um pedido negado não usou credencial nenhuma.
+    // Ferramenta: o NOME da credencial que a operação USA vai para o log (nunca o valor), para a observabilidade por
+    // agente. Só a partir daqui: um pedido negado não chega a ela.
     { const def = ehLeitura ? fonte.operacoes[operacao] : acaoDef; if (def && def.credencial) base.credencial = def.credencial; }
 
     if (ehLeitura) {
