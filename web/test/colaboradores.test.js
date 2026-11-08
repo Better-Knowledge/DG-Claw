@@ -531,3 +531,48 @@ test('dois escritores (Web e CLI): a gravação que leu a lista antes de outra m
   assert.ok(!fs.existsSync(trava), 'a trava órfã foi removida');
   assert.ok(JSON.parse(fs.readFileSync(path.join(dir, 'colaboradores.json'), 'utf8')).colaboradores.every((c) => c.revogado_em));
 });
+
+test('dois escritores: uma releitura no meio da transação não faz a gravação passar; mesmo mtime não engana a releitura', async () => {
+  const { criarColaboradores } = require('../lib/colaboradores');
+  const { gerarHashSenha } = require('../lib/auth');
+  const dir = pastaTemp('colab-corrida2');
+  const log = () => {};
+  let segura = null;
+  const lento = () => new Promise((resolve) => { segura = resolve; });
+  const A = criarColaboradores({ config: { dataDir: dir }, log, gerarHash: () => lento().then(() => 'scrypt$1$1$1$a$b') });
+  const B = criarColaboradores({ config: { dataDir: dir }, log, gerarHash: gerarHashSenha });
+  const inst = { ana: 'i:1' };
+  const maria = await B.criar({ agentes: ['ana'], email: 'maria@x.com', instancias: inst });
+  const joao = await B.criar({ agentes: ['ana'], email: 'joao@x.com', instancias: inst });
+  // (1) A reenvia o convite da maria (scrypt lento); B revoga o joão; um pedido qualquer faz A reler no meio
+  const pendente = A.reenviar(maria.registro.id);
+  await new Promise((r) => setTimeout(r, 30));
+  await B.revogar(joao.registro.id);
+  A.porEmailAtivo('maria@x.com'); // a releitura: troca a lista em memória de A
+  segura();
+  await assert.rejects(pendente, (e) => e.status === 409, 'o reenvio sobre o objeto antigo não é dado como gravado');
+  let arq = JSON.parse(fs.readFileSync(path.join(dir, 'colaboradores.json'), 'utf8'));
+  assert.equal(arq.colaboradores.find((c) => c.email === 'maria@x.com').senha_versao, 1, 'a senha temporária antiga continua a que vale');
+  assert.ok(arq.colaboradores.find((c) => c.email === 'joao@x.com').revogado_em, 'a revogação de B sobreviveu');
+  // (2) e-mail duplicado conferido na lista velha: A convida dup@x.com (lento), B convida o mesmo no meio, A relê
+  const dupA = A.criar({ agentes: ['ana'], email: 'dup@x.com', instancias: inst });
+  await new Promise((r) => setTimeout(r, 30));
+  await B.criar({ agentes: ['ana'], email: 'dup@x.com', instancias: inst });
+  A.lista();
+  segura();
+  await assert.rejects(dupA, (e) => e.status === 409);
+  arq = JSON.parse(fs.readFileSync(path.join(dir, 'colaboradores.json'), 'utf8'));
+  assert.equal(arq.colaboradores.filter((c) => c.email === 'dup@x.com' && !c.revogado_em).length, 1, 'um registro ativo só para o e-mail');
+  // (3) gravação de B com o MESMO mtime da anterior (dois tiques iguais): A relê pelo inode/tamanho e não apaga a mudança
+  const caminho = path.join(dir, 'colaboradores.json');
+  const antes = fs.statSync(caminho);
+  A.lista(); // A em dia com o arquivo atual
+  await B.alterar(maria.registro.id, { nome: 'Maria B' }, {});
+  fs.utimesSync(caminho, antes.atime, antes.mtime); // força o mesmo mtime de antes
+  await A.alterar(joao.registro.id, { nome: 'João A' }, {}).catch(() => {}); // revogado: 409 do próprio alterar, mas a leitura aconteceu
+  const r = await A.alterar(maria.registro.id, { nome: 'Maria A' }, {});
+  assert.equal(r.nome, 'Maria A');
+  arq = JSON.parse(fs.readFileSync(path.join(dir, 'colaboradores.json'), 'utf8'));
+  assert.ok(arq.colaboradores.find((c) => c.email === 'joao@x.com').revogado_em, 'a revogação não voltou');
+  assert.equal(arq.colaboradores.filter((c) => c.email === 'dup@x.com').length, 1);
+});

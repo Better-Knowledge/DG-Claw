@@ -91,7 +91,11 @@ function comTrava(arquivo, fn) {
       try {
         if (Date.now() - fs.statSync(trava).mtimeMs > TRAVA_VELHA_MS) {
           const velha = `${trava}.velha.${process.pid}.${crypto.randomBytes(3).toString('hex')}`;
-          fs.renameSync(trava, velha); fs.rmdirSync(velha); continue;
+          fs.renameSync(trava, velha);
+          // O stat e o rename não são atômicos juntos: se o que veio é uma trava NOVA (outro processo acabou de criá-la),
+          // devolve e volta a esperar; só uma trava de fato velha é apagada.
+          if (Date.now() - fs.statSync(velha).mtimeMs > TRAVA_VELHA_MS) { fs.rmdirSync(velha); continue; }
+          try { fs.renameSync(velha, trava); } catch (_) { fs.rmdirSync(velha); }
         }
       } catch (_) { /* sumiu ou outro processo a levou entre o stat e o rename: tenta de novo */ }
       if (Date.now() - inicio > TRAVA_ESPERA_MS) throw erroStatus(503, 'Outra gravação na lista de colaboradores está em andamento (a CLI, provavelmente). Tente de novo em alguns segundos.');
@@ -116,7 +120,8 @@ function criarColaboradores({ config, log, agora, gerarHash }) {
   let lista = [];
   let raizAlheia = {};     // chaves do arquivo que não são nossas (comentario...): sobrevivem à gravação
   let mtimeVisto = -1;     // -1: ainda não li; 0: arquivo ausente
-  let marcaVista = 'nunca';  // inode:mtime:tamanho do arquivo que a lista em memória reflete (grava() confere sob a trava)
+  let marcaVista = 'nunca';  // inode:mtime:tamanho do arquivo que a lista em memória reflete
+  let marcaBase = null;      // dentro de uma transação: a marca que ELA leu; grava() confere contra esta, não contra a global
   let ilegivel = null;     // motivo, quando o arquivo existe e não deu para ler
   let fila = Promise.resolve();
 
@@ -129,9 +134,9 @@ function criarColaboradores({ config, log, agora, gerarHash }) {
       lista = []; ilegivel = `${e.code || e.message}`; mtimeVisto = -2;
       return;
     }
-    const marca = st.mtimeMs;
-    marcaVista = marcaDe(st);
-    if (marca === mtimeVisto) return;
+    // Relê pela marca completa (inode, mtime e tamanho): duas gravações no mesmo tique de relógio têm mtime igual.
+    const marca = marcaDe(st);
+    if (marca === marcaVista && mtimeVisto !== -1) return;
     try {
       const j = JSON.parse(fs.readFileSync(arquivo, 'utf8'));
       if (!j || typeof j !== 'object' || !Array.isArray(j.colaboradores)) throw new Error('o conteúdo não tem a lista "colaboradores"');
@@ -144,7 +149,7 @@ function criarColaboradores({ config, log, agora, gerarHash }) {
       ilegivel = e.message;
       log('erro', `O arquivo ${arquivo} está ilegível (${e.message}). Trato como "nenhum colaborador" e NÃO apaguei nem vou regravar o arquivo. Corrija o JSON (ou renomeie o arquivo para recomeçar) e tente de novo.`);
     }
-    mtimeVisto = marca;
+    mtimeVisto = st.mtimeMs; marcaVista = marca;
   }
 
   function grava() {
@@ -156,9 +161,13 @@ function criarColaboradores({ config, log, agora, gerarHash }) {
         // A trava cobre só este trecho; a leitura e o scrypt ficaram fora dela. Se o arquivo mudou desde a leitura que
         // a lista em memória reflete (a CLI, o painel em outro processo, edição à mão), gravar agora apagaria essa
         // mudança: recusa, e a próxima leitura recarrega. Quem chamou desfaz a alteração em memória.
+        // Dentro de uma transação, a referência é a marca que a transação leu: uma releitura no meio (qualquer pedido
+        // que chame lista()/obter()) troca a lista em memória, e a alteração feita no objeto antigo não pode ser dada
+        // como gravada.
+        const esperada = marcaBase !== null ? marcaBase : marcaVista;
         let agora = 'ausente';
         try { agora = marcaDe(fs.statSync(arquivo)); } catch (e) { if (e.code !== 'ENOENT') throw e; }
-        if (agora !== marcaVista) {
+        if (agora !== esperada) {
           mtimeVisto = -1;
           throw erroStatus(409, 'A lista de colaboradores mudou enquanto a sua alteração era preparada (o painel ou a CLI gravou). Tente de novo.');
         }
@@ -167,6 +176,7 @@ function criarColaboradores({ config, log, agora, gerarHash }) {
         fs.renameSync(tmp, arquivo);
         const st = fs.statSync(arquivo);
         mtimeVisto = st.mtimeMs; marcaVista = marcaDe(st);
+        if (marcaBase !== null) marcaBase = marcaVista;
       });
     } catch (e) {
       try { fs.unlinkSync(tmp); } catch (_) { /* o temporário nem chegou a existir */ }
@@ -181,7 +191,8 @@ function criarColaboradores({ config, log, agora, gerarHash }) {
     const p = fila.then(async () => {
       carrega();
       if (ilegivel) throw erroStatus(500, `O arquivo ${arquivo} está ilegível (${ilegivel}), então não gravo nada para não perder o que está nele. Corrija o JSON ou renomeie o arquivo para recomeçar.`);
-      return fn();
+      marcaBase = marcaVista;
+      try { return await fn(); } finally { marcaBase = null; }
     });
     fila = p.catch(() => undefined);
     return p;
