@@ -111,6 +111,10 @@ pessoas_entregar_memoria() {
     case "$escopo" in grupo:*) grupo="${escopo#grupo:}" ;; esac
     ja_existe="$(bases_obter "$base")"
     if [ "$ENSAIO" = 1 ]; then info "[ensaio] copiaria a memoria dos agentes de $nome para a base $base (escopo $escopo${ja_existe:+, que ja esta no catalogo e fica como esta})" >&2; return 0; fi
+    # O escopo foi conferido antes da confirmacao; o catalogo pode ter mudado enquanto a pessoa digitava ou os
+    # agentes paravam. Reconfere agora, com a mesma regra; o falha de dentro so derruba o subshell, e cai no return.
+    [ "$(pessoas_escopo_entrega "$nome" "$base" 2>/dev/null)" = "$escopo" ] \
+        || { aviso "o catalogo de bases mudou desde a confirmacao: a base $base ja nao esta no escopo $escopo; nada foi copiado"; return 1; }
     [ -z "$ja_existe" ] || aviso "a base $base ja esta no catalogo; o escopo e os campos dela ficam como estao (so os arquivos entram)"
     destino="$DG_BASES_DIR/$base"
     for slug in $(pessoas_agentes "$nome"); do

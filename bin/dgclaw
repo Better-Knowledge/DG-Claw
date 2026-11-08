@@ -2232,12 +2232,22 @@ pessoa_desligar() {
     pessoas_estado "$nome" desligada
     [ "$ENSAIO" = 1 ] || ok "estado: desligada (o Web nega na hora e revoga os pedidos pendentes dos agentes dela)"
     passo "Parando os agentes de $nome"
+    local parou_tudo=1 est
     for slug in $(pessoas_agentes "$nome"); do
         if [ "$ENSAIO" = 1 ]; then info "[ensaio] pararia o agente $slug"; continue; fi
         if [ "$(podman inspect -f '{{.State.Status}}' "dgclaw-$slug" 2>/dev/null)" = running ]; then
-            podman stop "dgclaw-$slug" >/dev/null && ok "agente $slug parado (a casa dele fica inteira)" || aviso "nao consegui parar o agente $slug; pare com: dgclaw agente parar $slug"
+            podman stop "dgclaw-$slug" >/dev/null && ok "agente $slug parado (a casa dele fica inteira)" || { aviso "nao consegui parar o agente $slug"; parou_tudo=0; }
         else info "agente $slug ja estava parado"; fi
     done
+    # A memoria so e copiada com os agentes parados: a copia roda como root no host, e um agente vivo poderia
+    # trocar um arquivo por atalho entre a conferencia e a copia. O acesso da pessoa ja esta negado pelo Web.
+    if [ "$ENSAIO" != 1 ]; then
+        for slug in $(pessoas_agentes "$nome"); do
+            est="$(podman inspect -f '{{.State.Status}}' "dgclaw-$slug" 2>/dev/null)" || est=ausente
+            case "$est" in running|stopping|paused|restarting) aviso "o agente $slug ainda esta em '$est'"; parou_tudo=0 ;; esac
+        done
+        [ "$parou_tudo" = 1 ] || falha "um agente de $nome continua rodando; a memoria nao e copiada com o agente vivo (a pessoa ja esta desligada e o Web ja nega o acesso dela)." "pare com: dgclaw agente parar <slug>, confira com: dgclaw agente listar, e rode de novo: dgclaw pessoa desligar $nome --sim --base $base"
+    fi
     passo "Entregando a memoria de trabalho dos agentes para a base $base (escopo $escopo)"
     if [ "$ENSAIO" = 1 ]; then pessoas_entregar_memoria "$nome" "$base" "$escopo" 2>&1; return 0; fi
     n="$(pessoas_entregar_memoria "$nome" "$base" "$escopo")" \

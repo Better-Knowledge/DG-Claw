@@ -46,7 +46,9 @@ sudo dgclaw pessoa desligar marta
 
 1. `estado: "desligada"` no arquivo de papéis: o Web nega todo acesso dos agentes dela a fontes, bases,
    ferramentas e skills na hora, e os pedidos pendentes de aprovação deles caem.
-2. Os agentes dela param (`podman stop`). A casa de cada um fica inteira: nada é apagado.
+2. Os agentes dela param (`podman stop`). A casa de cada um fica inteira: nada é apagado. Se algum agente não
+   parar, a memória não é copiada (a cópia roda como root e não acontece com o agente vivo); a pessoa já está
+   desligada, e o comando diz como parar o agente e rodar de novo.
 3. A memória de trabalho de cada agente (`MEMORY.md`, `working-memory.md`, `memory/*.md`) é copiada para a
    base de conhecimento `entrega-<pessoa>`, no escopo do **primeiro grupo** da pessoa (ou da empresa, se ela
    não tem grupo), com dono root e permissão 600/700. O sucessor, no mesmo grupo, consulta essa base pelo
