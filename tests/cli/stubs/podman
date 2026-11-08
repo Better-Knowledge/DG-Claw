@@ -4,6 +4,8 @@ echo "podman $*" >> "${STUB_LOG:?}"
 est="${STUB_ESTADO:?}"
 # O conmon de verdade herda os descritores abertos: se o 9 (a trava das restricoes) chega aqui, ele a segurava para sempre.
 if [ -e /proc/$$/fd/9 ]; then echo "podman $*" >> "$est/fd9-aberto"; fi
+# podman-quebrado: tudo falha com 125 (banco travado, servico fora), como o podman de verdade faz.
+if [ -f "$est/podman-quebrado" ]; then echo "Error: database is locked" >&2; exit 125; fi
 case "${1:-}" in
     image)
         # `image inspect -f {{.Id}}`: o id da imagem "atual" (muda quando o teste escreve estado/imagem-id).
