@@ -19,6 +19,7 @@ O endereço do painel é o que o instalador mostrou no fim da instalação. Toda
 | `/seguranca` | Ronda de segurança, boletins e botão de emergência | Menu ☰, item Segurança. Veja [seguranca.md](seguranca.md) |
 | `/logs` | Histórico do que cada agente fez (mensagens, comandos, arquivos), só leitura e só para o dono | Menu ☰ do Admin, item Logs. Veja [LOGS.md](../../web/docs/LOGS.md) |
 | `/manual` | Esta documentação, dentro do painel | Menu ☰, item Manual |
+| `/dados` | Dados por papel: o que cada agente alcança nas fontes de dados, os pedidos de ação que esperam a sua aprovação e os últimos acessos | Menu ☰, grupo Segurança, item Dados. Veja [DADOS-POR-PAPEL.md](../../web/docs/DADOS-POR-PAPEL.md) |
 | `/colaboradores` | Convite para outra pessoa conversar com um agente | Menu ☰, item Convidar colaborador. Veja [agentes.md](agentes.md) |
 | `/trocar-senha` | O colaborador troca a senha temporária | O colaborador cai aqui no primeiro acesso |
 

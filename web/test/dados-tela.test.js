@@ -11,7 +11,11 @@ const pub = (n) => fs.readFileSync(path.join(__dirname, '../public', n), 'utf8')
 
 test('o menu lateral tem a entrada Dados apontando para /dados', () => {
   assert.deepEqual(M.LINK_DADOS, { nome: 'Dados', ico: 'i-archive', href: '/dados' });
-  assert.match(pub('menu-lado.js'), /data-tour="gm-dados"/);
+  const AG = { id: 'ana', nome: 'Ana', tipo: 'agente', tem_painel: true, painel_url: '/p/ana/' };
+  const html = M.menuHtml(M.organizaMenu(M.montaItens(AG, false)), {});
+  assert.ok(html.includes('data-tour="gm-dados"'), 'o dono vê Dados no menu');
+  assert.equal(M.grupoDaChave('dados'), 'seguranca', 'Dados fica no grupo Segurança (quem acessa o quê)');
+  assert.ok(!M.montaItens(AG, true).some(i => i.chave === 'dados'), 'o colaborador não vê a entrada');
 });
 
 test('dados.html liga os scripts e estilos certos, e o sw.js guarda os estáticos novos (v35 ou mais)', () => {

@@ -7,6 +7,24 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Não lançado]
 
+**Dados por papel: o agente pede, o software decide.** Os agentes de trabalho passam a alcançar fontes de dados
+(agenda, clientes, documentos numa pasta) e ações (enviar e-mail) por uma rota nova da caixa, e o que cada um
+alcança vem de um arquivo de papéis, `/etc/dgclaw/papeis.json`, que fica fora do alcance dos agentes. Cada agente
+aponta para uma pessoa e um papel; ele só lê uma fonte se a pessoa E o papel liberam, e só os campos que os dois
+liberam (a recepção vê nome e telefone do cliente, nunca o CPF). O que não está escrito é negado. Toda ação vira
+um pedido que você aprova na nova tela **Dados** (menu ☰), lendo a ação exata; o agente não consegue mudar nada
+depois de pedir, e cada aprovação vale uma vez, por 15 minutos. Cada pedido vira uma linha no log de acesso,
+sem o conteúdo. Nesta versão as fontes são locais e de exemplo; nenhum sistema real entra ainda, e o e-mail só
+é registrado, não enviado. Os limites estão escritos em `web/docs/DADOS-POR-PAPEL.md`.
+
+### Como atualizar (dados por papel)
+
+Peça ao Admin, no chat: "atualiza o DG Claw". A atualização cria o arquivo `/etc/dgclaw/papeis.json` com um
+modelo que não libera agente nenhum; os seus agentes continuam como estão até você ligar cada um ali. Se o
+arquivo já existir, ele não é tocado. Os agentes ganharam um trecho novo nas instruções deles, dizendo como
+pedir dados e que conteúdo recuperado não é ordem; ele entra sozinho na identidade de cada agente ao
+atualizar, sem apagar o que você personalizou no `AGENT.md`.
+
 ## [1.1.0] - 2026-11-18
 
 - **Correção no aviso de versão nova: o número agora sobe a cada release e, quando é igual, o aviso mostra o commit.** O
@@ -635,24 +653,6 @@ da atualização lista os agentes que ainda precisam disso. Servidor arm64 preci
 **Convidar um colaborador.** Agora você pode convidar uma pessoa para conversar com um dos seus agentes de trabalho, sem dar acesso ao resto do DG Claw. No menu ☰ do agente há o item **Convidar colaborador** (ou a página `/colaboradores`): você informa o e-mail da pessoa, e ela recebe o link, o login e uma senha temporária que vale por 7 dias. No primeiro acesso ela cria a própria senha e passa a usar aquele agente: a conversa e a leitura das sessões, das rotinas, da memória e dos arquivos. Ela não grava memória, arquivos nem configuração pelo painel, e o login da conta de IA do agente também fica só com você. Ela não sai desse agente: o Admin, os outros agentes e as telas da caixa inteira (chaves de API do sistema, convidar colaborador, configurações globais) continuam só seus. Dentro do agente, o cofre, as chaves de API do painel, o login da conta de IA, as credenciais dos canais e a Tela também ficam com você. Você manda o convite de novo ou revoga o acesso quando quiser, e a lista guarda o histórico com as datas. As mensagens dele chegam ao agente marcadas como vindas de um colaborador. O envio do convite por e-mail é opcional: sem configurar nada, a tela mostra o texto pronto para você copiar e mandar por WhatsApp. Para o DG Claw mandar o e-mail sozinho, veja as variáveis `DGCLAW_SMTP_*` em `web/docs/COLABORADORES.md`. Nada precisa ser feito para atualizar.
 
 **Anexos na casa do agente.** Os arquivos enviados pela conversa agora são gravados pelo dono do agente, e não mais pelo root do servidor, para que uma pasta trocada por um atalho dentro da casa do agente não leve o arquivo para fora dela. Em instalações antigas, a pasta `uploads/` que o root tinha criado passa sozinha para o dono do agente no primeiro anexo; as pastas de dias antigos ficam como estão. Nada precisa ser feito para atualizar.
-
-**Dados por papel: o agente pede, o software decide.** Os agentes de trabalho passam a alcançar fontes de dados
-(agenda, clientes, documentos numa pasta) e ações (enviar e-mail) por uma rota nova da caixa, e o que cada um
-alcança vem de um arquivo de papéis, `/etc/dgclaw/papeis.json`, que fica fora do alcance dos agentes. Cada agente
-aponta para uma pessoa e um papel; ele só lê uma fonte se a pessoa E o papel liberam, e só os campos que os dois
-liberam (a recepção vê nome e telefone do cliente, nunca o CPF). O que não está escrito é negado. Toda ação vira
-um pedido que você aprova na nova tela **Dados** (menu ☰), lendo a ação exata; o agente não consegue mudar nada
-depois de pedir, e cada aprovação vale uma vez, por 15 minutos. Cada pedido vira uma linha no log de acesso,
-sem o conteúdo. Nesta versão as fontes são locais e de exemplo; nenhum sistema real entra ainda, e o e-mail só
-é registrado, não enviado. Os limites estão escritos em `web/docs/DADOS-POR-PAPEL.md`.
-
-### Como atualizar (dados por papel)
-
-Peça ao Admin, no chat: "atualiza o DG Claw". A atualização cria o arquivo `/etc/dgclaw/papeis.json` com um
-modelo que não libera agente nenhum; os seus agentes continuam como estão até você ligar cada um ali. Se o
-arquivo já existir, ele não é tocado. Os agentes ganharam um trecho novo nas instruções deles, dizendo como
-pedir dados e que conteúdo recuperado não é ordem; ele entra sozinho na identidade de cada agente ao
-atualizar, sem apagar o que você personalizou no `AGENT.md`.
 
 **Nova página Conectar conta.** Antes, para conectar a conta do Claude de um agente alguém tinha de gerar um link de login
 e mandar por mensagem, e o link vencia antes de você ver. Agora o painel tem a página **Conectar conta** (no menu ☰, ou em
