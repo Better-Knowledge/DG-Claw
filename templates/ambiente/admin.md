@@ -233,7 +233,7 @@ chat). Para o que cada agente sabe fazer, leia `/opt/dgclaw/app/templates/ambien
 
 ### Como o menu do agente está organizado
 
-O menu lateral deixa sempre à vista a Conversa, a Mesa e a Pasta do agente. O resto fica em grupos que abrem e fecham: Perfil do agente (Identidade, Personalidade, Memória), Dia a dia (Rotinas, Lembretes, Sessões), Ferramentas (Skills, Apps, Conectar conta, Anonimizar), Operação (Status, Operações, Custos e, só no menu do Admin, Logs) e Segurança (Segurança, Cofre, Avisos, Convidar colaborador). Como funciona e Socorro ficam soltos no fim, e o grupo Conexões (Navegador, Posts, Seguidores, Reuniões) só aparece quando algum desses itens está ligado. Ao orientar o dono, diga o grupo onde o item está. Uma bolinha no nome de um grupo fechado avisa que há algo esperando por ele lá dentro.
+O menu lateral deixa sempre à vista a Conversa, a Mesa e a Pasta do agente. O resto fica em grupos que abrem e fecham: Perfil do agente (Identidade, Personalidade, Memória), Dia a dia (Rotinas, Lembretes, Sessões), Ferramentas (Skills, Apps, Conectar conta, Anonimizar), Operação (Status, Operações, Custos e, só no menu do Admin, Logs) e Segurança (Segurança, Cofre, Avisos, Dados, Convidar colaborador). Como funciona e Socorro ficam soltos no fim, e o grupo Conexões (Navegador, Posts, Seguidores, Reuniões) só aparece quando algum desses itens está ligado. Ao orientar o dono, diga o grupo onde o item está. Uma bolinha no nome de um grupo fechado avisa que há algo esperando por ele lá dentro.
 
 ### A aba Pedidos da Mesa
 
@@ -243,6 +243,14 @@ Se o dono perguntar onde vê o que pediu aos agentes: no menu do agente, em Mesa
 agente na conversa depois da entrega, e o agente não fecha o item por ele. Se um agente não estiver
 abrindo itens, a regra "Fila de pedidos" chega às instruções dele pelo `dgclaw agente reparar <slug>`.
 Detalhes: `/opt/dgclaw/app/web/docs/PEDIDOS.md`.
+### Papéis de acesso a dados dos agentes
+
+O que cada agente de trabalho alcança nas fontes de dados (agenda, clientes, documentos, e-mail) vem do
+arquivo `/etc/dgclaw/papeis.json`, que só você e o dono editam; os agentes não o alcançam. Quando o dono
+pedir para liberar ou tirar um acesso, edite esse arquivo (uma pessoa, um papel, o agente apontando para
+os dois; o que não está escrito é negado), confira que continua JSON válido e nada mais: o Web relê sozinho.
+Nunca ponha um agente com mais acesso do que a pessoa dele tem. As ações (enviar e-mail) sempre passam
+pela aprovação do dono na tela Dados do painel. `/opt/dgclaw/app/web/docs/DADOS-POR-PAPEL.md`.
 
 ### Aviso de versão nova
 

@@ -1741,6 +1741,8 @@ FIM
     # Sem reiniciar sozinho: quem roda este instalador pode ser o proprio Admin.
     ligar_unidade dgclaw-admin.service avisar
 
+    # Papeis de acesso a dados: so cria se nao existe; o que o dono editou fica (web/docs/DADOS-POR-PAPEL.md).
+    papeis_garantir_arquivo "$SCRIPT_DIR/templates/papeis.exemplo.json"
     if tem_jq; then
         agentes_garantir_arquivo
         # codex_home_host vai sempre, mesmo com o Admin no Claude: o runner.json dele usa CODEX_HOME=/root/.codex

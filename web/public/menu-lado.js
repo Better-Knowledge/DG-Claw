@@ -39,6 +39,7 @@
   const ehColaborador = () => !!(raiz.DGPapel && raiz.DGPapel.colaborador);
   const LINK_ANONIMIZAR = { nome: 'Anonimizar', ico: 'i-glasses', href: '/anonimizar' };
   const LINK_LOGS = { nome: 'Logs', ico: 'i-scroll', href: '/logs' };
+  const LINK_DADOS = { nome: 'Dados', ico: 'i-archive', href: '/dados' };
 
   /* Sessões é item fixo para todo agente com painel (a tela fica no painel dele). Devolve o link do menu e os
      endereços que o menu consulta (config: a aba está ligada? pedidos: quantas sessões esperam o dono), ou null. */
@@ -81,6 +82,7 @@
     if (caminho === '/colaboradores') return 'colaboradores';
     if (caminho === '/anonimizar') return 'anonimizar';
     if (caminho === '/logs') return 'logs';
+    if (caminho === '/dados') return 'dados';
     if (/^\/a\/[^/]+$/.test(caminho)) return 'conversa';
     return '';
   }
@@ -102,13 +104,13 @@
      Conversa e Mesa ficam fixas no alto (casca.js), seguidas de Pasta do agente. As outras páginas ficam em acordeões;
      Como funciona, Manual e Socorro ficam soltos no fim. O que não está nesta tabela (Navegador, Posts, Seguidores, Reuniões e os
      itens que o painel acrescentar) vai para o grupo "Conexões", que só existe quando há pelo menos um deles.
-     Conectar conta, Face ID e Anonimizar entram em Ferramentas, e Convidar colaborador em Segurança (quem tem acesso ao quê). */
+     Conectar conta, Face ID e Anonimizar entram em Ferramentas, e Dados e Convidar colaborador em Segurança (quem tem acesso ao quê). */
   const GRUPOS_MENU = [
     { id: 'perfil', nome: 'Perfil do agente', ico: 'i-id', chaves: ['identity', 'personality', 'memory'] },
     { id: 'dia', nome: 'Dia a dia', ico: 'i-calendar', chaves: ['rotinas', 'lembretes', 'sessoes'] },
     { id: 'ferramentas', nome: 'Ferramentas', ico: 'i-package', chaves: ['skills', 'apps', 'conectar', 'faceid', 'anonimizar'] },
     { id: 'operacao', nome: 'Operação', ico: 'i-activity', chaves: ['status', 'operations', 'costs', 'logs'] },
-    { id: 'seguranca', nome: 'Segurança', ico: 'i-shield', chaves: ['seguranca', 'cofre', 'avisos', 'suporte', 'colaboradores'] },
+    { id: 'seguranca', nome: 'Segurança', ico: 'i-shield', chaves: ['seguranca', 'cofre', 'avisos', 'suporte', 'dados', 'colaboradores'] },
   ];
   const GRUPO_CONEXOES = { id: 'conexoes', nome: 'Conexões', ico: 'i-globe' };
   const CHAVES_FIXAS = ['arquivos'];
@@ -125,6 +127,8 @@
     fixo('conectar', LINK_CONECTAR, 'gm-conectar');
     fixo('faceid', LINK_FACEID, 'gm-faceid');
     if (!colab) fixo('anonimizar', LINK_ANONIMIZAR, 'gm-anonimizar');
+    // Dados (aprovações por papel): só o dono; o colaborador não vê a entrada.
+    if (!colab) fixo('dados', LINK_DADOS, 'gm-dados');
     if (mostraLogs(ag, colab)) fixo('logs', LINK_LOGS, 'gm-logs');
     // Convidar colaborador: só o dono, e nunca para o Admin (o Admin mexe no servidor inteiro)
     if (!colab && ag && ag.tipo !== 'admin' && id) {
@@ -404,7 +408,7 @@
     return { tipo: 'sem', texto: 'Este navegador não oferece a instalação por aqui. No Chrome ou no Edge, abra o menu do navegador e procure Instalar app. No Firefox para computador, o recurso não existe.' };
   }
 
-  if (!raiz.document) return { GRUPOS_MENU, GRUPO_CONEXOES, montaItens, organizaMenu, menuHtml, grupoHtml, grupoDaChave, corUso, quandoZeraUso, miniBarraUso, itemUso, ABAS_PAINEL, LINK_LEMBRETES, LINK_AVISOS, LINK_SUPORTE, LINK_MANUAL, LINK_SEGURANCA, LINK_CONECTAR, LINK_FACEID, LINK_COLABORADOR, LINK_ANONIMIZAR, LINK_LOGS, mostraLogs, linkSessoes, linkTela, itemAgente, bolinhaMenu, seloDe, totalNaoLidas, totalPrecisam, horaCurta, linksPainel, linksExtras, comAgente, chaveDoHref, passosMenu, instrucaoInstalar };
+  if (!raiz.document) return { GRUPOS_MENU, GRUPO_CONEXOES, montaItens, organizaMenu, menuHtml, grupoHtml, grupoDaChave, corUso, quandoZeraUso, miniBarraUso, itemUso, ABAS_PAINEL, LINK_LEMBRETES, LINK_AVISOS, LINK_SUPORTE, LINK_MANUAL, LINK_SEGURANCA, LINK_CONECTAR, LINK_FACEID, LINK_COLABORADOR, LINK_ANONIMIZAR, LINK_LOGS, LINK_DADOS, mostraLogs, linkSessoes, linkTela, itemAgente, bolinhaMenu, seloDe, totalNaoLidas, totalPrecisam, horaCurta, linksPainel, linksExtras, comAgente, chaveDoHref, passosMenu, instrucaoInstalar };
 
   /* ── Parte com DOM ─────────────────────────────────────────────────────── */
   const $ = id => document.getElementById(id);

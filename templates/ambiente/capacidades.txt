@@ -21,3 +21,4 @@ web/docs/CADEADO.md
 web/docs/PARAR.md
 docs/BOAS-PRATICAS-RONDAS.md
 docs/manual/README.md
+web/docs/DADOS-POR-PAPEL.md

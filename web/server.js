@@ -61,6 +61,8 @@ const { criarEmail } = require('./lib/email');
 const { criarCadeado, MSG_TRAVADO } = require('./lib/cadeado');
 const { criarMarca } = require('./lib/marca');
 const escopo = require('./lib/escopo');
+const { criarPapeis } = require('./lib/papeis');
+const { criarDados } = require('./lib/dados');
 
 const METODOS_QUE_ESCREVEM = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const TIPOS_ESTATICOS = {
@@ -228,6 +230,13 @@ function criarServidor(opcoes) {
   // O manual (docs/manual) é só leitura: o agente consulta pelo dgclaw-api antes de dizer que algo não existe.
   const manual = criarManual({ dir: opcoes.manualDir || path.join(__dirname, '..', 'docs', 'manual'), log });
   caixa.permitir('/api/v1/manual');
+  // Dados por papel: o agente pede pela caixa, o software decide pelos papéis (/etc/dgclaw/papeis.json). Só as
+  // rotas do agente entram na caixa; aprovar, recusar, ver os papéis e o log são do dono (web/docs/DADOS-POR-PAPEL.md).
+  const papeis = opcoes.papeis || criarPapeis({ caminho: config.papeisPath, log });
+  const dados = criarDados({ dir: path.join(config.dataDir, 'dados'), papeis, push: opcoes.push || push, log, agora: opcoes.agora, retencaoDias: config.dadosLogDias, prazoAprovacaoMs: opcoes.prazoAprovacaoMs });
+  caixa.permitir('/api/v1/dados/fontes');
+  caixa.permitir('/api/v1/dados/pedidos');
+  caixa.permitir('/api/v1/dados/docs.md');
   // Aviso de versão nova: só o dono, pelo painel. De propósito NÃO entra em caixa.permitir (agente em container não usa).
   const estados = criarEstados({ conversa, naoLidas, registro, log });
   const prefsAtencao = criarPrefsAtencao({ arquivo: path.join(config.dataDir, 'push', 'preferencias.json'), log });
@@ -589,6 +598,8 @@ function criarServidor(opcoes) {
     if ((p === '/api/v1/anonimizar' || p.startsWith('/api/v1/anonimizar/')) && await rotasAnonimizar.rotas(req, res, url, sessao)) return undefined;
 
     if ((p === '/api/v1/lembretes' || p.startsWith('/api/v1/lembretes/')) && await lembretes.rotas(req, res, url, sessao)) return undefined;
+
+    if ((p === '/api/v1/dados' || p.startsWith('/api/v1/dados/')) && await dados.rotas(req, res, url, sessao)) return undefined;
 
     if ((p === '/api/v1/atualizacao' || p.startsWith('/api/v1/atualizacao/')) && await atualizacao.rotas(req, res, url, sessao)) return undefined;
 
@@ -1608,6 +1619,16 @@ function criarServidor(opcoes) {
       return undefined;
     }
 
+    if (p === '/dados' && (m === 'GET' || m === 'HEAD')) {
+      if (!sessao) return semSessaoPagina(req, res, url);
+      if (sessao.via === 'caixa') return H.erroJson(res, 403, 'A tela de aprovações é do dono, pelo painel.');
+      if (!servirArquivo(req, res, path.join(config.publicDir, 'dados.html'), 'no-store')) {
+        log('erro', `A tela de dados não está instalada: falta ${path.join(config.publicDir, 'dados.html')}.`);
+        H.paginaErro(res, 500, 'Tela não instalada', 'O arquivo da tela de dados não foi encontrado no servidor. Reinstale o DG Claw Web.');
+      }
+      return undefined;
+    }
+
     if ((p === '/avisos' || p === '/avisos/') && (m === 'GET' || m === 'HEAD')) {
       if (!sessao) return semSessaoPagina(req, res, url);
       if (!servirArquivo(req, res, path.join(config.publicDir, 'avisos.html'), 'no-store')) {
@@ -1809,7 +1830,7 @@ function criarServidor(opcoes) {
   }
 
   return {
-    servidor, servidorAdmin, caminhoSocketAdmin, config, registro, auth, colaboradores, cadeado, contaColab, proxy, midia, conversa, anonimizar, filtroAnon, log, caixa, push, lembretes, avisos, chavesApi, diagnostico, estados, vigiaAtencao, prefsAtencao,
+    servidor, servidorAdmin, caminhoSocketAdmin, config, registro, auth, colaboradores, cadeado, contaColab, proxy, midia, conversa, anonimizar, filtroAnon, log, caixa, push, lembretes, avisos, chavesApi, diagnostico, estados, vigiaAtencao, prefsAtencao, dados, papeis,
     ouvir(porta, host) {
       return new Promise((resolve, reject) => {
         servidor.once('error', reject);

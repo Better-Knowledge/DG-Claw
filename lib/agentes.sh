@@ -61,3 +61,18 @@ agentes_remover() {
     # shellcheck disable=SC2016 # o $s e variavel do jq, nao do shell
     com_trava _agentes_aplicar '.agentes = [.agentes[] | select(.slug != $s)]' --arg s "$1"
 }
+
+# papeis_garantir_arquivo [modelo]: cria o /etc/dgclaw/papeis.json (papeis de acesso a dados dos
+# agentes, web/docs/DADOS-POR-PAPEL.md) SO SE ELE AINDA NAO EXISTE. Arquivo que ja existe e do dono:
+# nunca e reescrito, nem por atualizacao (regra do projeto: atualizar nunca apaga configuracao).
+# Sem o modelo (templates/papeis.exemplo.json), grava a politica vazia, que nega tudo. Modo 600 e dono
+# root: o agente nunca alcanca este arquivo, e e isso que impede o agente de ampliar a propria permissao.
+papeis_garantir_arquivo() {
+    local modelo="${1:-}"
+    if [ -s "$DG_PAPEIS_JSON" ]; then return 0; fi
+    if [ -n "$modelo" ] && [ -s "$modelo" ]; then
+        escrever_arquivo "$DG_PAPEIS_JSON" 600 <"$modelo"
+    else
+        printf '{"versao": 1, "pessoas": {}, "papeis": {}, "agentes": {}}\n' | escrever_arquivo "$DG_PAPEIS_JSON" 600
+    fi
+}

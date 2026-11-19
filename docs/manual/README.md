@@ -30,6 +30,7 @@ Os caminhos de teste são relativos à raiz do repositório.
 | Campo de senha na conversa (cofre) | Pronto | O agente mostra o cartão | teste: `web/test/campo-cofre.test.js`, `web/test/cofre-agente.test.js` | [conversa-e-telas.md](conversa-e-telas.md) |
 | Modo escondido (👁) | Pronto | Botão 👁 | teste: `web/test/sigilo.test.js`, `web/test/sigilo-tela.test.js` | [conversa-e-telas.md](conversa-e-telas.md) |
 | Anonimizar documentos | Pronto | `/anonimizar` | teste: `web/test/anonimizar.test.js`, `web/test/anonimizar-tela.test.js`, `tests/anonimizar/rodar.sh` | [conversa-e-telas.md](conversa-e-telas.md) |
+| Dados por papel (fontes, aprovações e log de acesso) | Pronto | `/dados` | teste: `web/test/papeis.test.js`, `web/test/dados.test.js`, `web/test/dados-tela.test.js` | [conversa-e-telas.md](conversa-e-telas.md) |
 | Lembretes que insistem | Pronto | `/lembretes` ou "me lembra de..." | teste: `web/test/lembretes.test.js`, `web/test/lembretes-tela.test.js` | [conversa-e-telas.md](conversa-e-telas.md) |
 | Avisos no aparelho (web push) | Pronto | "Ativar avisos neste aparelho" | teste: `web/test/push.test.js` | [conversa-e-telas.md](conversa-e-telas.md) |
 | Modo foco | Pronto | "Monta meu foco de hoje" | teste: `web/test/foco.test.js`, `web/test/foco-hook.test.js`, `web/test/foco-tela.test.js` | [conversa-e-telas.md](conversa-e-telas.md) |

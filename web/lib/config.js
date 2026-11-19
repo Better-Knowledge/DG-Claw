@@ -51,6 +51,8 @@ function carregaConfig(opcoes, log) {
     host: opcoes.host || env.DGCLAW_WEB_HOST || '127.0.0.1',
     porta: opcoes.porta != null ? opcoes.porta : num(env.DGCLAW_WEB_PORT, 8300),
     agentesPath: opcoes.agentesPath || env.DGCLAW_AGENTES || '/etc/dgclaw/agentes.json',
+    papeisPath: opcoes.papeisPath || env.DGCLAW_PAPEIS || '/etc/dgclaw/papeis.json',
+    dadosLogDias: Math.round(num(env.DGCLAW_DADOS_LOG_DIAS, 90)),
     dataDir: opcoes.dataDir || env.DGCLAW_WEB_DATA || '/var/lib/dgclaw/web',
     chavesApiArquivo: opcoes.chavesApiArquivo || null, // padrão: <dataDir>/chaves-api.json (override só para testes)
     // Pasta da marca (white label): fica fora da instalação e sobrevive à atualização.

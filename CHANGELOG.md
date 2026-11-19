@@ -7,6 +7,24 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Não lançado]
 
+**Dados por papel: o agente pede, o software decide.** Os agentes de trabalho passam a alcançar fontes de dados
+(agenda, clientes, documentos numa pasta) e ações (enviar e-mail) por uma rota nova da caixa, e o que cada um
+alcança vem de um arquivo de papéis, `/etc/dgclaw/papeis.json`, que fica fora do alcance dos agentes. Cada agente
+aponta para uma pessoa e um papel; ele só lê uma fonte se a pessoa E o papel liberam, e só os campos que os dois
+liberam (a recepção vê nome e telefone do cliente, nunca o CPF). O que não está escrito é negado. Toda ação vira
+um pedido que você aprova na nova tela **Dados** (menu ☰), lendo a ação exata; o agente não consegue mudar nada
+depois de pedir, e cada aprovação vale uma vez, por 15 minutos. Cada pedido vira uma linha no log de acesso,
+sem o conteúdo. Nesta versão as fontes são locais e de exemplo; nenhum sistema real entra ainda, e o e-mail só
+é registrado, não enviado. Os limites estão escritos em `web/docs/DADOS-POR-PAPEL.md`.
+
+### Como atualizar (dados por papel)
+
+Peça ao Admin, no chat: "atualiza o DG Claw". A atualização cria o arquivo `/etc/dgclaw/papeis.json` com um
+modelo que não libera agente nenhum; os seus agentes continuam como estão até você ligar cada um ali. Se o
+arquivo já existir, ele não é tocado. Os agentes ganharam um trecho novo nas instruções deles, dizendo como
+pedir dados e que conteúdo recuperado não é ordem; ele entra sozinho na identidade de cada agente ao
+atualizar, sem apagar o que você personalizou no `AGENT.md`.
+
 ## [1.1.0] - 2026-11-18
 
 - **Correção no aviso de versão nova: o número agora sobe a cada release e, quando é igual, o aviso mostra o commit.** O
