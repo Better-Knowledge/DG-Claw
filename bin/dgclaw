@@ -2459,7 +2459,7 @@ base_criar() {
         case "$classif" in publico|interno|pessoal|sensivel) ;; *) falha "a classificacao '$classif' nao existe." "use publico, interno, pessoal ou sensivel" ;; esac
     fi
     if [ -n "$retencao" ]; then
-        [[ "$retencao" =~ ^[0-9]{1,5}$ ]] && [ "$retencao" -le 36500 ] || falha "a retencao precisa ser um numero de dias de 0 (sem prazo) a 36500." "exemplo: --retencao 365"
+        { [[ "$retencao" =~ ^[0-9]{1,5}$ ]] && [ "$retencao" -le 36500 ]; } || falha "a retencao precisa ser um numero de dias de 0 (sem prazo) a 36500." "exemplo: --retencao 365"
     fi
     # Mesmas regras do Web (web/lib/bases.js): sem caractere de controle, sem texto so de espacos, teto em bytes.
     local campo valor
@@ -2541,7 +2541,8 @@ base_remover() {
     [[ "$nome" =~ $RX_NOME_BASE ]] || falha "o nome '$nome' nao e valido." "veja as bases com: dgclaw base listar"
     exigir_ferramentas jq
     [ -n "$(bases_obter "$nome")" ] || falha "a base '$nome' nao esta no catalogo." "veja as que existem com: dgclaw base listar"
-    local destino="$DG_LIB/bases-aposentadas/$nome-$(date +%Y%m%d-%H%M%S)"
+    local destino
+    destino="$DG_LIB/bases-aposentadas/$nome-$(date +%Y%m%d-%H%M%S)"
     if [ "$sim" != 1 ]; then
         [ -t 0 ] || falha "sem terminal para confirmar." "rode com --sim para remover sem perguntar: dgclaw base remover $nome --sim"
         printf 'Vou tirar a base %s do catalogo. A pasta NAO e apagada: vai para %s/.\nDigite o nome (%s) para confirmar: ' "$nome" "${destino#"$R"}" "$nome"
