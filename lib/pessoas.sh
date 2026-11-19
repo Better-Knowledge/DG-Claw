@@ -52,7 +52,7 @@ _pessoas_mudar_estado() {
         # derrubar uma trava recem-criada por outro processo no meio do caminho
         ino_trava="$(stat -c %i "$trava" 2>/dev/null || echo '')"
         if [ -n "$ino_trava" ] && [ "$(( $(date +%s) - $(stat -c %Y "$trava" 2>/dev/null || date +%s) ))" -gt 10 ]; then
-            [ "$(stat -c %i "$trava" 2>/dev/null || echo '')" = "$ino_trava" ] && rmdir "$trava" 2>/dev/null \
+            { [ "$(stat -c %i "$trava" 2>/dev/null || echo '')" = "$ino_trava" ] && rmdir "$trava" 2>/dev/null; } \
                 || { i=$((i + 1)); [ "$i" -le 100 ] || falha "a trava $trava nao e uma pasta vazia e nao consegui remove-la." "confira e apague-a a mao: ls -la $trava"; sleep 0.1; }
             continue
         fi

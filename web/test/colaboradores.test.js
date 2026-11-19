@@ -472,9 +472,12 @@ test('vários agentes: um agente recriado sai só ele da lista; registro antigo 
     assert.equal((await c.post('/login', { json: { usuario: 'rita@x.com', senha: r.json.convite.senha_temporaria } })).status, 200);
     const nova = 'senha-da-rita-123';
     assert.equal((await c.post('/api/v1/eu/senha', { json: { nova, confirmacao: nova } })).status, 200);
-    // o bob é removido e recriado com o mesmo nome (a casa muda de inode)
-    const homeBob = JSON.parse(fs.readFileSync(s.t.agentesPath, 'utf8')).agentes.find((a) => a.slug === 'bob').home_host;
-    fs.rmSync(homeBob, { recursive: true, force: true }); fs.mkdirSync(homeBob, { recursive: true });
+    // o bob é removido e recriado com o mesmo nome: o slug volta igual, a instância não (é o que o `dgclaw agente criar`
+    // grava). Não dá para simular apagando e recriando a casa: o sistema de arquivos pode devolver o mesmo inode.
+    const j0 = JSON.parse(fs.readFileSync(s.t.agentesPath, 'utf8'));
+    for (const a of j0.agentes) if (a.slug === 'bob') a.instancia = 'bob-recriado-2';
+    fs.writeFileSync(s.t.agentesPath, JSON.stringify(j0));
+    const depois = new Date(Date.now() + 5000); fs.utimesSync(s.t.agentesPath, depois, depois); // o registro nota a troca
     assert.equal((await c.get('/api/v1/agents/bob/messages')).status, 403, 'o bob recriado fecha');
     assert.equal((await c.get('/api/v1/agents/ana/messages')).status, 200, 'a ana continua');
     assert.deepEqual((await c.get('/api/v1/eu')).json.agentes, ['ana']);
