@@ -24,7 +24,7 @@ test('validaPapeis aceita o exemplo e normaliza fontes para { nivel, campos }', 
   assert.equal(r.ok, true, JSON.stringify(r.erros));
   assert.deepEqual(r.politica.papeis.recepcao.fontes.clientes, { nivel: 'leitura', campos: ['nome', 'telefone'] });
   assert.deepEqual(r.politica.papeis.recepcao.fontes.agenda, { nivel: 'leitura', campos: null });
-  assert.deepEqual(r.politica.pessoas.caio, { nome: 'caio', estado: 'ativa', grupos: [], fontes: { folha: { nivel: 'leitura', campos: null } }, acoes: {}, bases: {}, ferramentas: [] });
+  assert.deepEqual(r.politica.pessoas.caio, { nome: 'caio', estado: 'ativa', grupos: [], fontes: { folha: { nivel: 'leitura', campos: null } }, acoes: {}, bases: {}, ferramentas: [], skills: {} });
   assert.deepEqual(r.politica.agentes.ana, { pessoa: 'marta', papel: 'recepcao' });
 });
 

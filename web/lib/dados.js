@@ -47,9 +47,9 @@ class ErroDados extends Error {
   constructor(status, mensagem, extra) { super(mensagem); this.name = 'ErroDados'; this.status = status; this.extra = extra || null; }
 }
 
-function criarDados({ dir, papeis, bases, basesDir, ferramentas, cofreSistemas, push, log, agora, retencaoDias, prazoAprovacaoMs }) {
+function criarDados({ dir, papeis, bases, basesDir, ferramentas, cofreSistemas, skillsDir, push, log, agora, retencaoDias, prazoAprovacaoMs }) {
   const relogio = agora || (() => Date.now());
-  const fontes = criarFontes({ dir: path.join(dir, 'fontes'), log, agora: relogio, bases, basesDir, ferramentas, cofreSistemas });
+  const fontes = criarFontes({ dir: path.join(dir, 'fontes'), log, agora: relogio, bases, basesDir, ferramentas, cofreSistemas, skillsDir, papeis });
 
   /** A decisão para uma fonte: pelos papéis (fonte fixa), pelo escopo da base (base-<nome>) ou pelo escopo da operação (ferramenta-<nome>). */
   function decideFonte(estado, slug, fonte, operacao, acao) {
@@ -176,7 +176,9 @@ function criarDados({ dir, papeis, bases, basesDir, ferramentas, cofreSistemas, 
 
     // Ação: valida, congela, pede aprovação. Nada executa aqui.
     let params;
-    try { params = acaoDef.validar(corpo); } catch (e) {
+    // Quem valida pode precisar de saber de quem é o pedido (a skill proposta tem de ser para um grupo da pessoa).
+    const estadoAtual = papeis.estado();
+    try { params = acaoDef.validar(corpo, quem.tipo === 'agente' ? { agente: slug, pessoa: d.pessoa, papel: d.papel, politica: estadoAtual.ok ? estadoAtual.politica : null } : null); } catch (e) {
       if (e instanceof ErroFonte) nega(e.status, e.message, `a ação recusou os parâmetros (${e.status})`);
       log('erro', `Dados ${nomeFonte}/${operacao}: falha ao validar (${e.stack || e.message}).`);
       nega(500, 'Falha inesperada ao validar a ação; nada foi pedido.');
@@ -198,6 +200,9 @@ function criarDados({ dir, papeis, bases, basesDir, ferramentas, cofreSistemas, 
   function descreve(fonte, operacao, acao, params, agente) {
     if (acao === 'enviar_email') return `O agente ${agente} quer enviar um e-mail para ${params.para} com o assunto "${params.assunto}" (${params.texto.length} caracteres de texto).`;
     if (acao === 'escrever_base') return `O agente ${agente} quer ${params.substituir ? 'substituir' : 'criar'} o arquivo ${params.caminho} na base ${fonte.replace(/^base-/, '')} (${Buffer.byteLength(params.conteudo, 'utf8')} bytes).`;
+    if (acao === 'propor_skill') return params.substituir
+      ? `ATENÇÃO: o agente ${agente} quer SUBSTITUIR a skill "${params.nome}" do grupo ${params.grupo}, que já existe, por um texto novo (${Buffer.byteLength(params.conteudo, 'utf8')} bytes). Os outros agentes do grupo passam a seguir o texto novo.`
+      : `O agente ${agente} quer publicar a skill nova "${params.nome}" para o grupo ${params.grupo} (${Buffer.byteLength(params.conteudo, 'utf8')} bytes de SKILL.md).`;
     if (acao.startsWith('ferramenta:')) return `O agente ${agente} quer executar "${operacao}" no sistema ${fonte.replace(/^ferramenta-/, '')} com ${Object.keys(params).length} parâmetro(s): ${Object.entries(params).map(([k, v]) => `${k}=${JSON.stringify(v).slice(0, 80)}`).join(', ') || '(nenhum)'}.`;
     return `O agente ${agente} quer executar ${acao} em ${fonte} (${operacao}).`;
   }
@@ -221,7 +226,7 @@ function criarDados({ dir, papeis, bases, basesDir, ferramentas, cofreSistemas, 
       return r;
     }
     try {
-      let resultado = await def.executar(p.params, { agente: p.agente, aprovado_por: por, aprovacao: p.id });
+      let resultado = await def.executar(p.params, { agente: p.agente, dono: ehDoDono(p), aprovado_por: por, aprovacao: p.id });
       // O que fica guardado no arquivo de aprovações tem teto: um resultado grande de ferramenta vira um resumo.
       if (Buffer.byteLength(JSON.stringify(resultado === undefined ? null : resultado)) > MAX_RESULTADO_GUARDADO) {
         const itens = resultado && Array.isArray(resultado.itens) ? resultado.itens.length : undefined;
