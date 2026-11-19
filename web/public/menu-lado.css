@@ -11,7 +11,7 @@
 @import url("/ds/componentes.css");
 @import url("/ds/carregando.css");
 aside#menu{
-  --ml-painel:#fff; --ml-fundo2:#f0f4f1; --ml-linha:#e1e8e3; --ml-texto:var(--cor-texto); --ml-fraco:var(--cor-texto-2);
+  --ml-painel:var(--cor-superficie); --ml-fundo2:var(--cor-superficie-2); --ml-linha:var(--cor-borda); --ml-texto:var(--cor-texto); --ml-fraco:var(--cor-texto-2);
   --ml-a1:var(--accent); --ml-a2:color-mix(in srgb,var(--accent) 70%,#1d3b8f);
   background:var(--ml-painel);color:var(--ml-texto);overflow-y:auto;overflow-x:hidden;
   padding:22px 14px 10px;gap:14px;
@@ -129,6 +129,16 @@ aside#menu{
 .ml-ajuda{margin:4px 6px 2px;padding:9px 10px;border-radius:10px;background:var(--ml-fundo2);
   font-size:12.5px;line-height:1.45;color:var(--ml-texto)}
 .ml-ajuda[hidden]{display:none}
+/* tema: Padrão (da marca), Claro, Escuro, Como o aparelho (ds/tema.js monta os botões) */
+.ml-tema{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:6px 10px 4px}
+.ml-tema[hidden]{display:none}
+.ml-tema-rotulo{flex:1 0 100%;font-size:11.5px;color:var(--ml-fraco);font-weight:600}
+.ml-tema-seletor{display:flex;flex-wrap:wrap;gap:6px}
+.ml-tema-op{min-height:30px;padding:0 10px;border-radius:var(--raio-pilula);border:1px solid var(--ml-linha);background:var(--ml-fundo2);
+  color:var(--ml-texto);font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
+.ml-tema-op[aria-pressed="true"]{background:var(--botao-fundo);color:var(--botao-texto);border-color:transparent}
+.ml-tema-op:focus-visible{outline:2px solid var(--cor-foco);outline-offset:2px}
+@media (pointer:coarse){.ml-tema-op{min-height:36px}}
 
 /* Uso das assinaturas: seção recolhível, mini barras por agente */
 #mlUsoDet summary{list-style:none;cursor:pointer;min-height:40px}

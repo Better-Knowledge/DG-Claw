@@ -65,13 +65,21 @@ textos dos balões.
 
 ## Tema escuro
 
-O tema escuro vale quando o `<html>` tem `data-tema="escuro"`. Ele nunca liga sozinho pelo sistema do aparelho. Duas formas
-de usar:
+O tema escuro vale quando o `<html>` tem `data-tema="escuro"`. Quem decide o padrão é a marca; a pessoa pode trocar no
+aparelho dela. Três camadas:
 
-- Marca inteira escura: `"tema": "escuro"` no `marca.json`.
+- Marca inteira escura: `"tema": "escuro"` no `marca.json`. É o que o servidor escreve no `<html>` de toda página.
 - Só trocar alguns valores no escuro: use o bloco `cores_escuro` do `marca.json`, que só vale com o tema escuro ligado.
+- A escolha da pessoa: no menu ☰, em Configurações, ela escolhe Padrão (o da marca), Claro, Escuro ou Como o aparelho.
+  O `ds/tema.js`, carregado logo depois do `tokens.css` em toda página, lê a escolha (`localStorage` `dgclaw-tema`, a
+  mesma chave do painel do agente), põe o `data-tema` certo antes da primeira pintura e ajusta o `theme-color`. Sem
+  escolha guardada, vale o da marca: nada liga sozinho pelo `prefers-color-scheme`; "Como o aparelho" só vale quando a
+  pessoa pede. O `tokens.css` continua sem `@media (prefers-color-scheme)`.
 
-Os tokens do escuro ficam no bloco `html[data-tema="escuro"]` do `tokens.css`.
+Os tokens do escuro ficam no bloco `html[data-tema="escuro"]` do `tokens.css`. Os CSS das telas não têm cor fixa fora
+dele (teste `web/test/tema.test.js`): uma cor que precise ser diferente no escuro vira token, ou ganha uma regra
+`html[data-tema="escuro"] ...` no próprio arquivo, com a linha marcada `/* cor-fixa: motivo */` quando a cor é a mesma nos
+dois temas de propósito (um logotipo de terceiro, por exemplo).
 
 ## Ícones
 
@@ -143,7 +151,7 @@ O indicador de digitação da conversa (os três pontos do agente escrevendo) é
 - Nunca montar o nome de um ícone com texto vindo de fora (nome de arquivo, campo do agente, resposta da API).
 - Nunca escrever o nome da marca no HTML ou no JavaScript. Em HTML use `{{MARCA_NOME}}`, em JavaScript `dsMarca.nome`.
 - Nunca pôr texto de fora em `innerHTML` sem escapar.
-- Nunca ligar o tema escuro pelo sistema do aparelho (`prefers-color-scheme`). Quem decide é a marca.
+- Nunca ligar o tema escuro pelo sistema do aparelho sem a pessoa pedir (`prefers-color-scheme` não entra no CSS). O padrão é da marca; "Como o aparelho" é uma escolha explícita no menu.
 
 ## Como conferir
 

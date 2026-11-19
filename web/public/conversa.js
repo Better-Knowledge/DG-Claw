@@ -1910,6 +1910,8 @@ const visPorCaixa = new WeakMap();  // .visq -> estado
 const visAlturas = new Map();       // id da mídia -> última altura (sobrevive ao nó refeito)
 
 const temaApp = () => document.documentElement.dataset.tema === 'escuro' ? 'escuro' : 'claro';
+// A pessoa trocou o tema no menu (ds/tema.js): os visuais abertos acompanham na hora.
+document.addEventListener('dgclaw:tema', () => { for (const est of visuais.values()) enviaAoVisual(est, { tipo: 'tema', valor: temaApp() }); });
 /* Teto alto de propósito (12/10/2026): com 80% da tela, o relatório inteiro rolava
    DENTRO do balão, e no iPhone o dedo em cima do visual rolava o visual e não a
    conversa. O visual ocupa a altura que precisa; só um gigante rola por dentro. */

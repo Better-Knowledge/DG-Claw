@@ -16,6 +16,7 @@
   unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
 
 :root{
+  color-scheme:light;
   /* primitivos */
   --p-cinza-50:#F3F5F8; --p-branco:#FFFFFF; --p-grafite:#1B2430; --p-cinza-500:#66707F; --p-cinza-200:#DFE4EA;
   --p-azul:#00B4FF; --p-azul-escuro:#0074A8; --p-vermelho:#C62828; --p-verde:#197744; --p-ambar:#9A5B05;
@@ -39,7 +40,10 @@
   --cor-sucesso:var(--p-verde);     --cor-sucesso-fundo:#E6F5EC;  --cor-sucesso-borda:#B7DEC8;
   --cor-aviso:var(--p-ambar);       --cor-aviso-fundo:#FFF4DD;    --cor-aviso-borda:#F0D79A;
   --cor-info-fundo:#E5F6FE;         --cor-info-borda:#A9DEF7;
-  --cor-veu:rgba(27,36,48,.45);
+  --cor-veu:rgba(27,36,48,.45);          --cor-veu-forte:rgba(27,36,48,.66);   /* por trás de modal e do passo do tutorial */
+  --cor-superficie-2:#EEF2F6;            /* faixa, zebra, fundo de campo dentro de cartão */
+  --cor-codigo-fundo:rgba(27,36,48,.07); /* código na conversa e nos cartões */
+  --cor-info:var(--p-azul-escuro);       /* texto sobre --cor-info-fundo */
   --cor-foco:var(--p-azul-escuro);   /* o azul puro dá só 2,3:1 sobre o claro; o escuro dá 5:1 (mínimo 3:1 para o contorno) */
 
   /* botões, campos, cartões */
@@ -72,13 +76,14 @@
   /* espaçamento, raio, sombra, tempo */
   --esp-1:4px; --esp-2:8px; --esp-3:12px; --esp-4:16px; --esp-5:24px; --esp-6:32px;
   --raio-1:6px; --raio-2:10px; --raio-3:14px; --raio-pilula:999px;
-  --sombra-0:none; --sombra-1:0 1px 2px rgba(0,0,0,.14);
+  --sombra-0:none; --sombra-1:0 1px 2px rgba(0,0,0,.14); --sombra-2:0 6px 28px rgba(0,0,0,.18);
   --tempo-rapido:.12s; --tempo-medio:.22s; --tempo-carregando:1.2s; --tempo-carregando-defasagem:.07s; --tempo-carregando-quieto:1.5s;
   --alvo-toque:32px;
 }
 @media (pointer:coarse){:root{--alvo-toque:44px}}
 
 html[data-tema="escuro"]{
+  color-scheme:dark;
   --cor-fundo:#0F141B; --cor-superficie:#171E27; --cor-texto:#E8ECF1; --cor-texto-2:#98A2B0; --cor-borda:#2A3441;
   --cor-link:#5CCBFF; --cor-foco:var(--p-azul);
   --cor-sobre-perigo:var(--p-grafite); --cor-sobre-sucesso:var(--p-grafite); --cor-sobre-aviso:var(--p-grafite);
@@ -87,7 +92,9 @@ html[data-tema="escuro"]{
   --cor-sucesso:#5ED08F; --cor-sucesso-fundo:#12301F; --cor-sucesso-borda:#245A3A;
   --cor-aviso:#F0B35A;   --cor-aviso-fundo:#33260F; --cor-aviso-borda:#5E4519;
   --cor-info-fundo:#0E2A38; --cor-info-borda:#1D5670;
-  --cor-veu:rgba(0,0,0,.6);
+  --cor-veu:rgba(0,0,0,.6); --cor-veu-forte:rgba(0,0,0,.78);
+  --cor-superficie-2:#1F2833; --cor-codigo-fundo:rgba(255,255,255,.08); --cor-info:#5CCBFF;
+  --sombra-1:0 1px 2px rgba(0,0,0,.5); --sombra-2:0 6px 28px rgba(0,0,0,.6);
   --botao2-fundo:#1F2833;
   --login-pontos:#2A3441;
   --conversa-fundo:#0F141B;

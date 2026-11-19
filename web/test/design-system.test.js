@@ -128,7 +128,8 @@ test('componentes.css e carregando.css só usam tokens (sem cor, medida de tempo
 
 test('service worker: nova versão, /ds/* no cache e /marca* fora', () => {
   const sw = ler('sw.js');
-  assert.match(sw, /VERSAO = 'dgclaw-estaticos-v42'/);
+  assert.match(sw, /VERSAO = 'dgclaw-estaticos-v43'/);
+  assert.ok(sw.includes("'/ds/tema.js'"), 'o tema.js entra no cache');
   for (const a of ['/ds/tokens.css', '/ds/icones.svg', '/ds/carregando.js', '/ds/icone.js']) assert.ok(sw.includes(`'${a}'`), a);
   assert.match(sw, /PROIBIDOS = \[\/\^\\\/marca\//);
   assert.ok(!/ESTATICOS = \[[\s\S]*?'\/marca[\s\S]*?\];/.test(sw), '/marca* não pode estar na lista de cache');

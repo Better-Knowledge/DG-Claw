@@ -203,3 +203,14 @@ Cada agente tem um painel em `/p/<slug>/` com abas. O colaborador convidado vê 
 **O que é.** Esta documentação, aberta no navegador em `/manual` (menu ☰, item **Manual**). A tela tem uma busca que filtra a lista de páginas pelo título. Os agentes leem o mesmo conteúdo por `GET /api/v1/manual/docs.md`, sem credencial, pela caixa (`dgclaw-api`).
 **Limites.** A tela só lê: nada escreve no manual. Os links para documentos fora de `docs/manual/` aparecem como caminho, sem link clicável. O colaborador convidado não abre a tela do manual.
 **Se der erro.** "Manual ausente": a instalação está sem a pasta `docs/manual/`, e a solução é atualizar o DG Claw. Mais em [../../web/docs/MANUAL.md](../../web/docs/MANUAL.md).
+
+## Tema claro e escuro
+
+**O que é.** O painel abre com o tema da marca (claro, ou escuro se o `marca.json` pedir). Cada pessoa pode trocar no
+aparelho dela: menu ☰, seção **Configurações**, linha **Tema**, com as opções Padrão (o da marca), Claro, Escuro e Como o
+aparelho (segue o modo do celular ou do computador). A escolha fica guardada no navegador e vale antes da tela pintar, sem
+piscar; o painel de cada agente (`/p/<slug>/`) usa a mesma escolha.
+
+**Limites.** A escolha é por aparelho e navegador, não por conta. Sem escolha, o painel nunca muda de tema sozinho pelo
+modo do aparelho: quem decide o padrão é a marca.
+

@@ -7,6 +7,19 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Não lançado]
 
+**Tema claro ou escuro, à sua escolha.** O painel segue o tema da marca, mas agora cada pessoa pode trocar no aparelho dela:
+menu ☰, em Configurações, linha Tema, com Padrão (o da marca), Claro, Escuro e Como o aparelho (segue o modo do celular ou
+do computador). A escolha fica guardada no navegador, vale antes da tela pintar (sem piscar) e é a mesma do painel de cada
+agente, que já tinha o botão de tema. O menu, o cabeçalho, a conversa, a Mesa, os Lembretes, os Avisos, Segurança,
+Conectar, Colaboradores, Logs e as telas de entrada passam a tirar todas as cores dos tokens do design system; um teste
+novo impede que uma tela volte a ter cor fixa fora deles.
+
+### Como atualizar (tema)
+
+Peça ao Admin, no chat: "atualiza o DG Claw". Nada precisa ser configurado: o painel continua com o tema da marca até
+alguém escolher outro no menu. No celular, feche e abra o app instalado uma vez para ele pegar os arquivos novos.
+
+
 ## [1.1.0] - 2026-11-18
 
 - **Correção no aviso de versão nova: o número agora sobe a cada release e, quando é igual, o aviso mostra o commit.** O

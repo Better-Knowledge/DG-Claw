@@ -797,6 +797,8 @@
     }
     marca(opcoes.ativo || 'conversa');
     $('mlInstalar').onclick = aoInstalar;
+    // O tema (claro, escuro, como o aparelho) é do ds/tema.js; sem ele (página sem o script), a linha some.
+    if (raiz.DGTema && $('mlTemaSeletor')) raiz.DGTema.monta($('mlTemaSeletor')); else if ($('mlTema')) $('mlTema').hidden = true;
     // escolher uma página fecha a gaveta (a navegação em seguida troca a tela)
     $('mlTabs').addEventListener('click', ev => { if (ev.target.closest('a')) opcoes.fecha(); });
     if (colab) { const uso = $('mlUso'); if (uso) uso.remove(); } else ligaUso();

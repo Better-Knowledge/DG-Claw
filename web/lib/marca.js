@@ -23,7 +23,7 @@ const TEXTOS = {
 const EXT_LOGO = ['.svg', '.png', '.webp', '.jpg'];
 const TETO = { logo: 512 * 1024, favicon: 256 * 1024, icone_app: 2 * 1024 * 1024, fonte: 1536 * 1024, json: 64 * 1024 };
 const TOKENS_COR = new Set([
-  'cor-fundo', 'cor-superficie', 'cor-texto', 'cor-texto-2', 'cor-borda', 'cor-acento', 'cor-sobre-acento', 'cor-link',
+  'cor-fundo', 'cor-superficie', 'cor-superficie-2', 'cor-texto', 'cor-texto-2', 'cor-borda', 'cor-info', 'cor-acento', 'cor-sobre-acento', 'cor-link',
   'cor-perigo', 'cor-sucesso', 'cor-aviso', 'cor-gravando', 'cor-atencao', 'cor-sobre-perigo', 'cor-sobre-sucesso',
   'cor-sobre-aviso', 'cor-sobre-gravando', 'cor-sobre-atencao', 'botao-perigo-fundo', 'botao-perigo-texto', 'botao-fundo', 'botao-texto', 'botao-borda', 'botao2-fundo', 'botao2-texto',
   'campo-fundo', 'campo-texto', 'campo-borda', 'cartao-fundo', 'cartao-borda', 'login-fundo', 'login-pontos',
