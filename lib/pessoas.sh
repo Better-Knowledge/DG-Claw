@@ -91,7 +91,7 @@ pessoas_escopo_entrega() {
     grupo_atual="$(jq -r '.grupo // ""' <<<"$atual")"
     pessoa_atual="$(jq -r '.pessoa // ""' <<<"$atual")"
     case "$escopo_atual" in
-        grupo)   [ -n "$grupo" ] && [ "$grupo_atual" = "$grupo" ] || falha "a base '$base' ja existe no escopo grupo:$grupo_atual, e o grupo de $nome e '${grupo:-nenhum}'; a memoria dela nao pode ir para o grupo de outros." "use outro nome: dgclaw pessoa desligar $nome --base entrega-<nome-curto>"
+        grupo)   { [ -n "$grupo" ] && [ "$grupo_atual" = "$grupo" ]; } || falha "a base '$base' ja existe no escopo grupo:$grupo_atual, e o grupo de $nome e '${grupo:-nenhum}'; a memoria dela nao pode ir para o grupo de outros." "use outro nome: dgclaw pessoa desligar $nome --base entrega-<nome-curto>"
                  printf 'grupo:%s' "$grupo_atual" ;;
         empresa) [ -z "$grupo" ] || falha "a base '$base' ja existe no escopo empresa, e $nome tem grupo ($grupo); a memoria dela so vai para o grupo dela." "use outro nome: dgclaw pessoa desligar $nome --base entrega-<nome-curto>"
                  printf 'empresa' ;;
@@ -122,7 +122,7 @@ pessoas_entregar_memoria() {
         [ -d "$casa" ] || continue
         { mkdir -p "$destino/$slug" && chmod 700 "$destino" "$destino/$slug"; } || { aviso "nao consegui criar ${destino#"$R"}/$slug"; return 1; }
         for arq in MEMORY.md working-memory.md; do
-            [ -f "$casa/$arq" ] && [ ! -L "$casa/$arq" ] || continue
+            { [ -f "$casa/$arq" ] && [ ! -L "$casa/$arq" ]; } || continue
             { cp -- "$casa/$arq" "$destino/$slug/$arq" && chmod 600 "$destino/$slug/$arq"; } || { aviso "nao consegui copiar $arq do agente $slug"; return 1; }
             n=$((n + 1))
         done

@@ -2757,7 +2757,7 @@ pessoa_desligar() {
     if [ -n "$base" ] || [[ " $* " == *" --base "* ]] || [[ " $* " == *" --base= "* ]]; then [ -n "$base" ] || falha "faltou o nome depois de --base." "exemplo: dgclaw pessoa desligar $nome --base entrega-$nome"; fi
     exigir_ferramentas jq node
     [[ "$nome" =~ $RX_NOME_PESSOA ]] || falha "o nome '$nome' nao e valido." "veja as pessoas com: dgclaw pessoa listar"
-    [ -s "$DG_PAPEIS_JSON" ] && jq -e --arg n "$nome" '.pessoas[$n] != null' "$DG_PAPEIS_JSON" >/dev/null 2>&1 \
+    { [ -s "$DG_PAPEIS_JSON" ] && jq -e --arg n "$nome" '.pessoas[$n] != null' "$DG_PAPEIS_JSON" >/dev/null 2>&1; } \
         || falha "a pessoa '$nome' nao esta em ${DG_PAPEIS_JSON#"$R"}." "veja as pessoas com: dgclaw pessoa listar"
     # O nome da base, o escopo em que a memoria vai ficar e o catalogo atual sao conferidos antes de qualquer
     # mudanca: falhar no passo 3 deixaria a pessoa desligada e os agentes parados sem a entrega.
