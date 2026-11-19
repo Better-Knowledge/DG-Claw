@@ -449,6 +449,12 @@ nega "o self-8 ligado nao aparece" grep -q 'self-8' "$TMP/rec.txt"
 rm -f "$STUB_ESTADO/self-timers"
 
 
+# Cenario limpo: a ana nasce aqui (as secoes acima trocaram de cenario varias vezes).
+preparar
+export DGCLAW_TEMPO_PARADA=3
+criar_agente ana --nome "Ana"
+echo imagem-v2 >"$STUB_ESTADO/imagem-id"
+
 echo "recriar e reparar entregam o MCP de dados a um agente que nasceu sem ele"
 MCP="$LIB/agentes/ana/home/.plataforma/dgchat.mcp.json"
 RJ="$LIB/agentes/ana/runner/runner.json"
