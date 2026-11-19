@@ -64,6 +64,16 @@ mudar nada. Quem: Root. Detalhe geral em [ATUALIZAR.md](../ATUALIZAR.md) e no `d
 | `dgclaw colaborador revogar` | Tira o acesso e derruba as sessões da pessoa. Se ela conectou a conta de IA do agente, a conta continua conectada e o comando avisa | [agentes.md](agentes.md) |
 | `dgclaw colaborador ajuda` | Mostra o uso do comando | [agentes.md](agentes.md) |
 
+### Bases de conhecimento
+
+Pastas de texto que os agentes leem conforme o escopo (pessoa, grupo, empresa ou pública) e os papéis de `/etc/dgclaw/papeis.json`. Veja [BASES-DE-CONHECIMENTO.md](../../web/docs/BASES-DE-CONHECIMENTO.md).
+
+| Comando | Para que serve | Detalhe |
+| --- | --- | --- |
+| `dgclaw base criar` | Cadastra uma base: `<nome> --escopo empresa|publica|grupo:<grupo>|pessoa:<pessoa>`, com `--nome`, `--dono`, `--classificacao`, `--finalidade` e `--retencao`. A pasta fica em `/var/lib/dgclaw/bases/<nome>`; rodar de novo com o mesmo nome atualiza o catálogo | [BASES-DE-CONHECIMENTO.md](../../web/docs/BASES-DE-CONHECIMENTO.md) |
+| `dgclaw base listar` | Lista as bases, o escopo e quantos arquivos há em cada pasta (`--json` para máquina) | [BASES-DE-CONHECIMENTO.md](../../web/docs/BASES-DE-CONHECIMENTO.md) |
+| `dgclaw base remover` | Tira a base do catálogo. A pasta não é apagada: vai para `/var/lib/dgclaw/bases-aposentadas/`. Pede confirmação, ou `--sim` | [BASES-DE-CONHECIMENTO.md](../../web/docs/BASES-DE-CONHECIMENTO.md) |
+
 ### Suporte DG: acesso temporário por chave SSH
 
 | Comando | Para que serve | Detalhe |

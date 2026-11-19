@@ -17,8 +17,15 @@
 const { fonteJson, ErroFonte } = require('./json');
 const { fontePasta } = require('./pasta');
 const { fonteEmail } = require('./email');
+const { fonteBase } = require('./base');
 
-function criarFontes({ dir, log, agora }) {
+const RX_BASE = /^base-([a-z][a-z0-9_-]{0,39})$/;
+
+/**
+ * `bases` (opcional): o leitor de web/lib/bases.js e a pasta das bases. Cada base do catálogo vira a fonte
+ * dinâmica "base-<nome>", lida da pasta <basesDir>/<nome>/. Base fora do catálogo não é fonte.
+ */
+function criarFontes({ dir, log, agora, bases, basesDir }) {
   const lista = [
     fonteJson({ dir, nome: 'agenda', campos: ['id', 'data', 'hora', 'titulo', 'com', 'local'], busca: ['titulo', 'com', 'local'],
       catalogo: { dono: 'secretaria', classificacao: 'interno', finalidade: 'marcar e consultar compromissos', retencao_dias: 365 } }),
@@ -32,12 +39,29 @@ function criarFontes({ dir, log, agora }) {
       catalogo: { dono: 'comunicacao', classificacao: 'interno', finalidade: 'envio de e-mail em nome da pessoa (simulado nesta versão)', retencao_dias: 90 } }),
   ];
   const mapa = new Map(lista.map((f) => [f.nome, f]));
+  const descreve = (f) => ({ nome: f.nome, base: f.base || null, campos: f.campos, operacoes: Object.keys(f.operacoes), acoes: Object.fromEntries(Object.entries(f.acoes || {}).map(([op, a]) => [op, a.acao])), catalogo: f.catalogo });
+
+  function daBase(nomeBase) {
+    if (!bases || !basesDir) return null;
+    const b = bases.obter(nomeBase);
+    if (!b) return null;
+    return fonteBase({ dir: basesDir, nome: nomeBase, base: b, log, catalogo: { dono: b.dono, classificacao: b.classificacao, finalidade: b.finalidade, retencao_dias: b.retencao_dias, escopo: b.escopo, grupo: b.grupo, pessoa: b.pessoa, titulo: b.nome } });
+  }
+
   return {
-    obter(nome) { return mapa.get(nome) || null; },
-    nomes() { return [...mapa.keys()]; },
-    /** Para o dono e para a documentação: o catálogo de cada fonte, sem dado nenhum. */
+    obter(nome) {
+      const fixa = mapa.get(nome);
+      if (fixa) return fixa;
+      const m = RX_BASE.exec(String(nome));
+      return m ? daBase(m[1]) : null;
+    },
+    nomes() { return [...mapa.keys(), ...(bases && bases.estado().ok ? Object.keys(bases.estado().bases).map((n) => `base-${n}`) : [])]; },
+    /** Para o dono e para a documentação: o catálogo de cada fonte (fixas e bases), sem dado nenhum. */
     catalogo() {
-      return lista.map((f) => ({ nome: f.nome, campos: f.campos, operacoes: Object.keys(f.operacoes), acoes: Object.fromEntries(Object.entries(f.acoes || {}).map(([op, a]) => [op, a.acao])), catalogo: f.catalogo }));
+      const fixas = lista.map(descreve);
+      const est = bases ? bases.estado() : null;
+      const dinamicas = est && est.ok ? Object.keys(est.bases).sort().map((n) => descreve(daBase(n))) : [];
+      return fixas.concat(dinamicas);
     },
   };
 }
