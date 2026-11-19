@@ -60,7 +60,7 @@ Os campos são todos opcionais. O que você não escrever fica com o valor de f�
   Um logo `svg` é exibido só como imagem, isolado, sem executar script.
 - **Favicon** e **ícone do app**: o primeiro vai na aba do navegador, o segundo na tela de início do celular.
 - **Tema**: `"claro"` (padrão) ou `"escuro"`.
-- **Cores**: no formato `#RRGGBB`. Os nomes aceitos são `cor-fundo`, `cor-superficie`, `cor-texto`, `cor-texto-2`,
+- **Cores**: no formato `#RRGGBB`. Os nomes aceitos são `cor-fundo`, `cor-superficie`, `cor-superficie-2`, `cor-texto`, `cor-texto-2`, `cor-info`,
   `cor-borda`, `cor-acento`, `cor-sobre-acento`, `cor-link`, `cor-perigo`, `cor-sucesso`, `cor-aviso`, `cor-gravando`, `cor-atencao`, `cor-sobre-perigo`,
   `cor-sobre-sucesso`, `cor-sobre-aviso`, `cor-sobre-gravando`, `cor-sobre-atencao`, `botao-perigo-fundo`, `botao-perigo-texto`, `botao-fundo`,
   `botao-texto`, `botao-borda`, `botao2-fundo`, `botao2-texto`, `campo-fundo`, `campo-texto`, `campo-borda`, `cartao-fundo`,

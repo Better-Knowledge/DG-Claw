@@ -1583,13 +1583,13 @@ function metaPendente(p) {
     return `<span class="meta" title="entregue">${dsIcone('check')} ${esc(p.hhmm)}</span>`;
   }
   if (p.estado === 'falhou' && p.recusado) {   // comando recusado: reenviar daria o mesmo erro
-    return `<span class="meta"><span style="color:#c0392b;font-weight:600">recusado</span> ` +
+    return `<span class="meta"><span style="color:var(--cor-perigo);font-weight:600">recusado</span> ` +
            `${esc(p.erro || 'motivo desconhecido')} ` +
            `<button class="mini descartar" data-pend="${p.n}">descartar</button></span>`;
   }
   if (p.estado === 'falhou') {
     const ocupado = p.conferindo ? ' disabled' : '';
-    return `<span class="meta"><span style="color:#c0392b;font-weight:600" ` +
+    return `<span class="meta"><span style="color:var(--cor-perigo);font-weight:600" ` +
            `title="${esc(p.erro || 'motivo desconhecido')}">não foi enviada</span> ` +
            `<button class="mini reenviar" data-pend="${p.n}"${ocupado}>reenviar</button> ` +
            `<button class="mini descartar" data-pend="${p.n}"${ocupado}>descartar</button></span>`;
@@ -1910,6 +1910,8 @@ const visPorCaixa = new WeakMap();  // .visq -> estado
 const visAlturas = new Map();       // id da mídia -> última altura (sobrevive ao nó refeito)
 
 const temaApp = () => document.documentElement.dataset.tema === 'escuro' ? 'escuro' : 'claro';
+// A pessoa trocou o tema no menu (ds/tema.js): os visuais abertos acompanham na hora.
+document.addEventListener('dgclaw:tema', () => { for (const est of visuais.values()) enviaAoVisual(est, { tipo: 'tema', valor: temaApp() }); });
 /* Teto alto de propósito (12/10/2026): com 80% da tela, o relatório inteiro rolava
    DENTRO do balão, e no iPhone o dedo em cima do visual rolava o visual e não a
    conversa. O visual ocupa a altura que precisa; só um gigante rola por dentro. */

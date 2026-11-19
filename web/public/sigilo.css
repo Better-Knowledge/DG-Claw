@@ -60,9 +60,8 @@ body.sigilo #anexoLista{filter:blur(4px)}
   max-width:520px;margin:0 auto;font-size:12px;line-height:1.35;pointer-events:none}
 #sigAviso[hidden]{display:none}
 #sigAviso > button,#sigAviso > p{pointer-events:auto;display:block;width:100%;box-sizing:border-box;
-  background:#fff8db;color:#5b4300;border:1px solid #e5bd4c;border-radius:10px;padding:6px 10px;
+  background:var(--cor-aviso-fundo);color:var(--cor-aviso);border:1px solid var(--cor-aviso-borda);border-radius:10px;padding:6px 10px;
   text-align:left;font:inherit}
 #sigAviso > button{min-height:32px;cursor:pointer}
 #sigAviso > p{margin:4px 0 0}
 #sigAviso > p[hidden]{display:none}
-html[data-tema="escuro"] #sigAviso > button,html[data-tema="escuro"] #sigAviso > p{background:#3c341b;color:#fff3c8;border-color:#e5bd4c}

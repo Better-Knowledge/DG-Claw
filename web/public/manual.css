@@ -1,9 +1,6 @@
 /* manual.css: a tela do Manual (/manual). Celular primeiro; em tela larga a lista de páginas vira coluna ao lado. */
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-:root{--fundo:#eef4ec;--cartao:#fff;--txt:#0f1c14;--muted:#5d7365;--accent:var(--cor-acento);--line:rgba(0,0,0,.1);--suave:#f2f6f2;--link:#1f7ac2}
-@media(prefers-color-scheme:dark){
-  :root{--fundo:#0f1713;--cartao:#18241d;--txt:#e2f5e8;--muted:#9bb5a4;--line:rgba(255,255,255,.14);--suave:#223229;--link:#7ab8ea}
-}
+:root{--fundo:var(--cor-fundo);--cartao:var(--cor-superficie);--txt:var(--cor-texto);--muted:var(--cor-texto-2);--accent:var(--cor-acento);--line:var(--cor-borda);--suave:var(--cor-superficie-2);--link:var(--cor-link)}
 html,body{margin:0;min-height:100%;overflow-x:hidden}
 body{background:var(--fundo);color:var(--txt);overflow-wrap:anywhere;
   font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif}
@@ -34,7 +31,7 @@ body{background:var(--fundo);color:var(--txt);overflow-wrap:anywhere;
 .mn-tabela th,.mn-tabela td{border:1px solid var(--line);padding:6px 10px;text-align:left;vertical-align:top;min-width:6rem}
 .mn-tabela th{background:var(--suave)}
 .mn-ref{color:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9em}
-.mn-erro{border-left:4px solid #b3261e;padding:6px 12px;background:var(--suave)}
+.mn-erro{border-left:4px solid var(--cor-perigo);padding:6px 12px;background:var(--suave)}
 .mn-volta{display:inline-block;margin-bottom:8px;color:var(--link);text-decoration:none;font-weight:600;min-height:32px;line-height:32px}
 @media(min-width:900px){
   .mn-main{flex-direction:row;align-items:flex-start}

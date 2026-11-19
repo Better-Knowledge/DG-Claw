@@ -161,6 +161,8 @@ Quando o dono quiser que um agente faça uma ronda (rotina periódica de CRM, su
 
 ### Face ID (o cadeado do painel)
 
+- **Tema do painel**: o painel abre com o tema da marca (`marca.json`, chave `tema`). Cada pessoa troca no aparelho dela pelo menu ☰, em Configurações, linha Tema (Padrão, Claro, Escuro, Como o aparelho); a escolha fica no navegador, não há nada para configurar no servidor.
+
 O dono e cada colaborador podem ligar uma trava com Face ID, Touch ID ou biometria, por aparelho. Ligada, a tela
 trava sozinha depois de um tempo sem uso (15 minutos por padrão, de 1 a 120) e volta com o rosto, a digital ou o
 código do aparelho; "Entrar com a senha" é sempre a saída. Quem liga é a pessoa, na tela **Face ID** do menu ☰

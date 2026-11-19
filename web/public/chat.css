@@ -28,9 +28,9 @@ body{margin:0;color:var(--txt);overflow:hidden;
 header{position:fixed;top:0;left:0;right:0;height:var(--header-h);background:var(--header);
        border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;
        padding:0 12px;z-index:20;padding-top:env(safe-area-inset-top);
-       box-shadow:0 1px 4px rgba(0,0,0,.08)}
+       box-shadow:var(--sombra-1)}
 .av{width:40px;height:40px;border-radius:50%;flex:0 0 40px;display:flex;align-items:center;
-    justify-content:center;font-size:18px;font-weight:600;color:#fff;
+    justify-content:center;font-size:18px;font-weight:600;color:var(--cor-sobre-acento);
     background:var(--cor-acento)}
 .who{flex:1;min-width:0}
 .who b{display:block;font-size:15.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -60,8 +60,8 @@ select.btn{-webkit-appearance:none;appearance:none;padding-right:26px;
 /* a pilha de data NÃO é sticky: grudada no topo ela passava por cima do
    texto do balão (evita texto encavalado). Fica no fluxo. */
 .dia{text-align:center;margin:20px 0 16px}
-.dia span{background:rgba(255,255,255,.92);color:#4a6152;font-size:12.5px;font-weight:600;
-          padding:5px 14px;border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.10)}
+.dia span{background:color-mix(in srgb,var(--cor-superficie) 92%,transparent);color:var(--cor-texto-2);font-size:12.5px;font-weight:600;
+          padding:5px 14px;border-radius:16px;box-shadow:var(--sombra-1)}
 
 /* Balões */
 .row{display:flex;margin:0 0 8px;align-items:flex-end}
@@ -69,7 +69,7 @@ select.btn{-webkit-appearance:none;appearance:none;padding-right:26px;
 .row.me{justify-content:flex-end}
 .bub{max-width:min(76%,620px);padding:9px 13px 7px;border-radius:14px;position:relative;
      word-wrap:break-word;overflow-wrap:anywhere;font-size:15.5px;
-     box-shadow:0 1px 2px rgba(0,0,0,.14)}
+     box-shadow:var(--sombra-1)}
 .row.her .bub{background:var(--bub-in);color:var(--balao-agente-texto);border-bottom-left-radius:5px}
 .row.me  .bub{background:var(--bub-out);color:var(--balao-meu-texto);border-bottom-right-radius:5px}
 .row.cron .bub{background:var(--bub-in);border-bottom-left-radius:5px;
@@ -86,8 +86,8 @@ select.btn{-webkit-appearance:none;appearance:none;padding-right:26px;
 .tag{display:block;font-size:10.5px;font-weight:700;letter-spacing:.5px;color:var(--accent);
      margin-bottom:5px;text-transform:uppercase}
 .bub a{color:var(--cor-link)}
-.bub a.midbx{color:#fff}
-.mk{box-shadow:0 1px 2px rgba(0,0,0,.14),0 0 0 1.5px rgba(47,158,94,.35)}
+.bub a.midbx{color:#fff} /* cor-fixa: ícone branco sobre o véu escuro do botão de baixar, por cima da foto */
+.mk{box-shadow:var(--sombra-1),0 0 0 1.5px color-mix(in srgb,var(--accent) 35%,transparent)}
 
 /* placeholder de mídia (Fase 2 troca por miniatura) */
 .midia{display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:4px}
@@ -113,7 +113,7 @@ select.btn{-webkit-appearance:none;appearance:none;padding-right:26px;
       justify-content:center;padding:0;font-family:inherit}
 .vish .visfull:active,.vish .midbx:active{opacity:.7}
 .visq{position:relative;display:block;width:100%;height:220px;border-radius:10px;
-      overflow:hidden;background:#f6f8f6;max-width:100%}
+      overflow:hidden;background:var(--cor-superficie-2);max-width:100%}
 .visq .visf{position:absolute;inset:0;width:100%;height:100%;border:0;background:transparent;
             display:block}
 .visq-msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
@@ -122,15 +122,15 @@ select.btn{-webkit-appearance:none;appearance:none;padding-right:26px;
 .visq.on .visq-msg{display:none}
 .visq-capa{height:auto;min-height:64px;cursor:pointer;border:0;padding:0}
 .visq-capa .visq-msg{position:static;min-height:64px}
-.vistarja{margin:6px 0 0;padding:8px 10px;border-radius:10px;background:#fdecea;
-          border:1px solid #e5b4ae;color:#a3271b;font-size:13px;line-height:1.35;
+.vistarja{margin:6px 0 0;padding:8px 10px;border-radius:10px;background:var(--cor-perigo-fundo);
+          border:1px solid var(--cor-perigo-borda);color:var(--cor-perigo);font-size:13px;line-height:1.35;
           overflow-wrap:anywhere}
 @media(max-width:520px){
   .row.vis .bub{max-width:100%;width:100%}
 }
 
 /* Tela cheia: abaixo do visor de arquivos (z 70), que o baixar do celular pode abrir por cima. */
-#visTela{position:fixed;inset:0;z-index:68;background:#fff;display:none;flex-direction:column;
+#visTela{position:fixed;inset:0;z-index:68;background:var(--cor-superficie);display:none;flex-direction:column;
          padding-top:env(safe-area-inset-top);padding-left:env(safe-area-inset-left);
          padding-right:env(safe-area-inset-right)}
 #visTela.abre{display:flex}
@@ -149,7 +149,7 @@ select.btn{-webkit-appearance:none;appearance:none;padding-right:26px;
 
 /* Barrinha de confirmação do visual (BL-544): é do APP, fora do iframe. O visual só
    pede; quem envia é o toque nela. Cola no balão logo abaixo da caixa do visual. */
-.vispede{margin:6px 0 0;padding:8px 10px;border-radius:10px;background:#eef6ef;
+.vispede{margin:6px 0 0;padding:8px 10px;border-radius:10px;background:var(--cor-superficie-2);
          border:1px solid var(--accent);color:var(--txt);font-size:13.5px;line-height:1.35;
          min-width:0;max-width:100%}
 .vispede-rot{font-size:12px;font-weight:700;color:var(--cor-texto)}
@@ -163,12 +163,12 @@ select.btn{-webkit-appearance:none;appearance:none;padding-right:26px;
 .vispede-ok:not(:disabled):active,.vispede-nao:active{opacity:.7}
 #visTela .vispede-cheia{flex:0 0 auto;margin:0;border-radius:0;border-width:1px 0 0;
          padding:10px calc(10px + env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) 10px;
-         background:#eef6ef}
+         background:var(--cor-superficie-2)}
 .vtccorpo:has(+ .vispede){padding-bottom:0}
 
 /* Etiqueta da mensagem do dono que saiu de um visual. */
 .dovisual{display:inline-block;margin:0 0 4px;padding:2px 8px;border-radius:10px;
-          background:rgba(0,0,0,.07);font-size:11.5px;font-weight:700;color:var(--cor-texto);
+          background:var(--cor-codigo-fundo);font-size:11.5px;font-weight:700;color:var(--cor-texto);
           max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
           vertical-align:top}
 
