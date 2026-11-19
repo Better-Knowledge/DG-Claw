@@ -84,6 +84,17 @@ Sistemas da empresa (API HTTPS, banco SQLite, servidor MCP) que os agentes alcan
 | `dgclaw sistema listar` | Os nomes das credenciais (nunca os valores) e as ferramentas do catálogo | [FERRAMENTAS-POR-ESCOPO.md](../../web/docs/FERRAMENTAS-POR-ESCOPO.md) |
 | `dgclaw sistema remover` | Apaga a credencial de um sistema; as ferramentas que a usam param de funcionar na hora | [FERRAMENTAS-POR-ESCOPO.md](../../web/docs/FERRAMENTAS-POR-ESCOPO.md) |
 
+### Skills compartilhadas
+
+Catálogo de skills em `/var/lib/dgclaw/skills`, por escopo (global, grupo ou agente); cada agente recebe só as que o papel dele libera (bloco `skills` de `/etc/dgclaw/papeis.json`), numa vista só leitura. Veja [SKILLS-POR-ESCOPO.md](../../web/docs/SKILLS-POR-ESCOPO.md).
+
+| Comando | Para que serve | Detalhe |
+| --- | --- | --- |
+| `dgclaw skill publicar` | Copia a pasta da skill (a que tem o `SKILL.md`) para o catálogo: `<pasta> --escopo global|grupo:<grupo>|agente:<slug> [--nome <nome>]`. Recusa atalho, binário e segredo | [SKILLS-POR-ESCOPO.md](../../web/docs/SKILLS-POR-ESCOPO.md) |
+| `dgclaw skill listar` | As skills do catálogo, por escopo | [SKILLS-POR-ESCOPO.md](../../web/docs/SKILLS-POR-ESCOPO.md) |
+| `dgclaw skill remover` | Tira uma skill do catálogo (`<nome> --escopo <escopo>`); a pasta vai para `skills-aposentadas` | [SKILLS-POR-ESCOPO.md](../../web/docs/SKILLS-POR-ESCOPO.md) |
+| `dgclaw skill aplicar` | Refaz os links de `~/.claude/skills` de um agente (ou de todos) pela política atual; vale na próxima sessão | [SKILLS-POR-ESCOPO.md](../../web/docs/SKILLS-POR-ESCOPO.md) |
+
 ### Suporte DG: acesso temporário por chave SSH
 
 | Comando | Para que serve | Detalhe |
