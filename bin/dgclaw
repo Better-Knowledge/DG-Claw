@@ -2631,7 +2631,9 @@ garantir_mcp_dados() {
 # --- sistemas: cofre de credenciais e catalogo de ferramentas ------------------------------
 
 sistema_credencial() {
+    # shellcheck disable=SC2016 # o $CHAVE e o exemplo que a pessoa digita, nao variavel daqui
     [ $# -ge 1 ] || falha "faltou o nome do sistema." 'exemplo: printf %s "$CHAVE" | sudo dgclaw sistema credencial crm'
+    # shellcheck disable=SC2016 # idem
     [ $# -eq 1 ] || falha "so o nome vai na linha; o valor vem pelo STDIN." 'exemplo: printf %s "$CHAVE" | sudo dgclaw sistema credencial crm'
     sistemas_credencial_gravar "$1"
     [ "$ENSAIO" = 1 ] || ok "credencial $1 guardada em ${DG_COFRE_SISTEMAS#"$R"}/$1 (root, 600). Nenhum reinicio e preciso: o Web a le a cada chamada."
@@ -2647,6 +2649,7 @@ sistema_listar() {
             || ferr="(o catalogo ${DG_FERRAMENTAS_JSON#"$R"} nao e um JSON valido; o Web esta com todas as ferramentas fechadas)"
     else ferr=""; fi
     echo "Credenciais no cofre de sistemas (${DG_COFRE_SISTEMAS#"$R"}), so os nomes:"
+    # shellcheck disable=SC2086 # $nomes e a lista de nomes separada por espaco, um por linha na saida
     if [ -n "$nomes" ]; then printf '  %s\n' $nomes; else echo "  (nenhuma; guarde com: printf %s \"\$CHAVE\" | sudo dgclaw sistema credencial <nome>)"; fi
     echo "Ferramentas no catalogo (${DG_FERRAMENTAS_JSON#"$R"}):"
     if [ -n "$ferr" ]; then printf '  %-24s %-8s %-20s %s\n' NOME TIPO CREDENCIAL OPERACOES; printf '%s\n' "$ferr" | awk -F'\t' '{printf "  %-24s %-8s %-20s %s\n", $1, $2, $3, $4}'

@@ -10,6 +10,7 @@ const path = require('node:path');
 
 const RX_NOME = /^[a-z][a-z0-9_-]{0,39}$/;
 const MAX_BYTES = 8 * 1024;
+const MEU_UID = typeof process.getuid === 'function' ? process.getuid() : 0;
 
 class ErroCredencial extends Error {
   constructor(mensagem, codigo) { super(mensagem); this.name = 'ErroCredencial'; this.code = codigo || 'CREDENCIAL'; }
@@ -30,7 +31,9 @@ function criarCofreSistemas({ dir }) {
     }
     if (st.isSymbolicLink() || !st.isFile()) throw new ErroCredencial(`A credencial "${nome}" não é um arquivo comum (atalho?); recusada.`, 'ATALHO');
     if (st.mode & 0o077) throw new ErroCredencial(`O arquivo da credencial "${nome}" está legível por outros usuários (modo ${(st.mode & 0o777).toString(8)}); recusada. Corrija com: sudo chmod 600 ${arq}`, 'MODO');
-    if (st.uid !== 0) throw new ErroCredencial(`O arquivo da credencial "${nome}" não pertence ao root; recusada.`, 'DONO');
+    // O arquivo tem que ser do root (o dono grava com sudo) ou do próprio usuário do Web, quando o Web não roda como root
+    // (os testes no CI, por exemplo). Arquivo de outro usuário é recusado: ninguém planta credencial no cofre.
+    if (st.uid !== 0 && st.uid !== MEU_UID) throw new ErroCredencial(`O arquivo da credencial "${nome}" não pertence ao root nem ao usuário do Web; recusada.`, 'DONO');
     if (st.size > MAX_BYTES) throw new ErroCredencial(`A credencial "${nome}" passa de ${MAX_BYTES} bytes; recusada.`, 'TAMANHO');
     let fd = null;
     try {
