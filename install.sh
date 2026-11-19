@@ -1745,6 +1745,8 @@ FIM
     papeis_garantir_arquivo "$SCRIPT_DIR/templates/papeis.exemplo.json"
     # Catalogo das bases de conhecimento: vazio se nao existe; o que o dono cadastrou fica (web/docs/BASES-DE-CONHECIMENTO.md).
     bases_garantir_arquivo
+    # Catalogo de ferramentas (API, MCP, banco) vazio e o cofre de sistemas; o que o dono cadastrou fica (web/docs/FERRAMENTAS-POR-ESCOPO.md).
+    sistemas_garantir_arquivos
     if tem_jq; then
         agentes_garantir_arquivo
         # codex_home_host vai sempre, mesmo com o Admin no Claude: o runner.json dele usa CODEX_HOME=/root/.codex
@@ -2423,6 +2425,8 @@ main() {
     . "$SCRIPT_DIR/lib/agentes.sh"
     # shellcheck source=lib/bases.sh
     . "$SCRIPT_DIR/lib/bases.sh"
+    # shellcheck source=lib/sistemas.sh
+    . "$SCRIPT_DIR/lib/sistemas.sh"
     ENSAIO="$ARG_ENSAIO"
     LOG_INSTALAR="$DG_LOG/instalar.log"
     validar_args

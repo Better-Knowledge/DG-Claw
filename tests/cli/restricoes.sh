@@ -84,7 +84,8 @@ cp "$TMP/runner-padrao.json" "$TMP/ref.json"
 criar_agente ana --nome "Ana"
 igual "criar de novo sai com 0" "0" "$?"
 confere_travas ana "depois de criar de novo"
-afirma "fora das travas, o runner.json e o padrao de sempre" bash -c "[ \"\$(jq -cS 'del(.restricoesAplicadas) | .config |= (del(.denyTools) | .allowTools = [\"mcp__dgchat__reply\",\"mcp__dgchat__send_file\",\"mcp__dgchat__whatsapp_reply\",\"mcp__dgchat__whatsapp_send_file\"])' '$RJ')\" = \"\$(jq -cS . '$TMP/ref.json')\" ]"
+# As travas tiraram os envios de arquivo dos allowTools; devolvidos, a lista tem de ser a de sempre (inclusive as tools do MCP de dados).
+afirma "fora das travas, o runner.json e o padrao de sempre" bash -c "[ \"\$(jq -cS 'del(.restricoesAplicadas) | .config |= (del(.denyTools) | .allowTools = ((.allowTools + [\"mcp__dgchat__send_file\",\"mcp__dgchat__whatsapp_send_file\"]) | unique))' '$RJ')\" = \"\$(jq -cS '.config.allowTools |= unique' '$TMP/ref.json')\" ]"
 
 echo "o que o dono ja tinha em denyTools e o que o aluno poe no runner.json fica"
 jq '.config.denyTools += ["WebFetch"]' "$RJ" >"$RJ.novo" && mv -f "$RJ.novo" "$RJ" && chmod 444 "$RJ"

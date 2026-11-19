@@ -74,6 +74,16 @@ Pastas de texto que os agentes leem conforme o escopo (pessoa, grupo, empresa ou
 | `dgclaw base listar` | Lista as bases, o escopo e quantos arquivos há em cada pasta (`--json` para máquina) | [BASES-DE-CONHECIMENTO.md](../../web/docs/BASES-DE-CONHECIMENTO.md) |
 | `dgclaw base remover` | Tira a base do catálogo. A pasta não é apagada: vai para `/var/lib/dgclaw/bases-aposentadas/`. Pede confirmação, ou `--sim` | [BASES-DE-CONHECIMENTO.md](../../web/docs/BASES-DE-CONHECIMENTO.md) |
 
+### Sistemas de fora (gateway de ferramentas)
+
+Sistemas da empresa (API HTTPS, banco SQLite, servidor MCP) que os agentes alcançam só pelo Web, com uma credencial por sistema guardada no servidor e escopos `sistema:nivel` por operação em `/etc/dgclaw/ferramentas.json`. Veja [FERRAMENTAS-POR-ESCOPO.md](../../web/docs/FERRAMENTAS-POR-ESCOPO.md).
+
+| Comando | Para que serve | Detalhe |
+| --- | --- | --- |
+| `dgclaw sistema credencial` | Guarda a credencial de um sistema (`<nome>`; o valor vem sempre pelo STDIN) em `/etc/dgclaw/cofre-sistemas/`. O agente nunca a recebe: o Web a injeta na hora da chamada | [FERRAMENTAS-POR-ESCOPO.md](../../web/docs/FERRAMENTAS-POR-ESCOPO.md) |
+| `dgclaw sistema listar` | Os nomes das credenciais (nunca os valores) e as ferramentas do catálogo | [FERRAMENTAS-POR-ESCOPO.md](../../web/docs/FERRAMENTAS-POR-ESCOPO.md) |
+| `dgclaw sistema remover` | Apaga a credencial de um sistema; as ferramentas que a usam param de funcionar na hora | [FERRAMENTAS-POR-ESCOPO.md](../../web/docs/FERRAMENTAS-POR-ESCOPO.md) |
+
 ### Suporte DG: acesso temporário por chave SSH
 
 | Comando | Para que serve | Detalhe |

@@ -32,8 +32,9 @@ const RX_NOME = /^[a-z][a-z0-9_-]{0,39}$/;      // pessoas, papéis, fontes, aç
 const NIVEIS_FONTE = ['negado', 'leitura'];
 const NIVEIS_ACAO = ['negado', 'aprovacao_humana'];
 const CAMPOS_RAIZ = ['versao', 'pessoas', 'papeis', 'agentes', 'grupos', 'comentario'];
-const CAMPOS_PESSOA = ['nome', 'fontes', 'acoes', 'grupos', 'estado', 'bases', 'comentario'];
-const CAMPOS_PAPEL = ['fontes', 'acoes', 'bases', 'comentario'];
+const CAMPOS_PESSOA = ['nome', 'fontes', 'acoes', 'grupos', 'estado', 'bases', 'ferramentas', 'comentario'];
+const CAMPOS_PAPEL = ['fontes', 'acoes', 'bases', 'ferramentas', 'comentario'];
+const RX_ESCOPO = /^[a-z][a-z0-9_-]{0,39}:[a-z][a-z0-9_-]{0,39}$/;
 const CAMPOS_GRUPO = ['nome', 'tipo', 'comentario'];
 const TIPOS_GRUPO = ['departamento', 'projeto', 'equipe'];
 const ESTADOS_PESSOA = ['ativa', 'desligada'];
@@ -95,6 +96,16 @@ function normalizaBases(bruto, onde, erros) {
   return saida;
 }
 
+/** Bloco "ferramentas": lista de escopos "sistema:nivel" (ou "*"). */
+function normalizaFerramentas(bruto, onde, erros) {
+  if (bruto === undefined) return [];
+  if (!Array.isArray(bruto) || bruto.length > MAX_CAMPOS || bruto.some((e) => typeof e !== 'string' || (e !== '*' && !RX_ESCOPO.test(e)))) {
+    erros.push(`${onde}.ferramentas precisa ser uma lista de escopos no formato "sistema:nivel" (ex.: "crm:ler") ou "*".`);
+    return [];
+  }
+  return [...new Set(bruto)];
+}
+
 function normalizaAcoes(bruto, onde, erros) {
   if (bruto === undefined) return {};
   if (!ehObjeto(bruto)) { erros.push(`${onde}.acoes precisa ser um objeto { "<acao>": "aprovacao_humana" | "negado" }.`); return {}; }
@@ -152,7 +163,7 @@ function validaPapeis(bruto) {
           gruposDaPessoa = [...new Set(p.grupos)];
         }
       }
-      pessoas[nome] = { nome: typeof p.nome === 'string' ? p.nome : nome, estado: p.estado || 'ativa', grupos: gruposDaPessoa, fontes: normalizaFontes(p.fontes, onde, erros), acoes: normalizaAcoes(p.acoes, onde, erros), bases: normalizaBases(p.bases, onde, erros) };
+      pessoas[nome] = { nome: typeof p.nome === 'string' ? p.nome : nome, estado: p.estado || 'ativa', grupos: gruposDaPessoa, fontes: normalizaFontes(p.fontes, onde, erros), acoes: normalizaAcoes(p.acoes, onde, erros), bases: normalizaBases(p.bases, onde, erros), ferramentas: normalizaFerramentas(p.ferramentas, onde, erros) };
     }
   }
 
@@ -165,7 +176,7 @@ function validaPapeis(bruto) {
       if (!nomeValido(nome, 'papeis', erros)) continue;
       if (!ehObjeto(p)) { erros.push(`${onde} precisa ser um objeto.`); continue; }
       soChaves(p, CAMPOS_PAPEL, onde, erros);
-      papeis[nome] = { fontes: normalizaFontes(p.fontes, onde, erros), acoes: normalizaAcoes(p.acoes, onde, erros), bases: normalizaBases(p.bases, onde, erros) };
+      papeis[nome] = { fontes: normalizaFontes(p.fontes, onde, erros), acoes: normalizaAcoes(p.acoes, onde, erros), bases: normalizaBases(p.bases, onde, erros), ferramentas: normalizaFerramentas(p.ferramentas, onde, erros) };
     }
   }
 
