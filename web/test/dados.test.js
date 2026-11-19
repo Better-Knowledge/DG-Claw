@@ -347,11 +347,14 @@ test('pelo Web inteiro: a caixa só alcança fontes, pedidos e docs.md; o slug v
     assert.equal(r.status, 403); assert.match(r.json.erro, /não está liberada para agentes/);
     r = await c.pedir('GET', '/dados', { headers: cab('ana') });
     assert.equal(r.status, 403);
+    assert.equal((await c.pedir('GET', '/observabilidade', { headers: cab('ana') })).status, 403);
     // sem sessão, a API exige login; com login, a tela e as rotas do dono respondem
     assert.equal((await c.get('/api/v1/dados/papeis')).status, 401);
     fs.writeFileSync(path.join(t.publico, 'dados.html'), '<html>dados de teste</html>');
     await t.login(c);
     r = await c.get('/dados'); assert.equal(r.status, 200); assert.match(r.texto, /dados de teste/);
+    fs.writeFileSync(path.join(t.publico, 'observabilidade.html'), '<html>observabilidade de teste</html>');
+    r = await c.get('/observabilidade'); assert.equal(r.status, 200); assert.match(r.texto, /observabilidade de teste/);
     r = await c.get('/api/v1/dados/papeis'); assert.equal(r.status, 200); assert.equal(r.json.valido, true);
     r = await c.get('/api/v1/dados/aprovacoes'); assert.equal(r.status, 200); assert.equal(r.json.pendentes, 0);
     assert.equal(fs.statSync(path.join(t.dados, 'dados', 'log')).mode & 0o777, 0o700);
@@ -394,5 +397,24 @@ test('revogação automática aparece ao agente como "sistema", não como "dono"
     await s.pedir('GET', '/api/v1/dados/fontes', undefined, CAIXA('bia'));
     const v = await s.pedir('GET', `/api/v1/dados/pedidos/${e.json.pedido.id}`, undefined, CAIXA('ana'));
     assert.equal(v.json.pedido.estado, 'revogada'); assert.equal(v.json.pedido.decidido_por, 'sistema');
+  } finally { s.fechar(); }
+});
+
+test('o dono filtra o log, baixa o CSV e vê o resumo; o agente não; filtros inválidos são 400', async () => {
+  const s = await subir();
+  try {
+    await s.pedir('POST', '/api/v1/dados/fontes/clientes/listar', {}, CAIXA('ana'));
+    await s.pedir('POST', '/api/v1/dados/fontes/folha/listar', {}, CAIXA('bia'));
+    let r = await s.pedir('GET', '/api/v1/dados/log?agente=bia', undefined, DONO);
+    assert.equal(r.status, 200); assert.equal(r.json.linhas.length, 1); assert.equal(r.json.linhas[0].decisao, 'negado'); assert.deepEqual(r.json.filtro, { limit: 100, agente: 'bia' });
+    r = await s.pedir('GET', '/api/v1/dados/log?decisao=permitido&desde=2026-11-01', undefined, DONO);
+    assert.equal(r.json.linhas.length, 1); assert.equal(r.json.linhas[0].agente, 'ana');
+    r = await s.pedir('GET', '/api/v1/dados/log.csv?agente=ana', undefined, DONO);
+    assert.equal(r.status, 200); assert.ok(r.texto.startsWith('\ufeffquando,agente')); assert.ok(r.texto.includes(',ana,marta,recepcao,clientes,')); assert.ok(!r.texto.includes('bia'));
+    r = await s.pedir('GET', '/api/v1/dados/log/resumo', undefined, DONO);
+    assert.equal(r.json.linhas, 2); assert.deepEqual(r.json.por_decisao, { permitido: 1, negado: 1 }); assert.deepEqual(r.json.por_fonte, { clientes: 1, folha: 1 });
+    for (const q of ['agente=A%20B', 'desde=08%2F11%2F2026', 'limit=x', 'fonte=..%2Fx']) assert.equal((await s.pedir('GET', '/api/v1/dados/log?' + q, undefined, DONO)).status, 400, q);
+    assert.equal((await s.pedir('GET', '/api/v1/dados/log.csv', undefined, CAIXA('ana'))).status, 403);
+    assert.equal((await s.pedir('GET', '/api/v1/dados/log/resumo', undefined, CAIXA('ana'))).status, 403);
   } finally { s.fechar(); }
 });

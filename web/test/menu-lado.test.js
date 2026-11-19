@@ -125,7 +125,7 @@ test('grupos do menu: cada item tem um lugar e nenhum aparece em dois', () => {
   assert.deepEqual(por.perfil, ['identity', 'personality', 'memory']);
   assert.deepEqual(por.dia, ['rotinas', 'lembretes', 'sessoes']);
   assert.deepEqual(por.ferramentas.slice(0, 2), ['skills', 'apps']);
-  assert.deepEqual(por.operacao, ['status', 'operations', 'costs', 'logs']);
+  assert.deepEqual(por.operacao, ['status', 'operations', 'costs', 'observabilidade', 'logs']);
   assert.deepEqual(por.seguranca.slice(0, 3), ['seguranca', 'cofre', 'avisos']);
 });
 
@@ -146,7 +146,7 @@ test('organizaMenu (dono, agente com painel): fixos, cinco grupos, rodapé solto
 test('organizaMenu: o Admin (sem painel) só tem os grupos com algo dentro; colaborador não vê cofre, Mesa nem o que é do dono', () => {
   const admin = M.organizaMenu(M.montaItens({ id: 'admin', tipo: 'admin', tem_painel: false }, false));
   assert.deepEqual(admin.grupos.map(g => g.id), ['dia', 'ferramentas', 'operacao', 'seguranca']);
-  assert.deepEqual(admin.grupos.find(g => g.id === 'operacao').itens.map(i => i.chave), ['logs'], 'Logs só no Admin');
+  assert.deepEqual(admin.grupos.find(g => g.id === 'operacao').itens.map(i => i.chave), ['observabilidade', 'logs'], 'Logs só no Admin; Observabilidade é do dono em qualquer agente');
   assert.deepEqual(admin.grupos.find(g => g.id === 'seguranca').itens.map(i => i.chave), ['seguranca', 'avisos', 'suporte', 'dados'], 'o Admin não convida colaborador');
   assert.deepEqual(admin.conexoes, []);
   const colab = M.organizaMenu(M.montaItens(AG, true));

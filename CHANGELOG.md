@@ -7,6 +7,24 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Não lançado]
 
+**Observabilidade e conhecimento que fica na empresa.** O menu ganhou a tela **Observabilidade**: quantos
+pedidos os agentes fizeram às fontes, bases e ferramentas nos últimos 30 dias, quantos foram permitidos,
+negados ou viraram aprovação, as contagens por agente, fonte e pessoa, e a lista linha a linha com filtros e
+botão para baixar em CSV. Quando uma pessoa sai da empresa, `sudo dgclaw pessoa desligar <pessoa>` nega todo
+acesso dela na hora, para os agentes dela sem apagar nada e copia a memória de trabalho deles para uma base
+de conhecimento do grupo dela, para o sucessor consultar. E a reflexão da noite de cada agente passa a
+separar o que é conhecimento da empresa (como se faz, por que se decidiu) e a sugerir registrá-lo na base
+do grupo, sempre com o seu sim e a sua aprovação. A política está escrita em
+`docs/PROPRIEDADE-DO-CONHECIMENTO.md`; a tela, em `web/docs/OBSERVABILIDADE.md`.
+
+### Como atualizar (observabilidade e conhecimento)
+
+Peça ao Admin, no chat: "atualiza o DG Claw". A tela nova aparece no menu depois de fechar e abrir o painel
+no celular. As instruções dos agentes ganharam o trecho sobre o conhecimento da empresa; ele entra sozinho na
+identidade de cada um ao atualizar, sem apagar o que você personalizou. O passo novo da reflexão da noite
+vale a partir da próxima noite. Nada precisa ser configurado; se quiser o registro de conhecimento por grupo,
+crie uma base `conhecimento-<grupo>` com `sudo dgclaw base criar conhecimento-financeiro --escopo grupo:financeiro`.
+
 **Skills compartilhadas por escopo.** Além das skills da imagem e das que cada agente aprende na própria casa,
 existe agora um catálogo compartilhado (`/var/lib/dgclaw/skills`) com três escopos: global, de um grupo
 (departamento, projeto, equipe) ou de um agente só. Você publica com `sudo dgclaw skill publicar <pasta>

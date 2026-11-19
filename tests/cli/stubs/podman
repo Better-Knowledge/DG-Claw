@@ -4,6 +4,8 @@ echo "podman $*" >> "${STUB_LOG:?}"
 est="${STUB_ESTADO:?}"
 # O conmon de verdade herda os descritores abertos: se o 9 (a trava das restricoes) chega aqui, ele a segurava para sempre.
 if [ -e /proc/$$/fd/9 ]; then echo "podman $*" >> "$est/fd9-aberto"; fi
+# podman-quebrado: tudo falha com 125 (banco travado, servico fora), como o podman de verdade faz.
+if [ -f "$est/podman-quebrado" ]; then echo "Error: database is locked" >&2; exit 125; fi
 case "${1:-}" in
     image)
         # `image inspect -f {{.Id}}`: o id da imagem "atual" (muda quando o teste escreve estado/imagem-id).
@@ -43,8 +45,13 @@ case "${1:-}" in
         echo running > "$est/c-$2"
         # Simula o container que cai na partida (falta de inotify): estado exited, codigo 255.
         if [ -f "$est/saida-255" ]; then echo exited > "$est/c-$2"; echo 255 > "$est/codigo-$2"; fi ;;
+    unpause)
+        nome="${*: -1}"
+        [ -f "$est/c-$nome" ] && [ "$(cat "$est/c-$nome")" = paused ] && echo running > "$est/c-$nome" ;;
     stop)
         nome="${*: -1}"
+        # Como o podman de verdade: container pausado recusa o stop.
+        if [ -f "$est/c-$nome" ] && [ "$(cat "$est/c-$nome")" = paused ]; then echo "Error: container state improper" >&2; exit 125; fi
         touch "$est/stop-feito"
         [ -f "$est/c-$nome" ] || exit 0
         # stop-nao-para: o stop devolve 0, mas o container continua ligado (o caso do container que ignora o sinal).
@@ -54,6 +61,8 @@ case "${1:-}" in
         if [ -f "$est/stop-remove" ]; then rm -f "$est/c-$nome"; exit 0; fi
         # stop-trava-<container> = N: o stop devolve, mas o estado fica "stopping" por N consultas
         # (depois vira exited); = sempre: fica "stopping" para sempre (o caso real do podman 4.9.3).
+        # stop-nao-para-<container>: o stop devolve 0 mas o container continua running (processo que ignora o sinal).
+        if [ -f "$est/stop-nao-para-$nome" ]; then exit 0; fi
         if [ -f "$est/stop-trava-$nome" ]; then
             echo stopping > "$est/c-$nome"; cp "$est/stop-trava-$nome" "$est/stopping-resta-$nome"
         else echo exited > "$est/c-$nome"; fi ;;
@@ -66,7 +75,7 @@ case "${1:-}" in
         nome="${*: -1}"; forca=0
         for a in "$@"; do [ "$a" = -f ] && forca=1; done
         # Como o podman de verdade: sem -f, nao remove container ligado ou parando.
-        if [ -f "$est/c-$nome" ] && [ "$forca" = 0 ] && grep -qx 'running\|stopping' "$est/c-$nome"; then
+        if [ -f "$est/c-$nome" ] && [ "$forca" = 0 ] && grep -qx 'running\|stopping\|paused' "$est/c-$nome"; then
             echo "Error: cannot remove container $nome as it is $(cat "$est/c-$nome") - running or paused containers cannot be removed without force: container state improper" >&2
             exit 2
         fi

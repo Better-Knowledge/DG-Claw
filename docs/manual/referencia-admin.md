@@ -95,6 +95,16 @@ Catálogo de skills em `/var/lib/dgclaw/skills`, por escopo (global, grupo ou ag
 | `dgclaw skill remover` | Tira uma skill do catálogo (`<nome> --escopo <escopo>`); a pasta vai para `skills-aposentadas` | [SKILLS-POR-ESCOPO.md](../../web/docs/SKILLS-POR-ESCOPO.md) |
 | `dgclaw skill aplicar` | Refaz os links de `~/.claude/skills` de um agente (ou de todos) pela política atual; vale na próxima sessão | [SKILLS-POR-ESCOPO.md](../../web/docs/SKILLS-POR-ESCOPO.md) |
 
+### Pessoas (quem trabalha com os agentes)
+
+As pessoas de `/etc/dgclaw/papeis.json`: cada agente de trabalho aponta para uma pessoa e um papel. Veja [PROPRIEDADE-DO-CONHECIMENTO.md](../PROPRIEDADE-DO-CONHECIMENTO.md).
+
+| Comando | Para que serve | Detalhe |
+| --- | --- | --- |
+| `dgclaw pessoa listar` | As pessoas do arquivo de papéis, o estado, os grupos e os agentes de cada uma | [PROPRIEDADE-DO-CONHECIMENTO.md](../PROPRIEDADE-DO-CONHECIMENTO.md) |
+| `dgclaw pessoa desligar` | Marca a pessoa como desligada: todo acesso dela é negado na hora, os agentes dela param (a casa fica inteira) e a memória de trabalho deles vai para a base `entrega-<pessoa>`, no escopo do grupo. Pede confirmação, ou `--sim`; `--base <nome>` escolhe outro nome para a base | [PROPRIEDADE-DO-CONHECIMENTO.md](../PROPRIEDADE-DO-CONHECIMENTO.md) |
+| `dgclaw pessoa religar` | Volta a pessoa para ativa; os agentes dela voltam com `dgclaw agente iniciar <slug>` | [PROPRIEDADE-DO-CONHECIMENTO.md](../PROPRIEDADE-DO-CONHECIMENTO.md) |
+
 ### Suporte DG: acesso temporário por chave SSH
 
 | Comando | Para que serve | Detalhe |
