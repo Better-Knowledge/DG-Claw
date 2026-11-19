@@ -1643,7 +1643,13 @@ function criarServidor(opcoes) {
 
     if ((p === '/acessos' || p === '/acessos/') && (m === 'GET' || m === 'HEAD')) {
       if (!sessao) return semSessaoPagina(req, res, url);
-      if (await acessos.rotas(req, res, url, sessao)) return undefined;
+      // Só o dono (o colaborador já é barrado antes pelo escopo.js; aqui é a segunda trava).
+      if (sessao.via === 'caixa' || sessao.papel === 'colaborador') return H.paginaErro(res, 403, 'Só o dono', 'O controle de acesso dos agentes é do dono do DG Claw.');
+      if (!servirArquivo(req, res, path.join(config.publicDir, 'acessos.html'), 'no-store')) {
+        log('erro', `A tela de acessos não está instalada: falta ${path.join(config.publicDir, 'acessos.html')}.`);
+        H.paginaErro(res, 500, 'Tela não instalada', 'O arquivo da tela de acessos não foi encontrado no servidor. Reinstale o DG Claw Web.');
+      }
+      return undefined;
     }
 
     if (p === '/observabilidade' && (m === 'GET' || m === 'HEAD')) {

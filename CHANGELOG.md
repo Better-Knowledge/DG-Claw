@@ -23,6 +23,10 @@ pode ter várias pessoas: no convite você marca os agentes que ela vai usar, e 
 Colaboradores) muda a lista depois, sem derrubar a sessão dela. Com mais de um agente, ela troca de agente pelo menu,
 como você. O que ela não alcança continua igual: o Admin, os agentes que não foram marcados e as telas da caixa
 inteira. Quem já tinha convidado alguém não precisa fazer nada: o convite antigo continua valendo para o agente dele.
+O menu de troca de agentes, que a 1.1.0 tinha tirado da conversa do colaborador, volta só para quem tem mais de um agente,
+listando só os dele. No servidor, `dgclaw colaborador criar` aceita vários agentes separados por vírgula
+(`criar ana,bob maria@empresa.com`) e o novo `dgclaw colaborador agentes <id-ou-email> <a,b>` troca a lista de quem já foi
+convidado; o Admin usa os dois quando você pede pelo chat.
 
 **Observabilidade e conhecimento que fica na empresa.** O menu ganhou a tela **Observabilidade**: quantos
 pedidos os agentes fizeram às fontes, bases e ferramentas nos últimos 30 dias, quantos foram permitidos,

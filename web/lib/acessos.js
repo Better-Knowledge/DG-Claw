@@ -258,21 +258,11 @@ function criarAcessos({ papeis, bases, ferramentas, skillsDir, registro, colabor
     const p = url.pathname;
     const m = req.method;
     const ehApi = p === '/api/v1/acessos' || p.startsWith('/api/v1/acessos/');
-    const ehPagina = p === '/acessos' || p === '/acessos/';
-    if (!ehApi && !ehPagina) return false;
-    // Só o dono (o colaborador já é barrado antes pelo escopo.js; aqui é a segunda trava).
+    if (!ehApi) return false;
+    // Só o dono (o colaborador já é barrado antes pelo escopo.js; aqui é a segunda trava). A página /acessos é servida pelo server.js.
     const dono = !!sessao && sessao.via !== 'caixa' && sessao.papel !== 'colaborador';
-    if (!dono) {
-      if (ehPagina) H.paginaErro(res, 403, 'Só o dono', 'O controle de acesso dos agentes é do dono do DG Claw.');
-      else H.erroJson(res, 403, 'Só o dono do DG Claw mexe no controle de acesso dos agentes.');
-      return true;
-    }
+    if (!dono) { H.erroJson(res, 403, 'Só o dono do DG Claw mexe no controle de acesso dos agentes.'); return true; }
     try {
-      if (ehPagina) {
-        if (m !== 'GET' && m !== 'HEAD') { H.erroJson(res, 405, 'Use GET.'); return true; }
-        if (!servirArquivo(req, res, path.join(config.publicDir, 'acessos.html'), 'no-store')) H.paginaErro(res, 500, 'Tela não instalada', 'O arquivo da tela de acessos não foi encontrado no servidor. Reinstale o DG Claw Web.');
-        return true;
-      }
       if (p === '/api/v1/acessos') {
         if (m !== 'GET') { H.erroJson(res, 405, 'Use GET para ver os acessos; as mudanças vão em /api/v1/acessos/agente|papel|pessoa|grupo/<nome>.'); return true; }
         H.enviaJson(res, 200, visao());
