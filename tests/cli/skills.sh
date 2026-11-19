@@ -98,7 +98,9 @@ igual "a vista mantem o inode depois do skill aplicar (o container ligado contin
 afirma "agente reparar refaz a vista" dgclaw agente reparar ana
 igual "a vista mantem o inode depois do reparar" "$INODE_VISTA" "$(stat -c %i "$SK/.vistas/ana")"
 nega "a pasta temporaria da vista nao sobra" bash -c "ls -a '$SK/.vistas' | grep -q '^\\.ana\\.'"
+# shellcheck disable=SC2016 # o $nome e texto do script procurado, nao variavel daqui
 afirma "mandou o script de links por STDIN" grep -q 'ln -sfn "/run/dgclaw/skills/$nome"' "$STUB_LOG.stdin"
+# shellcheck disable=SC2016 # idem, $alvo
 afirma "remove link antigo que nao esta mais na lista" grep -q 'rm -f "$alvo"' "$STUB_LOG.stdin"
 afirma "skill aplicar sem slug passa por todos os agentes" dgclaw skill aplicar
 # a politica muda (ana perde o papel): a vista fica so com a propria skill

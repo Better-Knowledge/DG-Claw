@@ -1179,6 +1179,7 @@ ligar_skills_script() {
         [[ "$nome" =~ ^[a-z][a-z0-9-]{0,39}$ ]] || continue
         lista="$lista $nome"
     done < <(skills_vista_nomes "$slug")
+    # shellcheck disable=SC2016 # o $CASA e do script que roda dentro do container, nao daqui
     printf 'set -euo pipefail\nCASA=/home/agente\nmkdir -p "$CASA/.claude/skills"\nchown agente:agente "$CASA/.claude" "$CASA/.claude/skills"\nPERMITIDAS="%s"\n' "$lista"
     cat <<'DENTRO'
 for alvo in "$CASA"/.claude/skills/*; do

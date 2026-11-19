@@ -160,9 +160,9 @@ skills_listar_tsv() {
 # negar; as do grupo exigem a pessoa no grupo; as do proprio agente sempre entram. Pessoa desligada: nada.
 # Sem papeis.json valido ou agente fora dele: so as proprias.
 skills_permitidas() {
-    local slug="$1" linha escopo nome rel grupo
+    local slug="$1" escopo nome rel grupo
     [[ "$slug" =~ ^[a-z0-9][a-z0-9-]{1,30}$ ]] || return 0
-    local pol="" pessoa="" papel="" estado="ativa" grupos="" papel_skills="" pessoa_skills=""
+    local pol="" papel="" estado="ativa" grupos="" papel_skills="" pessoa_skills=""
     # So confia no papeis.json que o Web aceitaria: arquivo que o Web rejeita libera so as proprias.
     local papeis_ok=0
     if [ -s "$DG_PAPEIS_JSON" ] && node -e '
@@ -176,7 +176,7 @@ skills_permitidas() {
            grupos: ((.pessoas[$a.pessoa].grupos // []) | join(" ")),
            papel_skills: ((.papeis[$a.papel].skills // []) | join(" ")),
            pessoa_skills: ((.pessoas[$a.pessoa].skills // {}) | to_entries | map("\(.key)=\(.value)") | join(" "))} end' "$DG_PAPEIS_JSON" 2>/dev/null)" && [ "$pol" != null ]; then
-        pessoa="$(jq -r .pessoa <<<"$pol")"; papel="$(jq -r .papel <<<"$pol")"; estado="$(jq -r .estado <<<"$pol")"
+        papel="$(jq -r .papel <<<"$pol")"; estado="$(jq -r .estado <<<"$pol")"
         grupos="$(jq -r .grupos <<<"$pol")"; papel_skills="$(jq -r .papel_skills <<<"$pol")"; pessoa_skills="$(jq -r .pessoa_skills <<<"$pol")"
     fi
     [ "$estado" != desligada ] || { skills_listar_tsv | awk -F'\t' -v s="agente:$slug" '$1 == s && 0'; return 0; }
@@ -223,7 +223,7 @@ skills_montar_vista() {
         [[ "$rel" =~ ^(globais|grupos/[a-z][a-z0-9_-]{0,39}|agentes/[a-z0-9][a-z0-9-]{1,30})/[a-z][a-z0-9-]{0,39}$ ]] || continue
         nome="${rel##*/}"
         [ -f "$DG_SKILLS_DIR/$rel/SKILL.md" ] || continue
-        rm -rf "$tmp/$nome"
+        rm -rf "${tmp:?}/$nome"
         cp -R --no-dereference "$DG_SKILLS_DIR/$rel" "$tmp/$nome"
     done < <(skills_permitidas "$slug")
     find "$tmp" -type d -exec chmod 755 {} +
