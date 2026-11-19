@@ -56,8 +56,13 @@ comprometido ainda consegue mandar dados para a internet (ver "Pendências").
   sessões abertas. Cada sessão guarda uma
   marca da senha e do usuário de quando nasceu (um sha256, nunca o hash da senha); se a senha ou o
   usuário mudam, as sessões com a marca antiga deixam de valer no próximo pedido ou no restart.
-- Depois de 10 senhas erradas em 15 minutos, o painel responde "Muitas tentativas erradas.
-  Espere N minutos." e nem a senha certa entra até a janela passar.
+- Senhas erradas em 15 minutos: 5 por login e IP, 20 por IP somando todos os logins e 20 por
+  conta somando todos os IPs. Nos três casos o painel responde "Muitas tentativas erradas. Espere
+  N minutos." e nem a senha certa entra até a janela passar. A conta sob ataque (o terceiro caso,
+  força bruta distribuída) continua aberta para os IPs que já entraram nela nos últimos 30 dias,
+  lembrados em `sessoes.json` (até 10 por conta; IPv6 por /64); um login certo não zera esse
+  contador. De uma rede nova, a saída é esperar a janela ou, para um colaborador, o dono reenviar
+  o convite.
 - Contra CSRF, toda requisição que muda alguma coisa confere `Origin` e `Sec-Fetch-Site`.
   Sair é por POST.
 - No modo trancado só a senha fica desligada. As outras três portas de entrada continuam
@@ -201,6 +206,13 @@ atende outra pessoa usa a credencial dela.
   ou pedido já usado é recusado, e revogar a pessoa ou o agente derruba os pendentes.
 - Uma linha de log por pedido, sem parâmetros nem conteúdo. Contrato e limites em
   `web/docs/DADOS-POR-PAPEL.md`.
+- O painel **Acessos dos agentes** (`web/docs/ACESSOS.md`, só o dono) edita o `papeis.json` pelo Web só
+  depois do mesmo validador que decide, sob a mesma trava `mkdir` da CLI (`papeis.json.trava`), e recusa
+  gravar se o arquivo mudou no meio; o que o validador não conhece fica como está. O colaborador é barrado
+  antes, pelo escopo (rota sem slug), e de novo na rota.
+- Colaboradores com vários agentes (`web/docs/COLABORADORES.md`): cada registro guarda a lista de agentes e a
+  instância de cada um; a sessão relê a lista a cada pedido (editar vale no clique seguinte), um agente
+  recriado sai só ele da lista, e o que não está na lista responde como no original (403, ou 404 na mídia).
 - Bases de conhecimento (`web/docs/BASES-DE-CONHECIMENTO.md`): pastas de root em `/var/lib/dgclaw/bases`,
   com escopo (privada, grupo, empresa, pública) cruzado com a pessoa e o papel do agente; a escrita só
   acontece depois da aprovação de uma pessoa, num temporário `O_EXCL | O_NOFOLLOW` renomeado para dentro
@@ -233,4 +245,5 @@ atende outra pessoa usa a credencial dela.
 | Cabeçalhos contra iframe no painel | uma página hostil poderia carregar o painel num iframe e induzir cliques | o painel precisa abrir dentro de outra página em algumas instalações; o login com `SameSite` e a checagem de `Origin` seguram as ações |
 | Escrita de arquivo pelo painel | entre conferir o caminho e gravar, um agente malicioso poderia trocar uma pasta por atalho | exige um agente já comprometido dentro do próprio container |
 | Dados por papel só valem para o que passa pela rota | dado alcançado por outro caminho (arquivo montado, página, canal) ou já anotado na casa do agente não é filtrado nem apagado na revogação | aceito nesta versão; as fontes são locais e de exemplo, e a camada é o ponto de partida para o gateway de sistemas reais |
+| Trava do `papeis.json` e do `colaboradores.json` entre o painel e a CLI | o painel e a CLI tomam a mesma trava (`<arquivo>.trava`) e o painel recusa gravar se o arquivo mudou; a espera do painel bloqueia o processo do Web por até 2 s, e uma trava órfã é removida depois de 10 s | aceito nesta versão: a edição é rara e feita pelo dono; espera assíncrona fica para depois |
 | Token do runner e segredo do proxy dentro do container | quem controla o agente consegue falar com o próprio runner | aceitável na v1: cada token vale só para aquele agente, e o token do Admin nunca entra em container |

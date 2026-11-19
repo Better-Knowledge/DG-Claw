@@ -386,7 +386,7 @@ test('rodada 10: registro de colaborador sem instancia (gravado à mão ou antig
     assert.equal((await x.c.get('/api/v1/agents/ana/messages')).status, 200);
     const arq = s.t.web.colaboradores.arquivo;
     const j = JSON.parse(fs.readFileSync(arq, 'utf8'));
-    for (const c of j.colaboradores) delete c.instancia;
+    for (const c of j.colaboradores) { delete c.instancia; delete c.instancias; }
     fs.writeFileSync(arq, JSON.stringify(j));
     const futuro = new Date(Date.now() + 5000); fs.utimesSync(arq, futuro, futuro);
     assert.equal((await x.c.get('/api/v1/agents/ana/messages')).status, 401, 'a sessão existente caiu');

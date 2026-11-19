@@ -1,6 +1,6 @@
 # Colaboradores
 
-Um **colaborador** é uma pessoa que você convida para conversar com **um** agente de trabalho do seu DG Claw. Ela recebe um e-mail com o link, o login e uma senha temporária, cria a própria senha no primeiro acesso e passa a usar aquele agente por inteiro, e só ele.
+Um **colaborador** é uma pessoa que você convida para conversar com **um ou mais** agentes de trabalho do seu DG Claw. Ela recebe um e-mail com o link, o login e uma senha temporária, cria a própria senha no primeiro acesso e passa a usar aquele agente por inteiro, e só ele.
 
 Este documento tem duas partes: a primeira é para você, dono do DG Claw; a segunda, "API", é para o agente que opera o painel por você (o Admin, por exemplo).
 
@@ -31,12 +31,12 @@ Isso vale no servidor, não só na tela: o endereço de qualquer outro agente ou
 | A **Tela** do agente (a página, o noVNC, o WebSocket e a senha) | O navegador da Tela roda como o agente e abre arquivos do servidor, como as credenciais da assinatura. Ele lê: "A Tela do agente dá acesso aos arquivos e às contas dele, por isso é só do dono do DG Claw." |
 | **Mandar mensagem, instrução ou decisão pelo painel**: o chat do painel, a sessão de socorro e, em Sessões, criar, mandar recado, decidir pedido, retomar, passar o bastão, anexar e apagar | O painel não sabe quem é o colaborador e trataria a mensagem como sua. Ele conversa e confirma permissões só pela conversa do agente, onde cada mensagem e cada confirmação leva o nome dele. Em Sessões ele só acompanha, arquiva, renomeia e marca favorito. |
 
-Um agente pode ter **vários** colaboradores ao mesmo tempo, e cada pessoa acessa **um** agente só. As mensagens de cada um chegam ao agente marcadas como vindas de um colaborador (`colaborador: Nome (e-mail)`), para o agente saber quem falou e que não é você.
+Um agente pode ter **várias** pessoas convidadas, e uma pessoa pode usar **vários** agentes: você marca quais no convite e muda a lista quando quiser (botão **Editar agentes**; vale no clique seguinte dela, sem derrubar a sessão). Com mais de um agente, ela troca de agente pelo menu, como você. Atenção: **todas as pessoas convidadas para o mesmo agente compartilham a mesma conversa e o mesmo painel dele** (mensagens, anexos, sessões, memória e arquivos); não há conversas separadas por pessoa. Se duas pessoas não devem ver o trabalho uma da outra, crie um agente para cada uma. O que ela não alcança continua igual: o Admin, os agentes que não foram marcados e as telas da caixa inteira. As mensagens dele chegam ao agente marcadas como vindas de um colaborador (`colaborador: Nome (e-mail)`), para o agente saber que não é você.
 
 ### Como convidar
 
 1. Abra o menu ☰ do agente, abra o grupo **Segurança** e toque em **Convidar colaborador** (ou vá em `/colaboradores?agente=<agente>`).
-2. Digite o e-mail da pessoa (será o login dela) e, se quiser, o nome. Toque em **Convidar**.
+2. Digite o e-mail da pessoa (será o login dela), se quiser o nome, e marque os agentes que ela vai poder usar (o agente da tela já vem marcado). Toque em **Convidar**.
 3. A tela mostra um cartão para cada colaborador do agente, com o formulário para convidar mais uma pessoa logo abaixo. Depois de convidar, ela mostra o resultado:
    - se o e-mail saiu, ou por que não saiu;
    - o **texto do convite**, com o link, o login e a senha temporária, e o botão **Copiar**. A senha temporária aparece só nessa hora. Se você sair da tela sem copiar, use **Mandar convite de novo**.
@@ -44,9 +44,14 @@ Um agente pode ter **vários** colaboradores ao mesmo tempo, e cada pessoa acess
 
 A senha temporária vale por 7 dias. Passado o prazo, o login dela avisa que a senha venceu e você manda o convite de novo.
 
+Se alguém tentar adivinhar a senha dela (20 erros em 15 minutos, de qualquer lugar), o login dela fica fechado para
+endereços novos até a janela passar, mas continua aberto para os aparelhos de onde ela já entrou nos últimos 30 dias.
+Se ela precisar entrar de um lugar novo nesse meio tempo, mande o convite de novo.
+
 ### Mandar o convite de novo, revogar e a lista
 
 - **Mandar convite de novo** gera outra senha temporária, derruba as sessões abertas da pessoa e a obriga a criar a senha de novo. Serve para senha esquecida ou vencida. Os outros colaboradores do mesmo agente não são afetados.
+- **Editar agentes** troca a lista de agentes da pessoa (acrescenta ou tira). Para tirar todo o acesso, use Revogar.
 - **Revogar acesso** encerra tudo na hora: no próximo toque dela, a sessão cai. O registro continua na lista, com a data da revogação, e as outras pessoas do mesmo agente continuam com o acesso.
 - A lista de baixo mostra todos os colaboradores de todos os agentes, inclusive os revogados.
 
@@ -100,13 +105,14 @@ As regras, todas conferidas no servidor (na dúvida, ele recusa):
 Quem tem acesso ao servidor (o Admin, por exemplo) convida sem passar pela tela:
 
 ```
-sudo dgclaw colaborador criar <agente> <email> [--nome "Nome"] [--json]
+sudo dgclaw colaborador criar <agente>[,<agente2>...] <email> [--nome "Nome"] [--json]
+sudo dgclaw colaborador agentes <id-ou-email> <agente>[,<agente2>...] [--json]
 sudo dgclaw colaborador listar [agente] [--json]
 sudo dgclaw colaborador reenviar <id-ou-email> [--json]
 sudo dgclaw colaborador revogar <id-ou-email> [--json]
 ```
 
-`criar` e `reenviar` imprimem o texto do convite pronto para copiar (endereço, login e a senha temporária, que vale 7 dias). O Admin nunca é compartilhado. O link usa o domínio do DG Claw (`DGCLAW_DOMINIO` do `dgclaw.env`); sem domínio, o link é o endereço local, só abre no servidor, e o comando avisa.
+`criar` aceita vários agentes separados por vírgula, e `agentes` troca a lista de quem já foi convidado (a lista nova substitui a antiga; vale no clique seguinte da pessoa, sem derrubar a sessão). `criar` e `reenviar` imprimem o texto do convite pronto para copiar (endereço, login e a senha temporária, que vale 7 dias). O Admin nunca é compartilhado. O link usa o domínio do DG Claw (`DGCLAW_DOMINIO` do `dgclaw.env`); sem domínio, o link é o endereço local, só abre no servidor, e o comando avisa.
 
 O comando fala com o painel por um socket local, `admin.sock`, na pasta de dados do Web (veja "Socket do servidor" abaixo). Se ele disser que não consegue falar com o Web, confira `systemctl status dgclaw-web`; depois de atualizar o DG Claw, o Web precisa ser reiniciado (`sudo systemctl restart dgclaw-web`) para o socket existir.
 
@@ -120,22 +126,22 @@ Nenhuma resposta traz o hash da senha.
 
 ### `GET /api/v1/colaboradores`
 
-Lista todos os colaboradores, os revogados também, do mais novo para o mais antigo. `?agente=<slug>` filtra por agente.
+Lista todos os colaboradores, os revogados também, do mais novo para o mais antigo. `?agente=<slug>` filtra pelos que têm o agente na lista.
 
 ```json
 {"ok": true, "colaboradores": [{
-  "id": "…", "email": "maria@x.com", "nome": "Maria", "agente": "ana",
+  "id": "…", "email": "maria@x.com", "nome": "Maria", "agentes": ["ana", "bob"], "agente": "ana",
   "estado": "aguardando_primeiro_acesso",
   "trocar_senha": true, "temporaria_expira": 1790000000000,
   "criado_em": 1789000000000, "criado_por": "dono", "revogado_em": null, "ultimo_login": null
 }]}
 ```
 
-`estado` é `aguardando_primeiro_acesso`, `ativo`, `temporaria_vencida` ou `revogado`. Datas em milissegundos desde 1970.
+`estado` é `aguardando_primeiro_acesso`, `ativo`, `temporaria_vencida` ou `revogado`. Datas em milissegundos desde 1970. `agentes` é a lista; `agente` repete o primeiro, para quem lia o formato antigo.
 
 ### `POST /api/v1/colaboradores`
 
-Corpo: `{"agente": "ana", "email": "maria@x.com", "nome": "Maria"}`. O `nome` é opcional, com até 80 caracteres e sem `<` nem `>`. O e-mail é guardado em minúsculas.
+Corpo: `{"agentes": ["ana", "bob"], "email": "maria@x.com", "nome": "Maria"}` (`"agente": "ana"` também vale, para um só). Até 50 agentes, cada um existente e de trabalho. O `nome` é opcional, com até 80 caracteres e sem `<` nem `>`. O e-mail é guardado em minúsculas.
 
 Resposta `201`:
 
@@ -155,7 +161,11 @@ Resposta `201`:
 
 A `senha_temporaria` aparece só nesta resposta (e na do reenvio). O `texto` é a mensagem pronta para copiar e mandar por outro meio. Com o e-mail desligado ou com falha, `email_enviado` é `false` e `email_motivo` explica.
 
-Erros: `400` (e-mail inválido ou igual ao usuário do dono, agente é o Admin, nome inválido, falta o `agente`), `404` (agente inexistente), `409` (o e-mail já é colaborador ativo de um agente, este ou outro), `500` (o arquivo `colaboradores.json` está ilegível ou não foi possível gravar; o motivo vem na resposta).
+Erros: `400` (e-mail inválido ou igual ao usuário do dono, algum agente é o Admin, nome inválido, lista de agentes vazia ou inválida), `404` (agente inexistente), `409` (o e-mail já é colaborador ativo; nesse caso altere os agentes dele com `POST /api/v1/colaboradores/<id>`), `500` (não deu para identificar a instância de um agente, ou o arquivo `colaboradores.json` está ilegível ou não foi possível gravar; o motivo vem na resposta).
+
+### `POST /api/v1/colaboradores/<id>`
+
+Altera um colaborador ativo. Corpo: `{"agentes": ["ana"], "nome": "Maria S."}`, qualquer um dos dois (a lista de agentes substitui a anterior por inteiro). A sessão da pessoa não cai: o pedido seguinte dela já enxerga a lista nova, e um agente que saiu responde `403`. Resposta `200` com `{ok, colaborador}`. Erros: `400` (lista vazia ou inválida, nome inválido, corpo sem nenhum dos dois), `404` (id ou agente desconhecido), `409` (acesso revogado).
 
 ### `POST /api/v1/colaboradores/<id>/reenviar`
 
@@ -171,7 +181,7 @@ Este documento.
 
 ### `GET /api/v1/eu`
 
-Vale para qualquer sessão: `{ok, usuario, papel, agente, nome, trocar_senha}`. O dono recebe `papel: "dono"` e `agente: null`.
+Vale para qualquer sessão: `{ok, usuario, papel, agentes, agente, nome, trocar_senha}`. O colaborador recebe a lista dos agentes dele em `agentes` (e o primeiro em `agente`); o dono recebe `papel: "dono"`, `agentes: null` e `agente: null`.
 
 ### `POST /api/v1/eu/senha`
 

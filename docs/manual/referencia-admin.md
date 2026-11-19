@@ -58,7 +58,8 @@ mudar nada. Quem: Root. Detalhe geral em [ATUALIZAR.md](../ATUALIZAR.md) e no `d
 
 | Comando | Para que serve | Detalhe |
 | --- | --- | --- |
-| `dgclaw colaborador criar` | Cria o acesso de uma pessoa a um agente (`<agente> <email>`) e mostra o convite pronto para copiar, com endereço, login e senha temporária | [agentes.md](agentes.md) |
+| `dgclaw colaborador criar` | Cria o acesso de uma pessoa a um ou mais agentes (`<agente>[,<agente2>...] <email>`) e mostra o convite pronto para copiar, com endereço, login e senha temporária | [agentes.md](agentes.md) |
+| `dgclaw colaborador agentes` | Troca a lista de agentes de quem já foi convidado (`<id-ou-email> <agente>[,<agente2>...]`); vale no clique seguinte da pessoa, sem derrubar a sessão | [agentes.md](agentes.md) |
 | `dgclaw colaborador listar` | Lista os colaboradores e os agentes a que cada um tem acesso | [agentes.md](agentes.md) |
 | `dgclaw colaborador reenviar` | Gera uma senha temporária nova e mostra o convite de novo | [agentes.md](agentes.md) |
 | `dgclaw colaborador revogar` | Tira o acesso e derruba as sessões da pessoa. Se ela conectou a conta de IA do agente, a conta continua conectada e o comando avisa | [agentes.md](agentes.md) |
@@ -283,6 +284,7 @@ Servidas pelo DG Claw Web. Quem: Dono, salvo o que a coluna disser. Colab só pa
 | `/api/v1/uso` | Quanto da assinatura de cada agente já foi usado (`null` é "não medido") | Dono, Caixa (só o próprio agente) | [USO-DA-ASSINATURA.md](../../web/docs/USO-DA-ASSINATURA.md) |
 | `/api/v1/avisos` | Quadro de avisos entre os agentes e o dono (postar, ler, retirar); `/injecao` mostra o texto que entra na conversa do agente e `/preferencias` as preferências do dono que estão valendo | Dono, Caixa | [QUADRO-DE-AVISOS.md](../QUADRO-DE-AVISOS.md) |
 | `/api/v1/dados` | Dados por papel: `/fontes` (o que o agente alcança), `/pedidos` (pedir uma ação), `/aprovacoes` (o dono aprova ou recusa), `/papeis` e `/log` (só o dono); `/api/v1/dados/docs.md` é a documentação | Dono, Caixa (só fontes, pedidos e a documentação) | [DADOS-POR-PAPEL.md](../../web/docs/DADOS-POR-PAPEL.md) |
+| `/api/v1/acessos` | Acessos dos agentes: a visão inteira (GET) e as mudanças em `/agente/<slug>`, `/papel/<nome>`, `/pessoa/<nome>` e `/grupo/<nome>` (POST e DELETE), gravadas em `/etc/dgclaw/papeis.json` com a mesma trava da CLI | **Só a sessão do dono**. Colab e Caixa recebem 403 | [ACESSOS.md](../../web/docs/ACESSOS.md) |
 | `/api/v1/caixa` | Documentação da caixa do agente | Dono, Colab | [CAIXA-DO-AGENTE.md](../CAIXA-DO-AGENTE.md) |
 | `/api/v1/cofre` | Documentação do cofre na conversa (o cofre em si é do painel de cada agente) | Dono, Caixa (só a documentação) | [COFRE-NA-CONVERSA.md](../COFRE-NA-CONVERSA.md) |
 | `/api/v1/anonimizar` | Anonimização de documentos: `/estado`, `/testar`, `/detector/instalar`, e por agente a configuração, a tabela, os documentos e `/final/:id` | Dono. A documentação é pública | [ANONIMIZAR.md](../../web/docs/ANONIMIZAR.md) |

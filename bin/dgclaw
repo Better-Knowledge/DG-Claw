@@ -277,9 +277,10 @@ Personalizacoes do programa (o que o Admin mudou no DG Claw)
       Exemplo:  sudo dgclaw personalizacoes conferir
 
 Colaboradores (quem conversa com UM agente)
-  dgclaw colaborador criar <agente> <email> [--nome "<Nome>"] [--json]
+  dgclaw colaborador criar <agente>[,<agente2>...] <email> [--nome "<Nome>"] [--json]
       Cria o acesso e mostra o texto do convite pronto para copiar (endereco, login e senha temporaria).
-      Outros: listar [agente], reenviar <id-ou-email>, revogar <id-ou-email>. Ver "dgclaw colaborador ajuda".
+      Outros: agentes <id-ou-email> <a,b> (troca a lista), listar [agente], reenviar <id-ou-email>, revogar <id-ou-email>.
+      Ver "dgclaw colaborador ajuda".
       Exemplo:  sudo dgclaw colaborador criar ana maria@empresa.com --nome "Maria"
 
 Ronda de seguranca

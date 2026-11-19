@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# lib/colaborador.sh: o comando `dgclaw colaborador` (convidar e gerenciar quem conversa com UM agente).
+# lib/colaborador.sh: o comando `dgclaw colaborador` (convidar e gerenciar quem conversa com um ou mais agentes).
 #
 # Carregado com `source` pelo bin/dgclaw, nunca executado. Usa as funcoes dele e da lib/comum.sh
 # (falha, info, aviso, exigir_ferramentas, carregar_env_dgclaw...).
 # shellcheck disable=SC2154
 #
-#   dgclaw colaborador criar <agente> <email> [--nome X] [--json]
+#   dgclaw colaborador criar <agente>[,<agente2>...] <email> [--nome X] [--json]
+#   dgclaw colaborador agentes <id-ou-email> <agente>[,<agente2>...] [--json]
 #   dgclaw colaborador listar [agente] [--json]
 #   dgclaw colaborador reenviar <id-ou-email> [--json]
 #   dgclaw colaborador revogar <id-ou-email> [--json]
@@ -17,15 +18,18 @@
 
 colaborador_ajuda() {
     cat <<'FIM'
-dgclaw colaborador: convida alguem para conversar com UM agente de trabalho (nunca com o Admin).
+dgclaw colaborador: convida alguem para conversar com um ou mais agentes de trabalho (nunca com o Admin).
 
-  dgclaw colaborador criar <agente> <email> [--nome "<Nome>"] [--json]
-      Cria o acesso. O e-mail e o login da pessoa. Mostra o texto do convite pronto para copiar (endereco, login e
+  dgclaw colaborador criar <agente>[,<agente2>...] <email> [--nome "<Nome>"] [--json]
+      Cria o acesso. Varios agentes vao separados por virgula, sem espaco. O e-mail e o login da pessoa. Mostra o texto do convite pronto para copiar (endereco, login e
       senha temporaria, que vale 7 dias e a pessoa troca no primeiro acesso). Se o servidor tiver e-mail configurado,
       o convite tambem sai por e-mail.
-      Exemplo:  sudo dgclaw colaborador criar ana maria@empresa.com --nome "Maria"
+      Exemplo:  sudo dgclaw colaborador criar ana,bob maria@empresa.com --nome "Maria"
+  dgclaw colaborador agentes <id-ou-email> <agente>[,<agente2>...] [--json]
+      Troca a lista de agentes que a pessoa usa (a lista nova substitui a antiga por inteiro). Vale no clique
+      seguinte dela, sem derrubar a sessao. Para tirar todo o acesso, use revogar.
   dgclaw colaborador listar [<agente>] [--json]
-      Mostra os colaboradores (e se ja entraram, se a senha temporaria venceu ou se foram revogados).
+      Mostra os colaboradores, os agentes de cada um (e se ja entraram, se a senha temporaria venceu ou se foram revogados).
   dgclaw colaborador reenviar <id-ou-email> [--json]
       Gera uma senha temporaria nova e derruba as sessoes da pessoa. Mostra o convite de novo.
   dgclaw colaborador revogar <id-ou-email> [--json]
@@ -114,19 +118,20 @@ colaborador_criar() {
         esac
         shift
     done
-    [ "${#args[@]}" -eq 2 ] || falha "faltou o agente ou o e-mail (recebi ${#args[@]} argumento(s))." "use: dgclaw colaborador criar <agente> <email> [--nome \"Nome\"]"
+    [ "${#args[@]}" -eq 2 ] || falha "faltou o agente ou o e-mail (recebi ${#args[@]} argumento(s))." "use: dgclaw colaborador criar <agente>[,<agente2>...] <email> [--nome \"Nome\"]"
     agente="${args[0]}"; email="${args[1]}"
     exigir_ferramentas jq curl
     if [ "$ENSAIO" = 1 ]; then
-        info "[ensaio] pediria ao Web para criar o acesso de $email ao agente $agente e mostraria o convite (nada foi criado)"
+        info "[ensaio] pediria ao Web para criar o acesso de $email ao(s) agente(s) $agente e mostraria o convite (nada foi criado)"
         return 0
     fi
     carregar_env_dgclaw
     [ -z "${DGCLAW_DOMINIO:-}" ] || base="https://$DGCLAW_DOMINIO"
-    corpo="$(jq -n --arg agente "$agente" --arg email "$email" --arg nome "$nome" --arg base "$base" \
-        '{agente: $agente, email: $email} + (if $nome != "" then {nome: $nome} else {} end) + (if $base != "" then {base: $base} else {} end)')"
+    # Os agentes vao como lista ("ana,bob" -> ["ana","bob"]); o Web valida cada um (existe? nao e o Admin?).
+    corpo="$(jq -n --arg agentes "$agente" --arg email "$email" --arg nome "$nome" --arg base "$base" \
+        '{agentes: ($agentes | split(",") | map(select(. != ""))), email: $email} + (if $nome != "" then {nome: $nome} else {} end) + (if $base != "" then {base: $base} else {} end)')"
     colab_chamar POST /api/v1/colaboradores "$corpo"
-    [ "$COLAB_STATUS" = 201 ] || colab_erro "nao consegui criar o acesso de $email ao agente $agente"
+    [ "$COLAB_STATUS" = 201 ] || colab_erro "nao consegui criar o acesso de $email ao(s) agente(s) $agente"
     if [ "$json" = 1 ]; then printf '%s\n' "$COLAB_CORPO"; else colab_mostrar_convite "$COLAB_CORPO"; fi
 }
 
@@ -150,8 +155,8 @@ colaborador_listar() {
         return 0
     fi
     {
-        printf 'ID\tAGENTE\tE-MAIL\tESTADO\tNOME\n'
-        printf '%s' "$COLAB_CORPO" | jq -r '.colaboradores[] | [.id, .agente, .email, .estado, (.nome // "")] | @tsv'
+        printf 'ID\tAGENTES\tE-MAIL\tESTADO\tNOME\n'
+        printf '%s' "$COLAB_CORPO" | jq -r '.colaboradores[] | [.id, ((.agentes // [.agente]) | join(",")), .email, .estado, (.nome // "")] | @tsv'
     } | if command -v column >/dev/null 2>&1; then column -t -s $'\t'; else cat; fi
 }
 
@@ -177,6 +182,31 @@ colaborador_reenviar() {
     colab_chamar POST "/api/v1/colaboradores/$id/reenviar" "$corpo"
     [ "$COLAB_STATUS" = 200 ] || colab_erro "nao consegui reenviar o convite de ${args[0]}"
     if [ "$json" = 1 ]; then printf '%s\n' "$COLAB_CORPO"; else colab_mostrar_convite "$COLAB_CORPO"; fi
+}
+
+# colaborador agentes <id-ou-email> <agente>[,<agente2>...]: a lista nova substitui a antiga; a sessao da pessoa nao cai.
+colaborador_agentes() {
+    local json=0 args=() a id corpo
+    for a in "$@"; do
+        case "$a" in
+            --json) json=1 ;;
+            --*) falha "a opcao '$a' nao existe em 'colaborador agentes'." "veja as opcoes com: dgclaw colaborador ajuda" ;;
+            *) args+=("$a") ;;
+        esac
+    done
+    [ "${#args[@]}" -eq 2 ] || falha "faltou o colaborador ou a lista de agentes (recebi ${#args[@]} argumento(s))." "use: dgclaw colaborador agentes <id-ou-email> <agente>[,<agente2>...]"
+    [ -n "${args[1]//,/}" ] || falha "a lista de agentes esta vazia." "para tirar todo o acesso, use: dgclaw colaborador revogar ${args[0]}"
+    exigir_ferramentas jq curl
+    if [ "$ENSAIO" = 1 ]; then
+        info "[ensaio] pediria ao Web para trocar os agentes de ${args[0]} para ${args[1]} (nada foi mudado)"
+        return 0
+    fi
+    id="$(colab_resolve_id "${args[0]}")"
+    corpo="$(jq -n --arg agentes "${args[1]}" '{agentes: ($agentes | split(",") | map(select(. != "")))}')"
+    colab_chamar POST "/api/v1/colaboradores/$id" "$corpo"
+    [ "$COLAB_STATUS" = 200 ] || colab_erro "nao consegui trocar os agentes de ${args[0]}"
+    if [ "$json" = 1 ]; then printf '%s\n' "$COLAB_CORPO"; return 0; fi
+    ok "agentes de $(printf '%s' "$COLAB_CORPO" | jq -r '.colaborador.email') agora: $(printf '%s' "$COLAB_CORPO" | jq -r '.colaborador.agentes | join(", ")'). Vale no proximo clique da pessoa."
 }
 
 colaborador_revogar() {
@@ -211,6 +241,7 @@ colaborador_main() {
     [ $# -eq 0 ] || shift
     case "$sub" in
         criar) colaborador_criar "$@" ;;
+        agentes) colaborador_agentes "$@" ;;
         listar) colaborador_listar "$@" ;;
         reenviar) colaborador_reenviar "$@" ;;
         revogar) colaborador_revogar "$@" ;;

@@ -1,6 +1,7 @@
 'use strict';
-// Auditoria "tela igual à do dono, sem trocador": o colaborador não tem como chegar a outro agente, nem pela tela
-// (nada de trocador no DOM) nem pelo servidor (caminho, parâmetro, cookie e localStorage adulterados).
+// Auditoria "tela igual à do dono, só com os agentes dele": o colaborador não tem como chegar a um agente que não é
+// seu, nem pela tela (o trocador só lista os dele, e some quando é um só) nem pelo servidor (caminho, parâmetro,
+// cookie e localStorage adulterados).
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -26,11 +27,13 @@ test('a conversa chega ao colaborador sem a fileira #trocaBaixo (o elemento nem 
   } finally { await s.fechar(); }
 });
 
-test('a casca do colaborador não injeta o trocador de agentes nem a bolinha de soma dos outros; a do dono injeta', () => {
+test('a casca é uma só: o colaborador recebe o trocador, que lista só os agentes dele e some quando é um só', () => {
   assert.match(casca.MARCACAO_MENU, /id="mlTroca"/);
   assert.match(casca.MARCACAO_MENU, /id="mlLista"/);
-  for (const id of ['mlTroca', 'mlTrocaBtn', 'mlLista', 'trocar de agente']) assert.ok(!casca.MARCACAO_MENU_COLAB.includes(id), `sobrou ${id}`);
-  assert.match(casca.MARCACAO_MENU_COLAB, /id="mlTabs"/, 'o resto do menu continua');
+  assert.equal(casca.MARCACAO_MENU_COLAB, undefined, 'não existe mais um menu sem trocador para o colaborador');
+  const menu = fs.readFileSync(path.join(__dirname, '..', 'public', 'menu-lado.js'), 'utf8');
+  assert.match(menu, /troca\.hidden = lista\.length < 2;/, 'com um agente só, o trocador fica escondido');
+  assert.match(menu, /else recarrega\(ag\)/, 'a lista do colaborador também é carregada (o servidor devolve só os agentes dele)');
 });
 
 test('o tutorial do colaborador não tem passo de troca de agente nem de Admin', () => {
@@ -39,7 +42,7 @@ test('o tutorial do colaborador não tem passo de troca de agente nem de Admin',
   assert.equal(passos.length, 1);
   assert.doesNotMatch(JSON.stringify(passos), /#mlTroca|Trocar de agente|Admin vem primeiro/);
   const fonte = fs.readFileSync(path.join(__dirname, '..', 'public', 'conversa.js'), 'utf8');
-  assert.match(fonte, /comTroca: !COLAB && agentesMenu\.length > 1/);
+  assert.match(fonte, /comTroca: agentesMenu\.length > 1/, 'o colaborador com mais de um agente ganha o passo da troca');
   assert.match(fonte, /if \(\$\('trocaBaixo'\) && \$\('trocaBaixo'\)\.offsetParent !== null\)/, 'o passo da fileira só existe se o elemento existe');
 });
 

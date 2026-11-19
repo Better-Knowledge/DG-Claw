@@ -15,6 +15,12 @@ const TENTATIVAS_MAX = 5;
 // tentativas e chutar a senha do dono sem parar.
 const TENTATIVAS_MAX_POR_IP = 20;
 const JANELA_MS = 15 * 60 * 1000;
+// Terceiro contador: por CONTA, somando todos os IPs (força bruta distribuída contra um login só). Conta sob ataque
+// só aceita chaves de IP que JÁ ENTRARAM nela com sucesso nos últimos 30 dias (lembradas em sessoes.json).
+const TENTATIVAS_CONTA_MAX = 20;
+const IPS_OK_POR_CONTA = 10;
+const IPS_OK_MS = 30 * 24 * 60 * 60 * 1000;
+const MAX_CONTAS_LEMBRADAS = 5000;
 const MAX_SESSOES = 200;
 const MAX_SESSOES_POR_COLABORADOR = 10;
 // scrypt com N alto pode usar centenas de MB por chamada: no máximo 2 contas ao mesmo tempo,
@@ -57,6 +63,14 @@ function scrypt(senha, h) {
 }
 
 /** Hash fictício, gerado uma vez: login de e-mail que não existe gasta o mesmo scrypt de um que existe. */
+/** Gera "scrypt$N$r$p$sal$hash" sem o módulo inteiro (a CLI usa; o criarAuth também, com o limite de scrypt simultâneo). */
+async function gerarHashSenha(senha) {
+  const h = Object.assign({}, SCRYPT_NOVO, { sal: crypto.randomBytes(16) });
+  h.hash = { length: 32 };
+  const k = await scrypt(senha, h);
+  return `scrypt$${h.N}$${h.r}$${h.p}$${h.sal.toString('base64url')}$${k.toString('base64url')}`;
+}
+
 let hashFicticioCache = null;
 function hashFicticio() {
   if (hashFicticioCache) return hashFicticioCache;
@@ -77,13 +91,26 @@ function criarAuth({ config, log, agora, colaboradores: colabsInicial }) {
   let aoCriar = null; // gancho do cadeado (Face ID): avisa que uma sessão nasceu com senha
   let antesDeCriar = null; // gancho do cadeado: campos que entram no registro da sessão NA MESMA escrita que a cria
   const MOTIVO_INSTANCIA = 'Este convite era de um agente que foi removido. Peça um convite novo ao dono.';
-  /** O convite guarda a instância do agente; se o agente foi removido e recriado com o mesmo nome, ele não vale. */
-  // Sem exceção: convite sem instância, instância atual ilegível ou módulo não ligado também NEGAM.
-  const instanciaMudou = (c) => {
-    if (!c) return false;
-    const atual = instanciaAtual ? instanciaAtual(c.agente) : null;
-    return !c.instancia || !atual || c.instancia !== atual;
+  /**
+   * O convite guarda a instância de cada agente; um agente removido e recriado com o mesmo nome sai da lista do
+   * colaborador. Sem exceção: slug sem instância guardada, instância atual ilegível ou módulo não ligado também NEGAM.
+   * Devolve os agentes do registro que ainda valem, na ordem do registro.
+   */
+  // Registro no formato novo (agentes/instancias) ou antigo (agente/instancia no singular, inclusive os dos testes).
+  const registroAgentes = (c) => (Array.isArray(c.agentes) ? c.agentes : (typeof c.agente === 'string' && c.agente ? [c.agente] : []));
+  const registroInstancias = (c) => ((c.instancias && typeof c.instancias === 'object') ? c.instancias : (c.instancia && c.agente ? { [c.agente]: c.instancia } : {}));
+  const agentesValidos = (c) => {
+    if (!c || !instanciaAtual) return [];
+    const instancias = registroInstancias(c);
+    return registroAgentes(c).filter((slug) => {
+      const guardada = instancias[slug];
+      const atual = instanciaAtual(slug);
+      return !!guardada && !!atual && guardada === atual;
+    });
   };
+  /** Nenhum agente do convite vale mais (todos removidos e recriados, ou convite sem instância). */
+  const instanciaMudou = (c) => !!c && agentesValidos(c).length === 0;
+  const mesmaLista = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((x, i) => x === b[i]);
 
   const relogio = agora || (() => Date.now());
   const usuario = String(config.env.DGCLAW_PANEL_USER || '').trim();
@@ -126,6 +153,7 @@ function criarAuth({ config, log, agora, colaboradores: colabsInicial }) {
         if (!marcaConfere(v)) { descartadas++; continue; }
         sessoes.set(k, v);
       }
+      for (const [conta, m] of Object.entries(j.ips_ok || {})) if (m && typeof m === 'object') ipsOk.set(conta, new Map(Object.entries(m).filter(([, t]) => typeof t === 'number' && relogio() - t < IPS_OK_MS)));
       if (descartadas) {
         log('info', `${descartadas} sessão(ões) do painel descartada(s): a senha ou o usuário do painel mudou (ou a sessão é de uma versão antiga, sem a marca da senha); quem estava logado precisa entrar de novo.`);
         salva();
@@ -141,7 +169,7 @@ function criarAuth({ config, log, agora, colaboradores: colabsInicial }) {
       // `cadeado_pendente` (marca só na memória) nunca vai para o arquivo: ele só tem marca que de fato foi gravada.
       const saida = {};
       for (const [k, v] of sessoes) { if (v.cadeado_pendente) { const { cadeado_pendente, ...resto } = v; saida[k] = resto; } else saida[k] = v; }
-      fs.writeFileSync(tmp, JSON.stringify({ versao: 1, sessoes: saida }), { mode: 0o600 });
+      fs.writeFileSync(tmp, JSON.stringify({ versao: 1, sessoes: saida, ips_ok: Object.fromEntries([...ipsOk].map(([c, m]) => [c, Object.fromEntries(m)])) }), { mode: 0o600 });
       fs.renameSync(tmp, arquivo);
       for (const v of sessoes.values()) delete v.cadeado_pendente; // gravou tudo: o que estava pendente agora é de verdade
       return true;
@@ -162,6 +190,37 @@ function criarAuth({ config, log, agora, colaboradores: colabsInicial }) {
       sessoes.delete(alvo !== null ? alvo : sessoes.keys().next().value);
     }
   }
+  // ── IPs com login certo por conta (lidos por carrega(), então declarados antes dela rodar) ──────────────────
+  const falhasConta = new Map(); // identidade -> [timestamps], somando todos os IPs
+  const ipsOk = new Map();       // chave da conta -> Map(chave de ip -> instante do último login certo)
+  /** A chave do IP para a memória da conta: IPv4 inteiro; IPv6 agrupado por /64 (um aparelho tem o /64 inteiro). */
+  function chaveIp(ip) {
+    const s = String(ip || '');
+    if (!s.includes(':')) return s;
+    const [cabeca, cauda] = s.split('::');
+    const a = cabeca ? cabeca.split(':') : [];
+    const b = cauda ? cauda.split(':') : [];
+    const grupos = a.concat(new Array(Math.max(0, 8 - a.length - b.length)).fill('0'), b).map((g) => g.padStart(4, '0').toLowerCase());
+    return grupos.slice(0, 4).join(':') + '::/64';
+  }
+  function ipConhecido(conta, ip) {
+    const m = ipsOk.get(conta);
+    if (!m || !ip) return false;
+    const t = m.get(chaveIp(ip));
+    return typeof t === 'number' && relogio() - t < IPS_OK_MS;
+  }
+  // Os mapas despejam pela ordem de inserção; apagar antes de gravar move o usado agora para o fim (despejo por uso).
+  function lembraIpOk(conta, ip) {
+    if (!conta || !ip) return;
+    const m = ipsOk.get(conta) || new Map();
+    const k = chaveIp(ip);
+    m.delete(k); m.set(k, relogio());
+    for (const [kk, t] of m) if (relogio() - t >= IPS_OK_MS) m.delete(kk);
+    while (m.size > IPS_OK_POR_CONTA) m.delete(m.keys().next().value);
+    ipsOk.delete(conta); ipsOk.set(conta, m);
+    while (ipsOk.size > MAX_CONTAS_LEMBRADAS) ipsOk.delete(ipsOk.keys().next().value);
+  }
+  function esqueceIpsOk(conta) { if (ipsOk.delete(conta)) salva(); }
   carrega();
 
   // ── limite de tentativas ─────────────────────────────────────────────────
@@ -178,13 +237,20 @@ function criarAuth({ config, log, agora, colaboradores: colabsInicial }) {
   }
   const chaveIdentidade = (identidade, ip) => `${identidade}\n${ip}`;
   function segundosAte(lista) { return Math.max(1, Math.ceil((lista[0] + JANELA_MS - relogio()) / 1000)); }
-  /** Devolve { bloqueado, retryAfter } (segundos) para esta identidade neste IP, olhando os dois contadores. */
-  function bloqueioLogin(identidade, ip) {
+  /**
+   * Devolve { bloqueado, retryAfter } (segundos) para esta identidade neste IP, olhando os três contadores. O da conta
+   * (20 erros em 15 min, de qualquer origem) só é ignorado para um IP que já entrou nela (`contaIpsOk` é a chave da
+   * memória; por padrão a própria identidade). Um login certo NÃO zera esse contador: zerar devolveria 20 tentativas
+   * a qualquer origem a cada entrada do dono.
+   */
+  function bloqueioLogin(identidade, ip, contaIpsOk) {
     let espera = 0;
     const da = janelaDe(falhasIdentidade, chaveIdentidade(identidade, ip));
     if (da.length >= TENTATIVAS_MAX) espera = segundosAte(da);
     const doIp = janelaDe(falhasIp, ip);
     if (doIp.length >= TENTATIVAS_MAX_POR_IP) espera = Math.max(espera, segundosAte(doIp));
+    const daConta = janelaDe(falhasConta, identidade);
+    if (daConta.length >= TENTATIVAS_CONTA_MAX && !ipConhecido(contaIpsOk || identidade, ip)) espera = Math.max(espera, segundosAte(daConta));
     return espera ? { bloqueado: true, retryAfter: espera } : { bloqueado: false, retryAfter: 0 };
   }
   function registraFalhaLogin(identidade, ip) {
@@ -192,6 +258,8 @@ function criarAuth({ config, log, agora, colaboradores: colabsInicial }) {
     const k = chaveIdentidade(identidade, ip);
     falhasIdentidade.set(k, [...janelaDe(falhasIdentidade, k), t]);
     falhasIp.set(ip, [...janelaDe(falhasIp, ip), t]);
+    falhasConta.set(identidade, [...janelaDe(falhasConta, identidade), t]);
+    if (falhasConta.size > MAX_CONTAS_LEMBRADAS) for (const [c, v] of falhasConta) if (!v.some((x) => t - x < JANELA_MS)) falhasConta.delete(c);
   }
   /** Acerto: zera só o contador desta identidade neste IP. O do IP inteiro continua contando. */
   const limpaFalhasDe = (identidade, ip) => falhasIdentidade.delete(chaveIdentidade(identidade, ip));
@@ -220,13 +288,8 @@ function criarAuth({ config, log, agora, colaboradores: colabsInicial }) {
     /** Gera "scrypt$N$r$p$sal$hash" (mesmo formato e parâmetros do panel/lib/auth.js). Respeita o limite de scrypt simultâneo. */
     async gerarHash(senha) {
       if (scryptEmCurso >= SCRYPT_SIMULTANEOS) { const e = new Error('Muitas senhas sendo processadas ao mesmo tempo. Tente de novo em alguns segundos.'); e.ocupado = true; throw e; }
-      const h = Object.assign({}, SCRYPT_NOVO, { sal: crypto.randomBytes(16) });
-      h.hash = { length: 32 };
       scryptEmCurso++;
-      try {
-        const k = await scrypt(senha, h);
-        return `scrypt$${h.N}$${h.r}$${h.p}$${h.sal.toString('base64url')}$${k.toString('base64url')}`;
-      } finally { scryptEmCurso--; }
+      try { return await gerarHashSenha(senha); } finally { scryptEmCurso--; }
     },
 
     /** Confere usuário e senha. Sempre gasta o scrypt (mesmo com usuário errado). { ok, trancado?, erro? } */
@@ -252,7 +315,7 @@ function criarAuth({ config, log, agora, colaboradores: colabsInicial }) {
       const senhaOk = calculado.length === parsed.hash.length && crypto.timingSafeEqual(calculado, parsed.hash);
       const usuarioOk = comparaTempoConstante(usuarioInformado == null ? '' : usuarioInformado, usuario);
       if (senhaOk && usuarioOk) {
-        if (ip) limpaFalhasDe(IDENT_DONO, ip);
+        if (ip) { limpaFalhasDe(IDENT_DONO, ip); lembraIpOk(IDENT_DONO, ip); }
         return { ok: true, usuario, papel: 'dono' };
       }
       if (ip) registraFalhaLogin(IDENT_DONO, ip);
@@ -270,8 +333,9 @@ function criarAuth({ config, log, agora, colaboradores: colabsInicial }) {
         // Conferência síncrona logo antes de emitir: se a senha, o convite ou o acesso mudou depois que a senha foi
         // verificada, a sessão não nasce. Enquanto a senha é a temporária, a sessão morre junto com ela.
         const atual = colaboradores ? colaboradores.obter(colaborador.id) : null;
+        const pedidos = registroAgentes(colaborador);
         if (instanciaMudou(atual)) { const e = new Error(MOTIVO_INSTANCIA); e.status = 401; throw e; }
-        if (!atual || atual.revogado_em || atual.agente !== colaborador.agente || (atual.senha_versao || 1) !== colaborador.senha_versao || (colaborador.hash && atual.hash !== colaborador.hash)) {
+        if (!atual || atual.revogado_em || !mesmaLista(agentesValidos(atual), pedidos) || (atual.senha_versao || 1) !== colaborador.senha_versao || (colaborador.hash && atual.hash !== colaborador.hash)) {
           const e = new Error('O seu acesso mudou (senha trocada, convite novo ou acesso revogado) enquanto você entrava. Entre de novo.');
           e.status = 401;
           throw e;
@@ -289,12 +353,14 @@ function criarAuth({ config, log, agora, colaboradores: colabsInicial }) {
         abreVagaParaODono();
       }
       const reg = { usuario: nomeUsuario || usuario, criada, expira: expiraFinal, marca: marcaAtual() };
-      if (colaborador) Object.assign(reg, { papel: 'colaborador', colaborador_id: colaborador.id, agente: colaborador.agente, senha_versao: colaborador.senha_versao });
+      if (colaborador) { const ags = registroAgentes(colaborador).slice(); Object.assign(reg, { papel: 'colaborador', colaborador_id: colaborador.id, agentes: ags, agente: ags[0], senha_versao: colaborador.senha_versao }); }
       if (antesDeCriar) {
         try { Object.assign(reg, antesDeCriar({ req, colaborador }) || {}); } catch (e) { log('erro', `O gancho de sessão nova (cadeado) falhou antes de gravar: ${e.message}. A sessão nasce sem a marca do Face ID.`); }
       }
       sessoes.set(sha256hex(token), reg);
       limpaExpiradas();
+      // sessão aberta por aqui (login certo, link, troca de senha) conta como "este IP entrou nesta conta"
+      if (req && req.headers) lembraIpOk(colaborador ? `colab:${colaborador.id}` : IDENT_DONO, ipDoPedido(req, config.proxiesConfiaveis));
       // Marca que veio na criação e não foi gravada fica só na memória: pendente, nunca prova de gravação.
       if (!salva() && reg.cadeado_exige) reg.cadeado_pendente = true;
       if (aoCriar) {
@@ -338,6 +404,9 @@ function criarAuth({ config, log, agora, colaboradores: colabsInicial }) {
         return k.length === h.hash.length && crypto.timingSafeEqual(k, h.hash);
       } finally { scryptEmCurso--; }
     },
+
+    /** Esquece os IPs que já entraram numa conta (colaborador revogado): a memória é por registro, e um convite novo nasce do zero. */
+    esqueceIpsOk(chave) { esqueceIpsOk(chave); },
 
     /** Apaga todas as sessões de um colaborador (revogação, convite novo, troca de senha). Devolve { n, gravou }: quantas caíram e
         se o arquivo foi regravado (sem gravar, a sessão pode voltar depois de um restart; quem promete o efeito confere). */
@@ -419,16 +488,17 @@ function criarAuth({ config, log, agora, colaboradores: colabsInicial }) {
   // ── colaboradores (funções separadas das do dono, para facilitar o rebase) ──
   async function verificaColaborador(emailInformado, senha, ip) {
     const identidade = `colaborador:${String(emailInformado == null ? '' : emailInformado).trim().toLowerCase().slice(0, 200)}`;
-    const b = ip ? bloqueioLogin(identidade, ip) : { bloqueado: false };
+    const c = colaboradores.porEmailAtivo(emailInformado);
+    // a memória de IPs é por registro (`colab:<id>`): um convite novo para o mesmo e-mail nasce do zero
+    const b = ip ? bloqueioLogin(identidade, ip, c ? `colab:${c.id}` : identidade) : { bloqueado: false };
     if (b.bloqueado) return { ok: false, limite: true, retryAfter: b.retryAfter, erro: `Muitas tentativas erradas. Tente de novo em ${Math.ceil(b.retryAfter / 60)} min.` };
     if (scryptEmCurso >= SCRYPT_SIMULTANEOS) {
       log('aviso', `Login de ${ip || '(sem IP)'} recusado: já há ${scryptEmCurso} senhas sendo conferidas ao mesmo tempo.`);
       return { ok: false, limite: true, retryAfter: 2, erro: 'Muitas tentativas ao mesmo tempo. Tente de novo em alguns segundos.' };
     }
-    const c = colaboradores.porEmailAtivo(emailInformado);
     // O registro pode mudar DURANTE o scrypt (o dono reenvia o convite, o colaborador troca a senha) e os objetos
     // do registro são alterados no lugar. O que foi conferido fica em constantes aqui, antes do await.
-    const visto = c ? { id: c.id, email: c.email, agente: c.agente, hash: c.hash, versao: c.senha_versao || 1 } : null;
+    const visto = c ? { id: c.id, email: c.email, agentes: registroAgentes(c).slice(), hash: c.hash, versao: c.senha_versao || 1 } : null;
     let alvo = visto ? parseHash(visto.hash) : hashFicticio();
     if (alvo.erro) {
       log('erro', `O hash do colaborador ${visto.email} não vale (${alvo.erro}). Ele não consegue entrar; mande um convite novo (POST /api/v1/colaboradores/${visto.id}/reenviar).`);
@@ -451,27 +521,29 @@ function criarAuth({ config, log, agora, colaboradores: colabsInicial }) {
     }
     // Recarrega: só vale se o registro ainda é exatamente o que a senha conferiu e o acesso não foi revogado.
     const atual = colaboradores.obter(visto.id);
-    if (!atual || atual.revogado_em || atual.hash !== visto.hash || (atual.senha_versao || 1) !== visto.versao || atual.agente !== visto.agente) {
+    if (!atual || atual.revogado_em || atual.hash !== visto.hash || (atual.senha_versao || 1) !== visto.versao || !mesmaLista(registroAgentes(atual), visto.agentes)) {
       log('aviso', `Login de ${visto.email} (ip ${ip || '?'}) descartado: o convite, a senha ou o acesso mudou enquanto a senha era conferida.`);
       return { ok: false, erro: 'O seu acesso mudou (senha trocada, convite novo ou acesso revogado) enquanto você entrava. Entre de novo.' };
     }
     if (instanciaMudou(atual)) {
-      log('aviso', `Login de ${visto.email} (ip ${ip || '?'}) recusado: o convite era de uma instância antiga do agente ${atual.agente} (removido e recriado).`);
+      log('aviso', `Login de ${visto.email} (ip ${ip || '?'}) recusado: o convite era de uma instância antiga do(s) agente(s) ${registroAgentes(atual).join(', ')} (removido e recriado).`);
       return { ok: false, erro: MOTIVO_INSTANCIA };
     }
-    if (ip) limpaFalhasDe(identidade, ip);
+    if (ip) { limpaFalhasDe(identidade, ip); lembraIpOk(`colab:${atual.id}`, ip); }
     if (atual.trocar_senha && Number(atual.temporaria_expira) < relogio()) {
       return { ok: false, vencida: true, erro: 'A senha temporária venceu. Peça ao dono do DG Claw um convite novo.' };
     }
     colaboradores.registrarLogin(visto.id);
-    return { ok: true, usuario: visto.email, papel: 'colaborador', colaborador: { id: visto.id, agente: visto.agente, senha_versao: visto.versao, hash: visto.hash } };
+    return { ok: true, usuario: visto.email, papel: 'colaborador', colaborador: { id: visto.id, agentes: agentesValidos(atual), agente: agentesValidos(atual)[0], senha_versao: visto.versao, hash: visto.hash } };
   }
 
   /** Confere a CADA pedido que o colaborador ainda vale: a revogação e a troca de senha derrubam a sessão no pedido seguinte. */
   function sessaoDeColaborador(token, s) {
     const c = colaboradores ? colaboradores.obter(s.colaborador_id) : null;
-    if (!c || c.revogado_em || c.agente !== s.agente || (c.senha_versao || 1) !== s.senha_versao || instanciaMudou(c)) {
-      if (c && instanciaMudou(c)) log('aviso', `Sessão do colaborador ${c.email} derrubada: o agente ${c.agente} foi removido e recriado, e o convite era da instância antiga.`);
+    // Os agentes vêm do registro a cada pedido: o dono alterar a lista vale no clique seguinte, sem derrubar a sessão;
+    // só a revogação, a troca de senha e o sumiço de todos os agentes derrubam.
+    if (!c || c.revogado_em || (c.senha_versao || 1) !== s.senha_versao || instanciaMudou(c)) {
+      if (c && !c.revogado_em && instanciaMudou(c)) log('aviso', `Sessão do colaborador ${c.email} derrubada: o(s) agente(s) ${registroAgentes(c).join(', ')} foi(ram) removido(s) e recriado(s), e o convite era da instância antiga.`);
       sessoes.delete(sha256hex(token));
       salva();
       return null;
@@ -481,7 +553,8 @@ function criarAuth({ config, log, agora, colaboradores: colabsInicial }) {
       salva();
       return null;
     }
-    return { usuario: s.usuario, expira: s.expira, papel: 'colaborador', agente: c.agente, colaborador_id: c.id, nome: c.nome || '', trocar_senha: !!c.trocar_senha, senha_versao: c.senha_versao || 1 };
+    const agentes = agentesValidos(c);
+    return { usuario: s.usuario, expira: s.expira, papel: 'colaborador', agentes, agente: agentes[0], colaborador_id: c.id, nome: c.nome || '', trocar_senha: !!c.trocar_senha, senha_versao: c.senha_versao || 1 };
   }
 
   function montaCookiePapel(papel, req) {
@@ -497,4 +570,4 @@ function criarAuth({ config, log, agora, colaboradores: colabsInicial }) {
   }
 }
 
-module.exports = { criarAuth, parseHash, NOME_COOKIE, TENTATIVAS_MAX };
+module.exports = { criarAuth, parseHash, gerarHashSenha, NOME_COOKIE, TENTATIVAS_MAX };

@@ -7,6 +7,27 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Não lançado]
 
+**Força bruta contra uma conta, vinda de muitos endereços.** Além dos limites por endereço, cada login passa a ter
+um teto de 20 senhas erradas em 15 minutos somando todos os endereços. Quando esse teto é atingido, a conta continua
+aberta para os aparelhos de onde a pessoa já entrou nos últimos 30 dias (a sua casa, o seu celular), e fica fechada
+para endereços novos até a janela passar. Nada precisa ser configurado.
+
+**Acessos dos agentes.** A tela nova (menu ☰, `/acessos`) mostra, agente por agente, o que ele alcança de fato nos
+dados (fontes e campos, bases, ferramentas, skills e ações com aprovação) e quem conversa com ele no painel (você e
+os colaboradores convidados). Ali você escolhe a pessoa e o papel de cada agente e monta os papéis, as pessoas e os
+grupos marcando caixas, sem editar o arquivo de papéis à mão: nada é gravado se o arquivo ficar inválido, e o que
+você escreveu no arquivo e a tela não conhece fica como está. Detalhes em `web/docs/ACESSOS.md`.
+
+**Colaboradores com vários agentes.** Uma pessoa convidada pode usar mais de um agente de trabalho, e um agente
+pode ter várias pessoas: no convite você marca os agentes que ela vai usar, e o botão **Editar agentes** (tela
+Colaboradores) muda a lista depois, sem derrubar a sessão dela. Com mais de um agente, ela troca de agente pelo menu,
+como você. O que ela não alcança continua igual: o Admin, os agentes que não foram marcados e as telas da caixa
+inteira. Quem já tinha convidado alguém não precisa fazer nada: o convite antigo continua valendo para o agente dele.
+O menu de troca de agentes, que a 1.1.0 tinha tirado da conversa do colaborador, volta só para quem tem mais de um agente,
+listando só os dele. No servidor, `dgclaw colaborador criar` aceita vários agentes separados por vírgula
+(`criar ana,bob maria@empresa.com`) e o novo `dgclaw colaborador agentes <id-ou-email> <a,b>` troca a lista de quem já foi
+convidado; o Admin usa os dois quando você pede pelo chat.
+
 **Observabilidade e conhecimento que fica na empresa.** O menu ganhou a tela **Observabilidade**: quantos
 pedidos os agentes fizeram às fontes, bases e ferramentas nos últimos 30 dias, quantos foram permitidos,
 negados ou viraram aprovação, as contagens por agente, fonte e pessoa, e a lista linha a linha com filtros e

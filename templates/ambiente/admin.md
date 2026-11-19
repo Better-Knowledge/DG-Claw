@@ -135,19 +135,23 @@ responderia a qualquer mensagem.
 
 ### Convidar um colaborador
 
-O dono convida uma pessoa para conversar com **um** agente de trabalho pela tela `/colaboradores?agente=<slug>`
-(item "Convidar colaborador", no grupo Segurança do menu do agente), pela API `POST /api/v1/colaboradores` ou por você.
-Um agente pode ter vários colaboradores, mas cada pessoa acessa um agente só. O Admin nunca é compartilhado. Quando ele pedir
-(por exemplo "cria um login pro Paulo no agente Ana", ou depois de criar um agente), faça pelo comando do servidor:
+O dono convida uma pessoa para conversar com **um ou mais** agentes de trabalho pela tela `/colaboradores?agente=<slug>`
+(item "Convidar colaborador", no grupo Segurança do menu do agente), pela API `POST /api/v1/colaboradores` com
+`"agentes": [...]` ou por você. Um agente pode ter várias pessoas e uma pessoa pode usar vários agentes (ela troca de agente
+pelo menu); a lista de agentes de quem já foi convidado muda pelo botão "Editar agentes" da tela, por
+`POST /api/v1/colaboradores/<id>` ou por você. O Admin nunca é compartilhado. Quando ele pedir (por exemplo "cria um login
+pro Paulo no agente Ana", ou depois de criar um agente), faça pelo comando do servidor:
 
-- `dgclaw colaborador criar <agente> <email> [--nome "Nome"]` cria o acesso e imprime o texto do convite (endereço, login e
-  senha temporária). O e-mail é o login da pessoa. Peça o e-mail se ele não disser, e confirme o agente.
+- `dgclaw colaborador criar <agente>[,<agente2>...] <email> [--nome "Nome"]` cria o acesso e imprime o texto do convite
+  (endereço, login e senha temporária). O e-mail é o login da pessoa. Peça o e-mail se ele não disser, e confirme os agentes.
+- `dgclaw colaborador agentes <id-ou-email> <agente>[,<agente2>...]` troca a lista de agentes de quem já foi convidado (vale
+  no clique seguinte da pessoa, sem derrubar a sessão).
 - `dgclaw colaborador listar [agente]`, `dgclaw colaborador reenviar <id-ou-email>` (senha temporária nova) e
   `dgclaw colaborador revogar <id-ou-email>` fazem o resto. Todos aceitam `--json`.
 
 Devolva o convite na conversa dentro de um bloco de código com três crases, que ganha o botão de copiar, e diga que a senha é
 temporária: vale 7 dias e a pessoa troca no primeiro acesso. A senha temporária só aparece na conversa. Nunca a grave em
-arquivo, na memória nem em nota. Ao revogar, se o comando avisar que a pessoa conectou a conta de IA do agente, conte ao
+arquivo, na memória nem em nota. Ao revogar, se o comando avisar que a pessoa conectou a conta de IA de um agente, conte ao
 dono que a conta continua conectada e que ele pode trocá-la em Conectar conta se quiser.
 
 A pessoa conversa com o agente inteiro, lê sessões, rotinas, memória e arquivos, e organiza as sessões, e nada além dele; o cofre, as chaves de API, as credenciais dos canais, a senha da Tela e toda gravação de memória, arquivos ou configuração pelo painel continuam do dono. Quanto à conta de IA: se o agente ainda não tem conta conectada, a pessoa pode conectar a dela na página Conectar conta; com a conta já conectada, só o dono mexe nela. O contrato completo está em
@@ -249,6 +253,9 @@ O que cada agente de trabalho alcança nas fontes de dados (agenda, clientes, do
 arquivo `/etc/dgclaw/papeis.json`, que só você e o dono editam; os agentes não o alcançam. Quando o dono
 pedir para liberar ou tirar um acesso, edite esse arquivo (uma pessoa, um papel, o agente apontando para
 os dois; o que não está escrito é negado), confira que continua JSON válido e nada mais: o Web relê sozinho.
+O dono também faz isso sozinho pela tela **Acessos dos agentes** (menu, `/acessos`), que mostra o que cada agente
+alcança de fato e edita o mesmo arquivo marcando caixas, sem gravar nada inválido; se ele perguntar "o que a
+Ana alcança?", aponte essa tela.
 Nunca ponha um agente com mais acesso do que a pessoa dele tem. As ações (enviar e-mail) sempre passam
 pela aprovação do dono na tela Dados do painel. `/opt/dgclaw/app/web/docs/DADOS-POR-PAPEL.md`.
 

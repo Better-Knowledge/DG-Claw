@@ -66,8 +66,9 @@ test('menu-lado.js: Convidar colaborador só para o dono e nunca para o Admin', 
   const js = pub('menu-lado.js');
   assert.match(js, /if \(!colab && ag && ag\.tipo !== 'admin' && id\)/);
   assert.match(js, /LINK_COLABORADOR\.href \+ '\?agente=' \+ encodeURIComponent\(id\)/);
-  // colaborador não dispara nada que o servidor nega (lista de agentes, uso), mas tem as páginas e as Sessões do agente dele
-  assert.match(js, /if \(!colab\) \{\n      const troca = \$\('mlTroca'\)/, 'a troca de agente nem é ligada para o colaborador');
+  // colaborador não dispara nada que o servidor nega (uso), mas tem as páginas e as Sessões dos agentes dele; a lista de
+  // agentes ele carrega (o servidor devolve só os dele), para trocar de agente quando tem mais de um
+  assert.match(js, /else recarrega\(ag\)/);
   assert.match(js, /if \(colab\) \{ const uso = \$\('mlUso'\); if \(uso\) uso\.remove\(\); \} else ligaUso\(\)/);
   assert.doesNotMatch(js, /if \(!colab\) ligaSessoes/);
   assert.match(js, /filter\(l => !colab \|\| chaveDoHref\(l\.href\) !== 'cofre'\)/, 'o cofre do agente não aparece no menu do colaborador');
@@ -104,7 +105,7 @@ test('páginas novas: tutorial, viewport sem zoom, campos de 16 px e nada de tra
   assert.match(pub('colaboradores.js'), /DGCasca\.monta\(\{ pagina: 'colaboradores'/);
   assert.match(pub('colaboradores.html'), /data-co="ajuda"/);
   assert.doesNotMatch(pub('colaboradores.js'), /colaborador por vez/);
-  assert.match(pub('colaboradores.js'), /quantas quiser para o mesmo agente/);
+  assert.match(pub('colaboradores.js'), /uma pessoa pode usar vários agentes/);
   assert.match(pub('trocar-senha.js'), /tsTutorial/);
   assert.match(pub('colaboradores.css'), /font-size:16px/);
   for (const n of ['colaboradores.html', 'colaboradores.js', 'colaboradores.css', 'trocar-senha.html', 'trocar-senha.js', 'trocar-senha.css', 'papel.js', 'papel.css']) {

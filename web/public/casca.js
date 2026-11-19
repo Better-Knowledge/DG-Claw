@@ -49,7 +49,8 @@
     '<button class="btn" id="btnTutorial" type="button" title="Visita guiada desta tela: o que é cada parte e por que está aqui">Tutorial</button>' +
     '</header>';
 
-  /* O seletor de agentes do menu. Colaborador não recebe: o elemento nem entra na página (MARCACAO_MENU_COLAB). */
+  /* O seletor de agentes do menu. O colaborador também o recebe: a lista que o servidor lhe devolve tem só os agentes
+     dele, e o menu-lado.js esconde o seletor quando há um só. */
   const MARCACAO_TROCA =
     '<div class="ml-troca" id="mlTroca" data-tour="agentes" hidden>' +
     '<button type="button" id="mlTrocaBtn" aria-haspopup="true" aria-expanded="false"><span>trocar de agente</span><span class="ml-seta" aria-hidden="true">' + ico('chevron-down') + '</span></button>' +
@@ -81,8 +82,7 @@
     '<div class="pe"><div class="conta"><form method="post" action="/sair" id="formSair"><button type="submit" class="sair">Sair</button></form></div></div>' +
     '</aside>';
   const MARCACAO_MENU = montaMenu(MARCACAO_TROCA);
-  const MARCACAO_MENU_COLAB = montaMenu('');
-  const marcacaoMenu = () => (raiz.DGPapel && raiz.DGPapel.colaborador ? MARCACAO_MENU_COLAB : MARCACAO_MENU);
+  const marcacaoMenu = () => MARCACAO_MENU;
 
   /* Cookie não sensível com o último agente aberto: o servidor usa na rota "/" (localStorage ele não enxerga). */
   function guardaAgente(id) {
@@ -94,7 +94,7 @@
     } catch (e) { console.warn('casca: não consegui gravar o cookie do último agente:', e.message); }
   }
 
-  if (!raiz.document) return { escolheAgente, MARCACAO_CABECALHO, MARCACAO_MENU, MARCACAO_MENU_COLAB };
+  if (!raiz.document) return { escolheAgente, MARCACAO_CABECALHO, MARCACAO_MENU };
 
   /* ── Parte com DOM ─────────────────────────────────────────────────────── */
   const $ = id => document.getElementById(id);
@@ -240,8 +240,7 @@
       .then(({ lista, erro }) => {
         est.lista = lista;
         let ag = escolheAgente(lista, ctx);
-        const colab = !!(raiz.DGPapel && raiz.DGPapel.colaborador);
-        const slug = (/^\/[pa]\/([^/]+)/.exec(location.pathname) || [])[1] || (colab ? '' : (new URLSearchParams(location.search).get('a') || new URLSearchParams(location.search).get('agente') || guardado || ''));
+        const slug = (/^\/[pa]\/([^/]+)/.exec(location.pathname) || [])[1] || (new URLSearchParams(location.search).get('a') || new URLSearchParams(location.search).get('agente') || guardado || '');
         if (!ag) ag = { id: erro ? slug : '', nome: NOME, cor: '', avatar: NOME.slice(0, 1) };
         est.agente = ag;
         pintaCabecalho(ag);

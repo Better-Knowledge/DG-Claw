@@ -49,16 +49,24 @@ test('convite: quando o e-mail não sai, a resposta diz por quê e traz o texto 
   } finally { await s.fechar(); }
 });
 
-test('convite: vários colaboradores por agente, um agente por colaborador, Admin e e-mail do dono recusados', async () => {
+test('convite: vários colaboradores por agente e vários agentes por pessoa; e-mail repetido, Admin e e-mail do dono recusados', async () => {
   const s = await cenario({ env: { DGCLAW_PANEL_USER: 'dono@x.com' } });
   try {
     assert.equal((await s.convida({ agente: 'ana', email: 'maria@x.com' })).status, 201);
-    assert.equal((await s.convida({ agente: 'ana', email: 'joao@x.com' })).status, 201);
-    assert.equal((await s.convida({ agente: 'ana', email: 'rita@x.com' })).status, 201);
+    const outro = await s.convida({ agente: 'ana', email: 'joao@x.com' });
+    assert.equal(outro.status, 201, 'o mesmo agente aceita outra pessoa');
     const mesmo = await s.convida({ agente: 'bob', email: 'MARIA@x.com' });
-    assert.equal(mesmo.status, 409); assert.match(mesmo.json.erro, /agente ana/);
-    const repetido = await s.convida({ agente: 'ana', email: 'joao@x.com' });
-    assert.equal(repetido.status, 409); assert.match(repetido.json.erro, /deste agente \(ana\)/);
+    assert.equal(mesmo.status, 409); assert.match(mesmo.json.erro, /já é colaborador \(agente ana\)/); assert.match(mesmo.json.erro, /altere os agentes/);
+    const dois = await s.convida({ agentes: ['ana', 'bob'], email: 'rita@x.com', nome: 'Rita' });
+    assert.equal(dois.status, 201, dois.texto); assert.deepEqual(dois.json.colaborador.agentes, ['ana', 'bob']); assert.equal(dois.json.colaborador.agente, 'ana');
+    assert.match(dois.json.convite.texto, /os agentes Ana e Bob/);
+    assert.equal((await s.convida({ agentes: ['ana', 'ana'], email: 'dup@x.com' })).status, 201, 'slug repetido na lista conta uma vez');
+    assert.equal((await s.convida({ agentes: [], email: 'vazio@x.com' })).status, 400);
+    assert.equal((await s.convida({ agentes: ['ana', 'Fantasma!'], email: 'x1@x.com' })).status, 400);
+    assert.equal((await s.convida({ agentes: ['ana', 'admin'], email: 'x2@x.com' })).status, 400);
+    assert.equal((await s.convida({ agentes: ['ana', 'fantasma'], email: 'x3@x.com' })).status, 404);
+    assert.equal((await s.dono.get('/api/v1/colaboradores?agente=ana')).json.colaboradores.length, 4);
+    assert.equal((await s.dono.get('/api/v1/colaboradores?agente=bob')).json.colaboradores.length, 1);
     const adm = await s.convida({ agente: 'admin', email: 'novo@x.com' });
     assert.equal(adm.status, 400); assert.match(adm.json.erro, /Admin nunca pode ser compartilhado/);
     assert.equal((await s.convida({ agente: 'fantasma', email: 'novo@x.com' })).status, 404);
@@ -114,7 +122,7 @@ test('login do colaborador: temporária leva à troca, a API fica fechada até t
     assert.ok((l.headers['set-cookie'] || []).some((x) => /^dgclaw_papel=colaborador/.test(x)));
 
     const eu = await c.get('/api/v1/eu');
-    assert.deepEqual(eu.json, { ok: true, usuario: 'maria@x.com', papel: 'colaborador', agente: 'ana', nome: 'Maria', trocar_senha: true });
+    assert.deepEqual(eu.json, { ok: true, usuario: 'maria@x.com', papel: 'colaborador', agente: 'ana', agentes: ['ana'], nome: 'Maria', trocar_senha: true });
     const ag = await c.get('/api/v1/agents');
     assert.equal(ag.status, 403); assert.equal(ag.json.trocar_senha, true);
     assert.equal(ag.json.erro, 'Troque a senha temporária antes de continuar.');
@@ -400,4 +408,242 @@ test('revogar fecha também o stream aberto da conversa do colaborador', async (
     });
     await fechou;
   } finally { await s.fechar(); }
+});
+
+test('vários agentes: a pessoa usa os dois, não alcança o que não é dela, e editar a lista vale no clique seguinte', async () => {
+  const s = await cenario();
+  try {
+    const r = await s.convida({ agentes: ['ana', 'bob'], email: 'rita@x.com', nome: 'Rita' });
+    assert.equal(r.status, 201, r.texto);
+    const c = cliente(s.t.porta);
+    const l = await c.post('/login', { json: { usuario: 'rita@x.com', senha: r.json.convite.senha_temporaria } });
+    assert.equal(l.status, 200); assert.equal(l.json.destino, '/trocar-senha');
+    const nova = 'senha-da-rita-123';
+    const tr = await c.post('/api/v1/eu/senha', { json: { nova, confirmacao: nova } });
+    assert.equal(tr.status, 200, tr.texto); assert.equal(tr.json.destino, '/a/ana');
+    const eu = await c.get('/api/v1/eu');
+    assert.deepEqual(eu.json.agentes, ['ana', 'bob']); assert.equal(eu.json.agente, 'ana');
+    assert.deepEqual((await c.get('/api/v1/agents')).json.agentes.map((a) => a.id), ['ana', 'bob']);
+    assert.equal((await c.get('/a/bob', { headers: { Accept: 'text/html' } })).status, 200);
+    assert.equal((await c.get('/api/v1/agents/bob/messages')).status, 200);
+    assert.equal((await c.get('/api/v1/agents/ana/messages')).status, 200);
+    assert.equal((await c.get('/api/v1/agents/admin/messages')).status, 403, 'o Admin continua fora');
+    assert.equal((await c.get('/api/v1/media/' + s.idAna)).status, 200, 'mídia da ana');
+    assert.equal((await c.get('/api/v1/media/' + s.idBob)).status, 200, 'mídia do bob');
+    // o cookie do último agente aberto manda para ele; sem cookie, o primeiro da lista
+    c.jar.dgclaw_agente = 'bob';
+    const raiz = await c.get('/', { headers: { Accept: 'text/html' } });
+    delete c.jar.dgclaw_agente;
+    assert.equal(raiz.status, 302); assert.equal(raiz.headers.location, '/a/bob');
+    assert.equal((await c.get('/', { headers: { Accept: 'text/html' } })).headers.location, '/a/ana');
+    // o dono tira o bob: no pedido seguinte o bob fecha e a sessão continua
+    const id = r.json.colaborador.id;
+    const alt = await s.dono.post('/api/v1/colaboradores/' + id, { json: { agentes: ['ana'] } });
+    assert.equal(alt.status, 200, alt.texto); assert.deepEqual(alt.json.colaborador.agentes, ['ana']);
+    assert.equal((await c.get('/api/v1/agents/bob/messages')).status, 403);
+    assert.equal((await c.get('/api/v1/agents/ana/messages')).status, 200, 'a sessão não caiu');
+    assert.equal((await c.get('/api/v1/media/' + s.idBob)).status, 404, 'mídia do agente que saiu some');
+    assert.deepEqual((await c.get('/api/v1/eu')).json.agentes, ['ana']);
+    // põe o bob de volta e muda o nome; lista vazia e agente inexistente são recusados
+    assert.equal((await s.dono.post('/api/v1/colaboradores/' + id, { json: { agentes: ['bob', 'ana'], nome: 'Rita S.' } })).status, 200);
+    assert.deepEqual((await c.get('/api/v1/eu')).json.agentes, ['bob', 'ana']);
+    assert.equal((await c.get('/api/v1/eu')).json.nome, 'Rita S.');
+    assert.equal((await s.dono.post('/api/v1/colaboradores/' + id, { json: { agentes: [] } })).status, 400);
+    assert.equal((await s.dono.post('/api/v1/colaboradores/' + id, { json: { agentes: ['fantasma'] } })).status, 404);
+    assert.equal((await s.dono.post('/api/v1/colaboradores/' + id, { json: { agentes: ['admin'] } })).status, 400);
+    assert.equal((await s.dono.post('/api/v1/colaboradores/' + id, { json: {} })).status, 400);
+    assert.equal((await c.post('/api/v1/colaboradores/' + id, { json: { agentes: ['ana', 'bob'] } })).status, 403, 'o colaborador não altera a si mesmo');
+    // a lista do dono mostra os agentes de cada um e o filtro por agente acha a pessoa nos dois
+    const lista = (await s.dono.get('/api/v1/colaboradores')).json.colaboradores;
+    assert.deepEqual(lista[0].agentes, ['bob', 'ana']); assert.equal(lista[0].agente, 'bob');
+    assert.equal((await s.dono.get('/api/v1/colaboradores?agente=bob')).json.colaboradores.length, 1);
+    const arq = JSON.parse(fs.readFileSync(path.join(s.t.dados, 'colaboradores.json'), 'utf8')).colaboradores[0];
+    assert.deepEqual(arq.agentes, ['bob', 'ana']); assert.equal(arq.agente, 'bob', 'o campo antigo espelha o primeiro');
+    assert.ok(arq.instancias.ana && arq.instancias.bob, 'uma instância por agente');
+  } finally { await s.fechar(); }
+});
+
+test('vários agentes: um agente recriado sai só ele da lista; registro antigo no singular continua valendo', async () => {
+  const s = await cenario();
+  try {
+    const r = await s.convida({ agentes: ['ana', 'bob'], email: 'rita@x.com' });
+    assert.equal(r.status, 201, r.texto);
+    const c = cliente(s.t.porta);
+    assert.equal((await c.post('/login', { json: { usuario: 'rita@x.com', senha: r.json.convite.senha_temporaria } })).status, 200);
+    const nova = 'senha-da-rita-123';
+    assert.equal((await c.post('/api/v1/eu/senha', { json: { nova, confirmacao: nova } })).status, 200);
+    // o bob é removido e recriado com o mesmo nome: o slug volta igual, a instância não (é o que o `dgclaw agente criar`
+    // grava). Não dá para simular apagando e recriando a casa: o sistema de arquivos pode devolver o mesmo inode.
+    const j0 = JSON.parse(fs.readFileSync(s.t.agentesPath, 'utf8'));
+    for (const a of j0.agentes) if (a.slug === 'bob') a.instancia = 'bob-recriado-2';
+    fs.writeFileSync(s.t.agentesPath, JSON.stringify(j0));
+    const depois = new Date(Date.now() + 5000); fs.utimesSync(s.t.agentesPath, depois, depois); // o registro nota a troca
+    assert.equal((await c.get('/api/v1/agents/bob/messages')).status, 403, 'o bob recriado fecha');
+    assert.equal((await c.get('/api/v1/agents/ana/messages')).status, 200, 'a ana continua');
+    assert.deepEqual((await c.get('/api/v1/eu')).json.agentes, ['ana']);
+    // convidar alguém para o bob novo tira o bob dos convites antigos (o registro da rita fica só com a ana)
+    assert.equal((await s.convida({ agentes: ['bob'], email: 'novo@x.com' })).status, 201);
+    const rita = (await s.dono.get('/api/v1/colaboradores')).json.colaboradores.find((x) => x.email === 'rita@x.com');
+    assert.deepEqual(rita.agentes, ['ana']); assert.equal(rita.estado, 'ativo');
+    // um registro gravado no formato antigo (agente/instancia no singular) é lido e vale
+    const arq = path.join(s.t.dados, 'colaboradores.json');
+    const j = JSON.parse(fs.readFileSync(arq, 'utf8'));
+    const antigo = j.colaboradores.find((x) => x.email === 'rita@x.com');
+    delete antigo.agentes; delete antigo.instancias;
+    fs.writeFileSync(arq, JSON.stringify(j));
+    const futuro = new Date(Date.now() + 5000); fs.utimesSync(arq, futuro, futuro);
+    assert.equal((await c.get('/api/v1/agents/ana/messages')).status, 200, 'o registro antigo continua valendo');
+    assert.deepEqual((await c.get('/api/v1/eu')).json.agentes, ['ana']);
+  } finally { await s.fechar(); }
+});
+
+test('colaboradores.json: uma chave alheia na raiz (comentário do dono) sobrevive a convidar, alterar e revogar', async () => {
+  const s = await cenario();
+  try {
+    const arq = path.join(s.t.dados, 'colaboradores.json');
+    fs.mkdirSync(path.dirname(arq), { recursive: true });
+    fs.writeFileSync(arq, JSON.stringify({ versao: 1, comentario: 'anotação do dono', colaboradores: [] }), { mode: 0o600 });
+    const r = await s.convida({ agentes: ['ana'], email: 'maria@x.com' });
+    assert.equal(r.status, 201, r.texto);
+    assert.equal(JSON.parse(fs.readFileSync(arq, 'utf8')).comentario, 'anotação do dono', 'convidar mantém a chave');
+    assert.equal((await s.dono.post('/api/v1/colaboradores/' + r.json.colaborador.id, { json: { agentes: ['bob'] } })).status, 200);
+    assert.equal(JSON.parse(fs.readFileSync(arq, 'utf8')).comentario, 'anotação do dono', 'alterar mantém a chave');
+    assert.equal((await s.dono.pedir('DELETE', '/api/v1/colaboradores/' + r.json.colaborador.id)).status, 200);
+    const j = JSON.parse(fs.readFileSync(arq, 'utf8'));
+    assert.equal(j.comentario, 'anotação do dono', 'revogar mantém a chave');
+    assert.equal(j.versao, 1); assert.equal(j.colaboradores.length, 1);
+  } finally { await s.fechar(); }
+});
+
+test('força bruta por conta do colaborador: IP novo tranca, o IP de onde ele já entrou passa, o dono não é afetado, revogar esquece os IPs', async () => {
+  const s = await cenario();
+  try {
+    const x = await colaboradorAtivo(s); // entrou de 127.0.0.1 (a conexão de teste)
+    const arq = path.join(s.t.dados, 'sessoes.json');
+    assert.ok(JSON.parse(fs.readFileSync(arq, 'utf8')).ips_ok['colab:' + x.id], 'a memória de IPs é por registro');
+    for (let i = 0; i < 20; i += 1) await cliente(s.t.porta).post('/login', { json: { usuario: x.email, senha: 'errada-' + i }, headers: { 'X-Forwarded-For': `203.0.113.${i + 1}` } });
+    assert.equal((await cliente(s.t.porta).post('/login', { json: { usuario: x.email, senha: x.nova }, headers: { 'X-Forwarded-For': '198.51.100.9' } })).status, 429, 'IP novo com a senha certa: espera');
+    assert.equal((await cliente(s.t.porta).post('/login', { json: { usuario: x.email, senha: x.nova } })).status, 200, 'o IP de onde ela já entrou passa');
+    assert.equal((await cliente(s.t.porta).post('/login', { json: { usuario: 'dono', senha: s.t.senha }, headers: { 'X-Forwarded-For': '198.51.100.10' } })).status, 200, 'o dono não é afetado');
+    assert.equal((await s.dono.pedir('DELETE', '/api/v1/colaboradores/' + x.id)).status, 200);
+    assert.equal(JSON.parse(fs.readFileSync(arq, 'utf8')).ips_ok['colab:' + x.id], undefined, 'revogar apaga a memória de IPs do registro');
+  } finally { await s.fechar(); }
+});
+
+test('dois escritores (Web e CLI): a gravação que leu a lista antes de outra mudança é recusada com 409 e a mudança sobrevive', async () => {
+  const { criarColaboradores } = require('../lib/colaboradores');
+  const { gerarHashSenha } = require('../lib/auth');
+  const dir = pastaTemp('colab-corrida');
+  const log = () => {};
+  let segura = null;
+  const lento = () => new Promise((resolve) => { segura = resolve; }); // o scrypt "demorado" da instância A
+  const A = criarColaboradores({ config: { dataDir: dir }, log, gerarHash: () => lento().then(() => 'scrypt$1$1$1$a$b') });
+  const B = criarColaboradores({ config: { dataDir: dir }, log, gerarHash: gerarHashSenha });
+  const inst = { ana: 'i:1' };
+  const maria = await B.criar({ agentes: ['ana'], email: 'maria@x.com', instancias: inst });
+  // A começa a convidar o joão: já leu a lista (com a maria ativa) e está esperando o scrypt
+  const pendente = A.criar({ agentes: ['ana'], email: 'joao@x.com', instancias: inst });
+  await new Promise((r) => setTimeout(r, 30));
+  // enquanto isso B (o outro processo) revoga a maria e grava
+  await B.revogar(maria.registro.id);
+  segura();
+  await assert.rejects(pendente, (e) => e.status === 409 && /mudou enquanto/.test(e.message), 'a gravação de A, feita sobre a lista velha, é recusada');
+  const arq = JSON.parse(fs.readFileSync(path.join(dir, 'colaboradores.json'), 'utf8'));
+  assert.equal(arq.colaboradores.length, 1); assert.ok(arq.colaboradores[0].revogado_em, 'a revogação de B sobreviveu');
+  // A relê e, na segunda tentativa, grava por cima da lista nova
+  const A2 = criarColaboradores({ config: { dataDir: dir }, log, gerarHash: gerarHashSenha });
+  const joao = await A2.criar({ agentes: ['ana'], email: 'joao@x.com', instancias: inst });
+  assert.equal(joao.registro.estado, 'aguardando_primeiro_acesso');
+  const depois = JSON.parse(fs.readFileSync(path.join(dir, 'colaboradores.json'), 'utf8'));
+  assert.equal(depois.colaboradores.length, 2); assert.ok(depois.colaboradores.find((c) => c.email === 'maria@x.com').revogado_em);
+  // a instância A, depois do 409, também relê sozinha
+  assert.equal(A.lista().length, 2);
+  // trava órfã (processo que morreu há mais de 10 s) não trava ninguém e é removida
+  const trava = path.join(dir, 'colaboradores.json.trava');
+  fs.mkdirSync(trava); const antes = new Date(Date.now() - 20000); fs.utimesSync(trava, antes, antes);
+  await B.revogar(joao.registro.id);
+  assert.ok(!fs.existsSync(trava), 'a trava órfã foi removida');
+  assert.ok(JSON.parse(fs.readFileSync(path.join(dir, 'colaboradores.json'), 'utf8')).colaboradores.every((c) => c.revogado_em));
+});
+
+test('dois escritores: uma releitura no meio da transação não faz a gravação passar; mesmo mtime não engana a releitura', async () => {
+  const { criarColaboradores } = require('../lib/colaboradores');
+  const { gerarHashSenha } = require('../lib/auth');
+  const dir = pastaTemp('colab-corrida2');
+  const log = () => {};
+  let segura = null;
+  const lento = () => new Promise((resolve) => { segura = resolve; });
+  const A = criarColaboradores({ config: { dataDir: dir }, log, gerarHash: () => lento().then(() => 'scrypt$1$1$1$a$b') });
+  const B = criarColaboradores({ config: { dataDir: dir }, log, gerarHash: gerarHashSenha });
+  const inst = { ana: 'i:1' };
+  const maria = await B.criar({ agentes: ['ana'], email: 'maria@x.com', instancias: inst });
+  const joao = await B.criar({ agentes: ['ana'], email: 'joao@x.com', instancias: inst });
+  // (1) A reenvia o convite da maria (scrypt lento); B revoga o joão; um pedido qualquer faz A reler no meio
+  const pendente = A.reenviar(maria.registro.id);
+  await new Promise((r) => setTimeout(r, 30));
+  await B.revogar(joao.registro.id);
+  A.porEmailAtivo('maria@x.com'); // a releitura: troca a lista em memória de A
+  segura();
+  await assert.rejects(pendente, (e) => e.status === 409, 'o reenvio sobre o objeto antigo não é dado como gravado');
+  let arq = JSON.parse(fs.readFileSync(path.join(dir, 'colaboradores.json'), 'utf8'));
+  assert.equal(arq.colaboradores.find((c) => c.email === 'maria@x.com').senha_versao, 1, 'a senha temporária antiga continua a que vale');
+  assert.ok(arq.colaboradores.find((c) => c.email === 'joao@x.com').revogado_em, 'a revogação de B sobreviveu');
+  // (2) e-mail duplicado conferido na lista velha: A convida dup@x.com (lento), B convida o mesmo no meio, A relê
+  const dupA = A.criar({ agentes: ['ana'], email: 'dup@x.com', instancias: inst });
+  await new Promise((r) => setTimeout(r, 30));
+  await B.criar({ agentes: ['ana'], email: 'dup@x.com', instancias: inst });
+  A.lista();
+  segura();
+  await assert.rejects(dupA, (e) => e.status === 409);
+  arq = JSON.parse(fs.readFileSync(path.join(dir, 'colaboradores.json'), 'utf8'));
+  assert.equal(arq.colaboradores.filter((c) => c.email === 'dup@x.com' && !c.revogado_em).length, 1, 'um registro ativo só para o e-mail');
+  // (3) gravação de B com o MESMO mtime da anterior (dois tiques iguais): A relê pelo inode/tamanho e não apaga a mudança.
+  // utimes com segundos inteiros, porque Date só guarda milissegundos e o mtimeMs real tem fração (o mtime ficaria diferente).
+  const caminho = path.join(dir, 'colaboradores.json');
+  fs.utimesSync(caminho, 1700000000, 1700000000);
+  const antes = fs.statSync(caminho);
+  A.lista(); // A em dia com o arquivo atual (marca com o mtime fixo)
+  const dup = JSON.parse(fs.readFileSync(caminho, 'utf8')).colaboradores.find((c) => c.email === 'dup@x.com');
+  await B.revogar(dup.id); // a mudança de B
+  fs.utimesSync(caminho, 1700000000, 1700000000); // mesmo mtime de antes: só inode e tamanho denunciam a gravação
+  assert.equal(fs.statSync(caminho).mtimeMs, antes.mtimeMs, 'o mtime é de fato o mesmo');
+  const r = await A.alterar(maria.registro.id, { nome: 'Maria A' }, {}); // A mexe em OUTRO registro
+  assert.equal(r.nome, 'Maria A');
+  arq = JSON.parse(fs.readFileSync(caminho, 'utf8'));
+  assert.ok(arq.colaboradores.find((c) => c.email === 'dup@x.com').revogado_em, 'a revogação de B, com o mesmo mtime, não foi apagada por A');
+  assert.ok(arq.colaboradores.find((c) => c.email === 'joao@x.com').revogado_em, 'a revogação anterior continua');
+  assert.equal(arq.colaboradores.find((c) => c.email === 'maria@x.com').nome, 'Maria A');
+});
+
+test('trava: uma trava nova levada por engano (parecia velha no stat) é devolvida, a gravação espera e sai com 503, sem sobra', async () => {
+  const { criarColaboradores } = require('../lib/colaboradores');
+  const { criarPapeisEditor } = require('../lib/papeis-editor');
+  const { gerarHashSenha } = require('../lib/auth');
+  const dir = pastaTemp('colab-trava-aba');
+  const B = criarColaboradores({ config: { dataDir: dir }, log: () => {}, gerarHash: gerarHashSenha });
+  const maria = await B.criar({ agentes: ['ana'], email: 'maria@x.com', instancias: { ana: 'i:1' } });
+  const arq = path.join(dir, 'colaboradores.json');
+  // a trava é de agora (outro processo acabou de criá-la), mas o PRIMEIRO stat a vê como velha (a janela entre stat e rename)
+  const real = fs.statSync;
+  const enganaUmaVez = (alvo) => { let vezes = 0; fs.statSync = function (p, ...resto) { const st = real.call(fs, p, ...resto); if (String(p) === alvo && vezes++ === 0) return Object.assign(Object.create(Object.getPrototypeOf(st)), st, { mtimeMs: st.mtimeMs - 60000 }); return st; }; };
+  try {
+    fs.mkdirSync(`${arq}.trava`);
+    enganaUmaVez(`${arq}.trava`);
+    const t0 = Date.now();
+    await assert.rejects(B.alterar(maria.registro.id, { nome: 'Maria' }, {}), (e) => e.status === 503, 'a gravação não rouba a trava nova: espera e desiste');
+    assert.ok(Date.now() - t0 >= 1500, 'esperou a janela da trava');
+    assert.ok(fs.existsSync(`${arq}.trava`), 'a trava do outro processo foi devolvida');
+    assert.ok(!fs.readdirSync(dir).some((n) => n.includes('.velha.')), 'nenhuma pasta .velha sobrou');
+    fs.rmdirSync(`${arq}.trava`);
+    assert.equal((await B.alterar(maria.registro.id, { nome: 'Maria' }, {})).nome, 'Maria', 'com a trava solta, grava');
+    // o mesmo no editor de papéis
+    const pap = path.join(dir, 'papeis.json');
+    fs.writeFileSync(pap, JSON.stringify({ versao: 1, pessoas: {}, papeis: {}, agentes: {} }));
+    const editor = criarPapeisEditor({ caminho: pap, log: () => {} });
+    fs.mkdirSync(`${pap}.trava`);
+    enganaUmaVez(`${pap}.trava`);
+    assert.throws(() => editor.editar((b) => { b.comentario = 'x'; }), (e) => e.status === 503);
+    assert.ok(fs.existsSync(`${pap}.trava`) && !fs.readdirSync(dir).some((n) => n.includes('.velha.')));
+    fs.rmdirSync(`${pap}.trava`);
+  } finally { fs.statSync = real; }
 });

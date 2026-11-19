@@ -21,6 +21,7 @@ O endereço do painel é o que o instalador mostrou no fim da instalação. Toda
 | `/manual` | Esta documentação, dentro do painel | Menu ☰, item Manual |
 | `/dados` | Dados por papel: o que cada agente alcança nas fontes de dados, os pedidos de ação que esperam a sua aprovação e os últimos acessos | Menu ☰, grupo Segurança, item Dados. Veja [DADOS-POR-PAPEL.md](../../web/docs/DADOS-POR-PAPEL.md) |
 | `/observabilidade` | Quem leu o quê: resumo, filtros e CSV do log de acesso aos dados, e os sistemas de fora por agente | Menu ☰, grupo Operação, item Observabilidade. Veja [OBSERVABILIDADE.md](../../web/docs/OBSERVABILIDADE.md) |
+| `/acessos` | Acessos dos agentes: edita o arquivo de papéis pelo painel (pessoas, papéis, grupos e o que cada agente alcança de fato) | Menu ☰, grupo Segurança, item Acessos dos agentes. Veja [ACESSOS.md](../../web/docs/ACESSOS.md) |
 | `/colaboradores` | Convite para outra pessoa conversar com um agente | Menu ☰, item Convidar colaborador. Veja [agentes.md](agentes.md) |
 | `/trocar-senha` | O colaborador troca a senha temporária | O colaborador cai aqui no primeiro acesso |
 
