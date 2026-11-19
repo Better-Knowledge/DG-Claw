@@ -98,8 +98,12 @@
     return cred + nomes.map(n => {
       const f = r.ferramentas[n];
       const ops = Object.entries(f.operacoes || {}).map(([o, d]) => esc(o) + (d.acao ? ' (ação)' : '') + ' <small>' + esc(d.escopo) + '</small>').join(', ');
-      const semCred = f.credencial && !(r.credenciais || []).includes(f.credencial) ? ' <span class="dp-erro">· credencial ' + esc(f.credencial) + ' não está no cofre</span>' : '';
-      return '<p class="dp-papel"><code>' + esc(n) + '</code> ' + esc(f.titulo && f.titulo !== n ? f.titulo : '') + ' · ' + esc(f.tipo) + (f.credencial ? ' · credencial ' + esc(f.credencial) : '') + semCred + '<br>' + (ops || 'sem operações') + '</p>';
+      const porEscopo = Object.entries(f.credenciais || {});
+      const nomesCred = (f.credencial ? [f.credencial] : []).concat(porEscopo.map(([, c]) => c));
+      const faltam = nomesCred.filter(c => !(r.credenciais || []).includes(c));
+      const semCred = faltam.length ? ' <span class="dp-erro">· credencial ' + faltam.map(esc).join(', ') + ' não está no cofre</span>' : '';
+      const rotuloCred = (f.credencial ? ' · credencial ' + esc(f.credencial) + (porEscopo.length ? ' (padrão)' : '') : '') + porEscopo.map(([e, c]) => ' · ' + esc(e) + ' → ' + esc(c)).join('');
+      return '<p class="dp-papel"><code>' + esc(n) + '</code> ' + esc(f.titulo && f.titulo !== n ? f.titulo : '') + ' · ' + esc(f.tipo) + rotuloCred + semCred + '<br>' + (ops || 'sem operações') + '</p>';
     }).join('');
   }
 

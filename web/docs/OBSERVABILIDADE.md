@@ -5,7 +5,8 @@ no log de acesso**, sem o conteúdo do dado e sem segredo (`web/docs/DADOS-POR-P
 tela **Observabilidade** (menu ☰, ou `/observabilidade`) lê esse log para o dono:
 
 - **Uso dos dados nos últimos 30 dias**: quantos pedidos, quantos permitidos, negados, aprovações pedidas,
-  executadas, recusadas, falharam; e as contagens por agente, por fonte e por pessoa.
+  executadas, recusadas, falharam; as contagens por agente, por fonte e por pessoa; e **Sistemas de fora,
+  por agente**: qual agente usou qual sistema (CRM, ERP, servidor MCP) com qual escopo.
 - **Quem leu o quê**: linha a linha, com filtros por agente, pessoa, fonte, decisão e período, e o botão
   **Baixar CSV** com as mesmas linhas para a planilha.
 
@@ -15,10 +16,11 @@ tela **Observabilidade** (menu ☰, ou `/observabilidade`) lê esse log para o d
 | --- | --- |
 | `GET /api/v1/dados/log?limit=&agente=&pessoa=&fonte=&decisao=&operacao=&desde=&ate=` | as linhas, mais novas primeiro, até `limit` (padrão 100, máximo 1000); filtros por igualdade exata; datas `AAAA-MM-DD` |
 | `GET /api/v1/dados/log.csv` (mesmos filtros; `limit` padrão 1000) | as linhas em CSV (UTF-8 com BOM, para o Excel abrir certo) |
-| `GET /api/v1/dados/log/resumo?desde=` | contagens por decisão, agente, fonte e pessoa desde a data (padrão: 30 dias), até 100 mil linhas |
+| `GET /api/v1/dados/log/resumo?desde=` | contagens por decisão, agente, fonte, pessoa e `por_agente_sistema` ("agente › sistema (escopo)") desde a data (padrão: 30 dias), até 100 mil linhas |
 
 Os campos de cada linha: `quando, agente, pessoa, papel, fonte, escopo, operacao, acao, decisao, motivo,
-status, itens, bytes, aprovacao, por`. `decisao` é `permitido`, `negado`, `aprovacao` (pedido criado),
+status, itens, bytes, aprovacao, por, credencial` (o **nome** da credencial que a chamada à ferramenta usou,
+nunca o valor). `decisao` é `permitido`, `negado`, `aprovacao` (pedido criado),
 `executada`, `recusada`, `falhou` ou `revogada`.
 
 ## O que a tela responde

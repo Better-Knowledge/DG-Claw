@@ -38,8 +38,29 @@ const METODOS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 const AUTHS = ['bearer', 'cabecalho', 'basico', 'nenhuma'];
 const CLASSIFICACOES = ['publico', 'interno', 'pessoal', 'sensivel'];
 const CAMPOS_RAIZ = ['versao', 'ferramentas', 'comentario'];
-const CAMPOS_COMUNS = ['tipo', 'titulo', 'credencial', 'catalogo', 'operacoes', 'comentario', 'timeout_s'];
-const CAMPOS_POR_TIPO = { api: ['base_url', 'auth'], banco: ['arquivo'], mcp: ['comando', 'args', 'credencial_env', 'env'] };
+const CAMPOS_COMUNS = ['tipo', 'titulo', 'credencial', 'credenciais', 'catalogo', 'operacoes', 'comentario', 'timeout_s'];
+const CAMPOS_POR_TIPO = { api: ['base_url', 'auth', 'cabecalho_agente'], banco: ['arquivo'], mcp: ['comando', 'args', 'credencial_env', 'env', 'env_agente'] };
+// O cabeçalho que leva o slug do agente ao sistema de destino tem de ser PRÓPRIO (X-...) e nunca um que o
+// destino ou um proxy interpretem com efeito colateral (método, origem, IP, autenticação, a própria caixa).
+const RX_CABECALHO_AGENTE = /^X-[A-Za-z0-9-]{1,59}$/;
+// Prefixos e SEGMENTOS (entre hífens) que o cabeçalho do agente não pode ter: identidade confiada por proxy
+// (X-Remote-User, X-WebAuth-User, X-User...), autenticação e segredo (token, key, signature, cookie, session...),
+// proxy e reescrita (X-Forwarded-*, X-Real-IP, X-Rewrite-URL...), troca de método, e os cabeçalhos do próprio DG Claw.
+const CABECALHO_PREFIXOS_PROIBIDOS = /^x-(forwarded(-|$)|http-method|method-override|rewrite-url$|override-url$|host$|scheme$|real-ip$|remote-|webauth-|(cluster-)?client-ip$|originating-ip$|original-|dgclaw-(caixa|proxy|usuario)$|requested-with$|csrf|xsrf|auth)/i;
+const CABECALHO_SEGMENTOS_PROIBIDOS = new Set(['token', 'key', 'secret', 'signature', 'password', 'passwd', 'pwd', 'pass', 'senha', 'cookie', 'session', 'user', 'username', 'userid', 'userinfo', 'uid', 'login', 'principal', 'identity', 'subject', 'consumer', 'email', 'group', 'groups', 'role', 'roles', 'admin', 'root', 'sudo', 'superuser', 'owner', 'impersonate', 'act', 'run', 'auth', 'authorization', 'credential', 'credentials', 'jwt', 'assertion', 'bypass', 'skip', 'internal']);
+// Um segmento colado também conta (X-ApiKey, X-AccessToken, X-ClientSecret): o sufixo de segredo é proibido em qualquer segmento.
+const RX_SEGMENTO_SUFIXO_SEGREDO = /(token|secret|password|passwd|senha|signature|jwt|key)$/;
+function cabecalhoAgenteProibido(nome) {
+  const n = String(nome).toLowerCase();
+  if (CABECALHO_PREFIXOS_PROIBIDOS.test(n)) return true;
+  return n.split('-').some((seg) => CABECALHO_SEGMENTOS_PROIBIDOS.has(seg) || RX_SEGMENTO_SUFIXO_SEGREDO.test(seg));
+}
+// A variável que leva o slug do agente ao servidor MCP tem de ser própria do DG Claw: uma lista negra nunca
+// alcança tudo o que muda como um programa roda (NODE_*, OPENSSL_*, GCONV_PATH, PAGER...).
+// Só DGCLAW_AGENTE ou DGCLAW_AGENTE_SLUG: o prefixo DGCLAW_ é o espaço das variáveis que os programas do próprio
+// DG Claw leem (DGCLAW_RAIZ, DGCLAW_WEB_DATA, e também DGCLAW_AGENTE_ID, que o runner e o monitor usam), e um wrapper
+// que chame um script do projeto não pode recebê-las com o valor que o gateway manda.
+const RX_ENV_AGENTE = /^DGCLAW_AGENTE(_SLUG)?$/;
 const CAMPOS_OP_COMUNS = ['escopo', 'params', 'acao', 'descricao', 'comentario', 'campos', 'max_itens'];
 const CAMPOS_OP_POR_TIPO = { api: ['metodo', 'rota'], banco: ['sql'], mcp: ['tool'] };
 const MAX_FERRAMENTAS = 200;
@@ -132,9 +153,22 @@ function validaFerramentas(bruto) {
       for (const k of Object.keys(f)) if (!aceitos.includes(k)) erros.push(`${onde} (tipo ${f.tipo}) tem o campo desconhecido "${String(k).slice(0, 40)}". Campos aceitos: ${aceitos.join(', ')}.`);
       if (f.titulo !== undefined && !textoCurto(f.titulo, 120)) erros.push(`${onde}.titulo precisa ser um texto de até 120 caracteres.`);
       if (f.credencial !== undefined && f.credencial !== null && (typeof f.credencial !== 'string' || !RX_NOME.test(f.credencial))) erros.push(`${onde}.credencial precisa ser o NOME de uma credencial do cofre de sistemas (a-z, 0-9, _ e -), nunca o valor.`);
+      // Credencial por escopo: { "crm:ler": "crm-leitura", "crm:escrever": "crm-escrita" }. "credencial" vira o padrão
+      // para os escopos que não estão aqui. Assim um escopo mais fraco usa uma chave mais fraca no sistema de destino.
+      const credenciais = {};
+      if (f.credenciais !== undefined) {
+        if (!ehObjeto(f.credenciais) || Object.keys(f.credenciais).length > MAX_OPERACOES) erros.push(`${onde}.credenciais precisa ser um objeto { "<escopo>": "<nome da credencial no cofre>" }.`);
+        else for (const [esc, nomeCred] of Object.entries(f.credenciais)) {
+          if (!RX_ESCOPO.test(esc)) erros.push(`${onde}.credenciais: o escopo "${String(esc).slice(0, 40)}" não vale (formato sistema:nivel).`);
+          else if (typeof nomeCred !== 'string' || !RX_NOME.test(nomeCred)) erros.push(`${onde}.credenciais.${esc} precisa ser o NOME de uma credencial do cofre, nunca o valor.`);
+          else credenciais[esc] = nomeCred;
+        }
+        if (f.tipo === 'banco') erros.push(`${onde}: banco SQLite não usa "credenciais".`);
+      }
       if (f.timeout_s !== undefined && !(Number.isInteger(f.timeout_s) && f.timeout_s >= 1 && f.timeout_s <= TIMEOUT_MAX_S)) erros.push(`${onde}.timeout_s precisa ser um inteiro de 1 a ${TIMEOUT_MAX_S}.`);
       const catalogo = validaCatalogoDaFerramenta(f.catalogo, onde, erros);
-      const norm = { tipo: f.tipo, titulo: typeof f.titulo === 'string' ? f.titulo : nome, credencial: typeof f.credencial === 'string' ? f.credencial : null, timeout_s: f.timeout_s || TIMEOUT_PADRAO_S, catalogo, operacoes: {} };
+      const norm = { tipo: f.tipo, titulo: typeof f.titulo === 'string' ? f.titulo : nome, credencial: typeof f.credencial === 'string' ? f.credencial : null, credenciais, timeout_s: f.timeout_s || TIMEOUT_PADRAO_S, catalogo, operacoes: {} };
+      const temAlgumaCredencial = !!norm.credencial || Object.keys(credenciais).length > 0;
       if (f.tipo === 'api') {
         let u = null;
         try { u = new URL(f.base_url); } catch (_) { u = null; }
@@ -146,10 +180,13 @@ function validaFerramentas(bruto) {
         else {
           for (const k of Object.keys(a)) if (!['tipo', 'nome'].includes(k)) erros.push(`${onde}.auth tem o campo desconhecido "${String(k).slice(0, 40)}".`);
           if (a.tipo === 'cabecalho' && (typeof a.nome !== 'string' || !/^[A-Za-z][A-Za-z0-9-]{0,60}$/.test(a.nome))) erros.push(`${onde}.auth do tipo "cabecalho" precisa de "nome" (o nome do cabeçalho, ex.: X-Api-Key).`);
-          if (a.tipo !== 'nenhuma' && !norm.credencial) erros.push(`${onde}.auth do tipo "${a.tipo}" exige "credencial".`);
-          if (a.tipo === 'nenhuma' && norm.credencial) erros.push(`${onde}: auth "nenhuma" com "credencial" não faz sentido.`);
+          if (a.tipo !== 'nenhuma' && !temAlgumaCredencial) erros.push(`${onde}.auth do tipo "${a.tipo}" exige "credencial" (ou "credenciais" por escopo).`);
+          if (a.tipo === 'nenhuma' && temAlgumaCredencial) erros.push(`${onde}: auth "nenhuma" com "credencial" não faz sentido.`);
         }
         norm.auth = ehObjeto(a) ? { tipo: a.tipo, nome: a.nome || null } : { tipo: 'nenhuma', nome: null };
+        // O sistema de destino pode saber qual agente chamou: o gateway manda o slug neste cabeçalho (nunca a credencial).
+        if (f.cabecalho_agente !== undefined && (typeof f.cabecalho_agente !== 'string' || !RX_CABECALHO_AGENTE.test(f.cabecalho_agente) || cabecalhoAgenteProibido(f.cabecalho_agente) || (norm.auth.nome && f.cabecalho_agente.toLowerCase() === norm.auth.nome.toLowerCase()))) erros.push(`${onde}.cabecalho_agente precisa ser o nome de um cabeçalho HTTP próprio, começando por X- (ex.: X-DGClaw-Agente), que não seja de autenticação, de proxy (X-Forwarded-*, X-Real-IP) nem de troca de método (X-HTTP-Method-Override), e sem um pedaço como token, key, user, email, session ou cookie no nome (X-Session-Id e X-ApiKey não servem).`);
+        norm.cabecalho_agente = typeof f.cabecalho_agente === 'string' ? f.cabecalho_agente : null;
       }
       if (f.tipo === 'banco') {
         if (typeof f.arquivo !== 'string' || !path.isAbsolute(f.arquivo) || f.arquivo.includes('..') || /[\u0000-\u001f]/.test(f.arquivo) || !/\.(sqlite|sqlite3|db)$/.test(f.arquivo)) erros.push(`${onde}.arquivo precisa ser o caminho absoluto de um arquivo .sqlite, .sqlite3 ou .db.`);
@@ -160,11 +197,12 @@ function validaFerramentas(bruto) {
         if (typeof f.comando !== 'string' || !path.isAbsolute(f.comando) || /[\s\u0000-\u001f]/.test(f.comando)) erros.push(`${onde}.comando precisa ser o caminho absoluto do programa do servidor MCP (sem espaços).`);
         if (f.args !== undefined && (!Array.isArray(f.args) || f.args.length > 30 || f.args.some((x) => typeof x !== 'string' || x.length > 300 || /[\u0000-\u001f]/.test(x)))) erros.push(`${onde}.args precisa ser uma lista de até 30 textos.`);
         if (f.credencial_env !== undefined && (typeof f.credencial_env !== 'string' || !RX_ENV.test(f.credencial_env))) erros.push(`${onde}.credencial_env precisa ser o nome de uma variável de ambiente (MAIÚSCULAS).`);
-        if (norm.credencial && !f.credencial_env) erros.push(`${onde}: com "credencial", diga em qual variável ela vai ("credencial_env").`);
+        if (temAlgumaCredencial && !f.credencial_env) erros.push(`${onde}: com "credencial" (ou "credenciais"), diga em qual variável ela vai ("credencial_env").`);
+        if (f.env_agente !== undefined && (typeof f.env_agente !== 'string' || !RX_ENV_AGENTE.test(f.env_agente) || f.env_agente === f.credencial_env || (ehObjeto(f.env) && Object.prototype.hasOwnProperty.call(f.env, f.env_agente)))) erros.push(`${onde}.env_agente precisa ser DGCLAW_AGENTE ou DGCLAW_AGENTE_SLUG, diferente de credencial_env e das chaves de "env".`);
         if (f.env !== undefined && (!ehObjeto(f.env) || Object.keys(f.env).length > 20 || Object.entries(f.env).some(([k, v]) => !RX_ENV.test(k) || typeof v !== 'string' || v.length > 300 || /[\u0000-\u001f]/.test(v)))) erros.push(`${onde}.env precisa ser um objeto { "VAR": "valor" } com até 20 itens.`);
         else if (f.env && f.credencial_env && Object.prototype.hasOwnProperty.call(f.env, f.credencial_env)) erros.push(`${onde}.env não pode definir ${f.credencial_env}: a credencial vem do cofre de sistemas.`);
         if (f.env && Object.keys(f.env).some((k) => /(TOKEN|SECRET|KEY|PASSWORD|SENHA)/.test(k))) erros.push(`${onde}.env parece ter um segredo (TOKEN, KEY, SECRET...). Segredo vai para o cofre de sistemas, não para o catálogo.`);
-        norm.comando = f.comando; norm.args = f.args || []; norm.credencial_env = f.credencial_env || null; norm.env = f.env || {};
+        norm.comando = f.comando; norm.args = f.args || []; norm.credencial_env = f.credencial_env || null; norm.env = f.env || {}; norm.env_agente = f.env_agente || null;
       }
       const bo = f.operacoes === undefined ? {} : f.operacoes;
       if (!ehObjeto(bo)) erros.push(`${onde}.operacoes precisa ser um objeto { "<operacao>": {...} }.`);
@@ -175,6 +213,11 @@ function validaFerramentas(bruto) {
           if (n) norm.operacoes[nomeOp] = n;
         }
       }
+      // Com credenciais por escopo e sem padrão, todo escopo usado precisa de uma; senão a operação não teria chave.
+      if (Object.keys(credenciais).length && !norm.credencial) {
+        for (const [nomeOp, op] of Object.entries(norm.operacoes)) if (!credenciais[op.escopo]) erros.push(`${onde}.operacoes.${nomeOp}: o escopo "${op.escopo}" não tem credencial em "credenciais" e não há "credencial" padrão.`);
+      }
+      for (const esc of Object.keys(credenciais)) if (!Object.values(norm.operacoes).some((op) => op.escopo === esc)) erros.push(`${onde}.credenciais cita o escopo "${esc}", que nenhuma operação usa.`);
       ferramentas[nome] = norm;
     }
   }
